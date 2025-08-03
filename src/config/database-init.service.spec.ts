@@ -61,7 +61,6 @@ describe('DatabaseInitService', () => {
             mockDataSource.query.mockRejectedValue(new Error('Connection failed'));
 
             const result = await service.healthCheck();
-
             expect(result).toBe(false);
             expect(mockDataSource.query).toHaveBeenCalledWith('SELECT 1');
         });

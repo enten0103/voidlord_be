@@ -2,6 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { User } from '../src/entities/user.entity';
+import { Book } from '../src/entities/book.entity';
+import { Tag } from '../src/entities/tag.entity';
+import { UsersModule } from '../src/users/users.module';
+import { AuthModule } from '../src/auth/auth.module';
+import { BooksModule } from '../src/books/books.module';
 
 export async function createTestModule(): Promise<TestingModule> {
     return Test.createTestingModule({
@@ -13,15 +18,18 @@ export async function createTestModule(): Promise<TestingModule> {
             TypeOrmModule.forRoot({
                 type: 'postgres',
                 host: process.env.DB_HOST || 'localhost',
-                port: parseInt(process.env.DB_PORT || '5432'),
+                port: parseInt(process.env.DB_PORT || '5433'),
                 username: process.env.DB_USERNAME || 'postgres',
                 password: process.env.DB_PASSWORD || 'postgres',
                 database: process.env.DB_NAME || 'voidlord_test',
-                entities: [User],
+                entities: [User, Book, Tag],
                 synchronize: true,
                 dropSchema: true, // 每次测试都重新创建数据库结构
             }),
-            TypeOrmModule.forFeature([User]),
+            TypeOrmModule.forFeature([User, Book, Tag]),
+            UsersModule,
+            AuthModule,
+            BooksModule,
         ],
     }).compile();
 }

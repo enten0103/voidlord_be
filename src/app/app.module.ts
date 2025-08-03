@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
+import { BooksModule } from '../books/books.module';
 import { DatabaseConfig } from '../config/database.config';
 import { DatabaseInitService } from '../config/database-init.service';
 
@@ -18,6 +19,7 @@ import { DatabaseInitService } from '../config/database-init.service';
     }),
     UsersModule,
     AuthModule,
+    BooksModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

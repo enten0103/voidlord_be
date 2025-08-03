@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 开发数据库
   postgres:
     image: postgres:15
     container_name: voidlord-postgres
@@ -19,5 +20,25 @@ services:
       timeout: 10s
       retries: 3
 
+  # 测试数据库
+  postgres-test:
+    image: postgres:15
+    container_name: voidlord-postgres-test
+    restart: always
+    environment:
+      POSTGRES_DB: voidlord_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"  # 使用不同的端口避免冲突
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   postgres_data:
+  postgres_test_data:

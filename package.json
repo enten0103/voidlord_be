@@ -20,7 +20,11 @@
     "test:e2e": "jest --config ./jest-e2e.json",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "docker:dev": "docker-compose up -d postgres",
+    "docker:test": "docker-compose up -d postgres-test",
+    "docker:restart": "docker-compose down && docker-compose up -d",
+    "docker:clean": "docker-compose down -v"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
