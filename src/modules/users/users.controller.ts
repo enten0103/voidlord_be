@@ -15,7 +15,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 
 @ApiTags('users')
 @Controller('users')
@@ -37,7 +37,7 @@ export class UsersController {
 
     @Get()
     @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth()
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Get all users' })
     @ApiResponse({
         status: 200,
@@ -50,7 +50,7 @@ export class UsersController {
 
     @Get(':id')
     @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth()
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Get user by ID' })
     @ApiResponse({
         status: 200,
@@ -64,7 +64,7 @@ export class UsersController {
 
     @Patch(':id')
     @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth()
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Update user' })
     @ApiResponse({
         status: 200,
@@ -78,7 +78,7 @@ export class UsersController {
 
     @Delete(':id')
     @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth()
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Delete user' })
     @ApiResponse({ status: 200, description: 'User deleted successfully' })
     @ApiResponse({ status: 404, description: 'User not found' })

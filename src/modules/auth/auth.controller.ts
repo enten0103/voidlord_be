@@ -1,13 +1,13 @@
 import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CreateUserDto } from '../users/dto/create-user.dto';
-import { UsersService } from '../users/users.service';
+import { CreateUserDto } from '../../users/dto/create-user.dto';
+import { UsersService } from '../../users/users.service';
 import { AuthService } from './auth.service';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
-import type { RequestWithUser } from '../types/request.interface';
+import type { RequestWithUser } from '../../types/request.interface';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -45,7 +45,7 @@ export class AuthController {
 
     @UseGuards(JwtAuthGuard)
     @Get('profile')
-    @ApiBearerAuth()
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Get user profile' })
     @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -55,7 +55,7 @@ export class AuthController {
 
     @UseGuards(JwtAuthGuard)
     @Get('protected')
-    @ApiBearerAuth()
+    @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Protected route example' })
     @ApiResponse({ status: 200, description: 'Access granted' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })

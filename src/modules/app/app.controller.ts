@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
-import { DatabaseInitService } from '../config/database-init.service';
+import { DatabaseInitService } from '../../config/database-init.service';
 
 @ApiTags('app')
 @Controller()

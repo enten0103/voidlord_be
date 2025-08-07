@@ -327,6 +327,206 @@ describe('Books (e2e)', () => {
         });
     });
 
+    describe('/books/search (POST)', () => {
+        let bookId1: number;
+        let bookId2: number;
+        let bookId3: number;
+
+        beforeEach(async () => {
+            // 清理数据 - 使用级联删除
+            const books = await bookRepository.find();
+            if (books.length > 0) {
+                await bookRepository.remove(books);
+            }
+
+            const tags = await tagRepository.find();
+            if (tags.length > 0) {
+                await tagRepository.remove(tags);
+            }
+
+            // 创建测试数据
+            const book1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'search-book-1',
+                    title: 'Science Fiction Book',
+                    description: 'A sci-fi book',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' },
+                        { key: 'year', value: '1950' }
+                    ]
+                });
+            bookId1 = book1.body.id;
+
+            const book2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'search-book-2',
+                    title: 'Fantasy Novel',
+                    description: 'A fantasy book',
+                    tags: [
+                        { key: 'author', value: 'J.R.R. Tolkien' },
+                        { key: 'genre', value: 'Fantasy' },
+                        { key: 'year', value: '1954' }
+                    ]
+                });
+            bookId2 = book2.body.id;
+
+            const book3 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'search-book-3',
+                    title: 'Another Sci-Fi',
+                    description: 'Another sci-fi book',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' },
+                        { key: 'year', value: '1951' }
+                    ]
+                });
+            bookId3 = book3.body.id;
+        });
+
+        it('should search books by tag keys', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagKeys: 'author,genre'
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(3);
+            expect(response.body.map((book: any) => book.id).sort()).toEqual([bookId1, bookId2, bookId3].sort());
+        });
+
+        it('should search books by specific tag key-value pair', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagKey: 'author',
+                    tagValue: 'Isaac Asimov'
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(2);
+            expect(response.body.map((book: any) => book.id).sort()).toEqual([bookId1, bookId3].sort());
+        });
+
+        it('should search books by multiple tag filters', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagFilters: [
+                        { key: 'genre', value: 'Fantasy' },
+                        { key: 'year', value: '1950' }
+                    ]
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(2);
+            expect(response.body.map((book: any) => book.id).sort()).toEqual([bookId1, bookId2].sort());
+        });
+
+        it('should return all books when no search criteria provided', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({})
+                .expect(201);
+
+            expect(response.body).toHaveLength(3);
+        });
+
+        it('should return empty array when no books match criteria', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagKey: 'author',
+                    tagValue: 'Nonexistent Author'
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(0);
+        });
+    });
+
+    describe('/books/tags/:key/:value (GET)', () => {
+        let bookId1: number;
+        let bookId2: number;
+
+        beforeEach(async () => {
+            // 清理数据 - 使用级联删除
+            const books = await bookRepository.find();
+            if (books.length > 0) {
+                await bookRepository.remove(books);
+            }
+
+            const tags = await tagRepository.find();
+            if (tags.length > 0) {
+                await tagRepository.remove(tags);
+            }
+
+            // 创建测试数据
+            const book1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tag-search-1',
+                    title: 'Book by Asimov',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' }
+                    ]
+                });
+            bookId1 = book1.body.id;
+
+            const book2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tag-search-2',
+                    title: 'Another Asimov Book',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' }
+                    ]
+                });
+            bookId2 = book2.body.id;
+        });
+
+        it('should return books with specific tag key-value pair', async () => {
+            const response = await request(app.getHttpServer())
+                .get('/books/tags/author/Isaac%20Asimov')
+                .expect(200);
+
+            expect(response.body).toHaveLength(2);
+            expect(response.body.map((book: any) => book.id).sort()).toEqual([bookId1, bookId2].sort());
+
+            response.body.forEach((book: any) => {
+                expect(book.tags.some((tag: any) => tag.key === 'author' && tag.value === 'Isaac Asimov')).toBe(true);
+            });
+        });
+
+        it('should return empty array when no books match the tag', async () => {
+            const response = await request(app.getHttpServer())
+                .get('/books/tags/author/Nonexistent%20Author')
+                .expect(200);
+
+            expect(response.body).toHaveLength(0);
+        });
+
+        it('should handle URL encoded values correctly', async () => {
+            const response = await request(app.getHttpServer())
+                .get('/books/tags/genre/Science%20Fiction')
+                .expect(200);
+
+            expect(response.body).toHaveLength(2);
+        });
+    });
+
     describe('/books/:id (DELETE)', () => {
         let bookId: number;
 
@@ -361,6 +561,282 @@ describe('Books (e2e)', () => {
                 .delete('/books/999999')
                 .set('Authorization', `Bearer ${authToken}`)
                 .expect(404);
+        });
+    });
+
+    describe('/books/tag-id/:id (GET)', () => {
+        let bookId1: number;
+        let bookId2: number;
+        let tagId: number;
+
+        beforeEach(async () => {
+            // 清理数据 - 使用级联删除
+            const books = await bookRepository.find();
+            if (books.length > 0) {
+                await bookRepository.remove(books);
+            }
+
+            const tags = await tagRepository.find();
+            if (tags.length > 0) {
+                await tagRepository.remove(tags);
+            }
+
+            // 创建测试数据
+            const book1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tagid-search-1',
+                    title: 'Book with Author Tag',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' }
+                    ]
+                });
+            bookId1 = book1.body.id;
+
+            const book2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tagid-search-2',
+                    title: 'Another Book with Author Tag',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Fantasy' }
+                    ]
+                });
+            bookId2 = book2.body.id;
+
+            // 获取author tag的ID
+            const authorTag = await tagRepository.findOne({ where: { key: 'author', value: 'Isaac Asimov' } });
+            if (!authorTag) {
+                throw new Error('Author tag not found');
+            }
+            tagId = authorTag.id;
+        });
+
+        it('should return books by tag ID', async () => {
+            const response = await request(app.getHttpServer())
+                .get(`/books/tag-id/${tagId}`)
+                .expect(200);
+
+            expect(response.body).toHaveLength(2);
+            expect(response.body.map((book: any) => book.id).sort()).toEqual([bookId1, bookId2].sort());
+            expect(response.body[0]).toHaveProperty('tags');
+        });
+
+        it('should return empty array for non-existent tag ID', async () => {
+            const response = await request(app.getHttpServer())
+                .get('/books/tag-id/999999')
+                .expect(200);
+
+            expect(response.body).toHaveLength(0);
+        });
+
+        it('should return 400 for invalid tag ID', async () => {
+            await request(app.getHttpServer())
+                .get('/books/tag-id/invalid')
+                .expect(400);
+        });
+
+        it('should return 400 for negative tag ID', async () => {
+            await request(app.getHttpServer())
+                .get('/books/tag-id/-1')
+                .expect(400);
+        });
+    });
+
+    describe('/books/tag-ids/:ids (GET)', () => {
+        let bookId1: number;
+        let bookId2: number;
+        let bookId3: number;
+        let authorTagId: number;
+        let genreTagId: number;
+
+        beforeEach(async () => {
+            // 清理数据 - 使用级联删除
+            const books = await bookRepository.find();
+            if (books.length > 0) {
+                await bookRepository.remove(books);
+            }
+
+            const tags = await tagRepository.find();
+            if (tags.length > 0) {
+                await tagRepository.remove(tags);
+            }
+
+            // 创建测试数据
+            const book1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tagids-search-1',
+                    title: 'Sci-Fi Book',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' }
+                    ]
+                });
+            bookId1 = book1.body.id;
+
+            const book2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tagids-search-2',
+                    title: 'Fantasy Book',
+                    tags: [
+                        { key: 'author', value: 'J.R.R. Tolkien' },
+                        { key: 'genre', value: 'Science Fiction' }
+                    ]
+                });
+            bookId2 = book2.body.id;
+
+            const book3 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'tagids-search-3',
+                    title: 'Another Asimov Book',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Fantasy' }
+                    ]
+                });
+            bookId3 = book3.body.id;
+
+            // 获取tag IDs
+            const authorTag = await tagRepository.findOne({ where: { key: 'author', value: 'Isaac Asimov' } });
+            const genreTag = await tagRepository.findOne({ where: { key: 'genre', value: 'Science Fiction' } });
+            if (!authorTag || !genreTag) {
+                throw new Error('Required tags not found');
+            }
+            authorTagId = authorTag.id;
+            genreTagId = genreTag.id;
+        });
+
+        it('should return books by multiple tag IDs', async () => {
+            const response = await request(app.getHttpServer())
+                .get(`/books/tag-ids/${authorTagId},${genreTagId}`)
+                .expect(200);
+
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0].id).toBe(bookId1);
+        });
+
+        it('should filter out invalid tag IDs', async () => {
+            const response = await request(app.getHttpServer())
+                .get(`/books/tag-ids/${authorTagId},invalid,${genreTagId},0`)
+                .expect(200);
+
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0].id).toBe(bookId1);
+        });
+
+        it('should return 400 when no valid tag IDs provided', async () => {
+            await request(app.getHttpServer())
+                .get('/books/tag-ids/invalid,0,-1')
+                .expect(400);
+        });
+
+        it('should return empty array for non-existent tag IDs', async () => {
+            const response = await request(app.getHttpServer())
+                .get('/books/tag-ids/999999,888888')
+                .expect(200);
+
+            expect(response.body).toHaveLength(0);
+        });
+    });
+
+    describe('/books/search (POST) with tag IDs', () => {
+        let bookId1: number;
+        let bookId2: number;
+        let authorTagId: number;
+        let genreTagId: number;
+
+        beforeEach(async () => {
+            // 清理数据 - 使用级联删除
+            const books = await bookRepository.find();
+            if (books.length > 0) {
+                await bookRepository.remove(books);
+            }
+
+            const tags = await tagRepository.find();
+            if (tags.length > 0) {
+                await tagRepository.remove(tags);
+            }
+
+            // 创建测试数据
+            const book1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'search-tagids-1',
+                    title: 'Tagged Book 1',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Science Fiction' }
+                    ]
+                });
+            bookId1 = book1.body.id;
+
+            const book2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    hash: 'search-tagids-2',
+                    title: 'Tagged Book 2',
+                    tags: [
+                        { key: 'author', value: 'Isaac Asimov' },
+                        { key: 'genre', value: 'Fantasy' }
+                    ]
+                });
+            bookId2 = book2.body.id;
+
+            // 获取tag IDs
+            const authorTag = await tagRepository.findOne({ where: { key: 'author', value: 'Isaac Asimov' } });
+            const genreTag = await tagRepository.findOne({ where: { key: 'genre', value: 'Science Fiction' } });
+            if (!authorTag || !genreTag) {
+                throw new Error('Required tags not found');
+            }
+            authorTagId = authorTag.id;
+            genreTagId = genreTag.id;
+        });
+
+        it('should search books by single tag ID', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagId: authorTagId
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(2);
+            expect(response.body.map((book: any) => book.id).sort()).toEqual([bookId1, bookId2].sort());
+        });
+
+        it('should search books by multiple tag IDs', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagIds: `${authorTagId},${genreTagId}`
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0].id).toBe(bookId1);
+        });
+
+        it('should return empty array for non-existent tag ID', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/books/search')
+                .send({
+                    tagId: 999999
+                })
+                .expect(201);
+
+            expect(response.body).toHaveLength(0);
         });
     });
 });

@@ -207,6 +207,7 @@ describe('BooksService', () => {
             const mockQueryBuilder = {
                 leftJoinAndSelect: jest.fn().mockReturnThis(),
                 where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
                 getMany: jest.fn().mockResolvedValue([mockBook]),
             };
 
@@ -218,6 +219,107 @@ describe('BooksService', () => {
             expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith('book');
             expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('book.tags', 'tag');
             expect(mockQueryBuilder.where).toHaveBeenCalledWith('tag.key IN (:...tagKeys)', { tagKeys: ['author', 'genre'] });
+            expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
+        });
+    });
+
+    describe('findByTagKeyValue', () => {
+        it('should return books filtered by specific tag key-value pair', async () => {
+            const mockQueryBuilder = {
+                leftJoinAndSelect: jest.fn().mockReturnThis(),
+                where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                getMany: jest.fn().mockResolvedValue([mockBook]),
+            };
+
+            mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+            const result = await service.findByTagKeyValue('author', 'John Doe');
+
+            expect(result).toEqual([mockBook]);
+            expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith('book');
+            expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('book.tags', 'tag');
+            expect(mockQueryBuilder.where).toHaveBeenCalledWith('tag.key = :key AND tag.value = :value', { key: 'author', value: 'John Doe' });
+            expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
+        });
+    });
+
+    describe('findByMultipleTagValues', () => {
+        it('should return books filtered by multiple tag key-value pairs', async () => {
+            const mockQueryBuilder = {
+                leftJoinAndSelect: jest.fn().mockReturnThis(),
+                where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                getMany: jest.fn().mockResolvedValue([mockBook]),
+            };
+
+            mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+            const tagFilters = [
+                { key: 'author', value: 'John Doe' },
+                { key: 'genre', value: 'Fiction' }
+            ];
+
+            const result = await service.findByMultipleTagValues(tagFilters);
+
+            expect(result).toEqual([mockBook]);
+            expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith('book');
+            expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('book.tags', 'tag');
+            expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+                '(tag.key = :key0 AND tag.value = :value0) OR (tag.key = :key1 AND tag.value = :value1)',
+                { key0: 'author', value0: 'John Doe', key1: 'genre', value1: 'Fiction' }
+            );
+            expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
+        });
+    });
+
+    describe('findByTagId', () => {
+        it('should return books filtered by tag ID', async () => {
+            const mockQueryBuilder = {
+                leftJoinAndSelect: jest.fn().mockReturnThis(),
+                where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                getMany: jest.fn().mockResolvedValue([mockBook]),
+            };
+
+            mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+            const result = await service.findByTagId(1);
+
+            expect(result).toEqual([mockBook]);
+            expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith('book');
+            expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('book.tags', 'tag');
+            expect(mockQueryBuilder.where).toHaveBeenCalledWith('tag.id = :tagId', { tagId: 1 });
+            expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
+        });
+    });
+
+    describe('findByTagIds', () => {
+        it('should return books filtered by multiple tag IDs', async () => {
+            const mockQueryBuilder = {
+                leftJoinAndSelect: jest.fn().mockReturnThis(),
+                where: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                getMany: jest.fn().mockResolvedValue([mockBook]),
+            };
+
+            mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+            const result = await service.findByTagIds([1, 2, 3]);
+
+            expect(result).toEqual([mockBook]);
+            expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith('book');
+            expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('book.tags', 'tag');
+            expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+                'book.id IN (' +
+                'SELECT bt.book_id FROM book_tags bt ' +
+                'WHERE bt.tag_id IN (:...tagIds) ' +
+                'GROUP BY bt.book_id ' +
+                'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
+                ')',
+                { tagIds: [1, 2, 3], tagCount: 3 }
+            );
+            expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
         });
     });
 });

@@ -202,16 +202,6 @@ const books = await fetch('/books?tags=genre').then(r => r.json());
 const book = await fetch('/books/hash/sci-fi-001').then(r => r.json());
 ```
 
-## 🔧 扩展功能建议
-
-1. **搜索功能**: 添加全文搜索支持
-2. **分页**: 添加分页查询参数
-3. **排序**: 支持多种排序方式
-4. **图书封面**: 添加图片存储功能
-5. **批量操作**: 支持批量创建/更新/删除
-6. **标签管理**: 独立的标签管理 API
-7. **统计功能**: 图书和标签的统计信息
-
 ## 🏃‍♂️ 快速开始
 
 1. 确保 PostgreSQL 数据库运行

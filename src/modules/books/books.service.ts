@@ -113,6 +113,60 @@ export class BooksService {
             .createQueryBuilder('book')
             .leftJoinAndSelect('book.tags', 'tag')
             .where('tag.key IN (:...tagKeys)', { tagKeys })
+            .orderBy('book.created_at', 'DESC')
+            .getMany();
+    }
+
+    async findByTagKeyValue(key: string, value: string): Promise<Book[]> {
+        return this.bookRepository
+            .createQueryBuilder('book')
+            .leftJoinAndSelect('book.tags', 'tag')
+            .where('tag.key = :key AND tag.value = :value', { key, value })
+            .orderBy('book.created_at', 'DESC')
+            .getMany();
+    }
+
+    async findByMultipleTagValues(tagFilters: { key: string; value: string }[]): Promise<Book[]> {
+        const queryBuilder = this.bookRepository
+            .createQueryBuilder('book')
+            .leftJoinAndSelect('book.tags', 'tag');
+
+        const conditions = tagFilters.map((filter, index) =>
+            `(tag.key = :key${index} AND tag.value = :value${index})`
+        ).join(' OR ');
+
+        const parameters = tagFilters.reduce((params, filter, index) => {
+            params[`key${index}`] = filter.key;
+            params[`value${index}`] = filter.value;
+            return params;
+        }, {} as any);
+
+        return queryBuilder
+            .where(conditions, parameters)
+            .orderBy('book.created_at', 'DESC')
+            .getMany();
+    }
+
+    async findByTagId(tagId: number): Promise<Book[]> {
+        return this.bookRepository
+            .createQueryBuilder('book')
+            .leftJoinAndSelect('book.tags', 'tag')
+            .where('tag.id = :tagId', { tagId })
+            .orderBy('book.created_at', 'DESC')
+            .getMany();
+    }
+
+    async findByTagIds(tagIds: number[]): Promise<Book[]> {
+        return this.bookRepository
+            .createQueryBuilder('book')
+            .leftJoinAndSelect('book.tags', 'tag')
+            .where('book.id IN (' +
+                'SELECT bt.book_id FROM book_tags bt ' +
+                'WHERE bt.tag_id IN (:...tagIds) ' +
+                'GROUP BY bt.book_id ' +
+                'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
+                ')', { tagIds, tagCount: tagIds.length })
+            .orderBy('book.created_at', 'DESC')
             .getMany();
     }
 

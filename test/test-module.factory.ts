@@ -5,7 +5,7 @@ import { User } from '../src/entities/user.entity';
 import { Book } from '../src/entities/book.entity';
 import { Tag } from '../src/entities/tag.entity';
 import { UsersModule } from '../src/users/users.module';
-import { AuthModule } from '../src/auth/auth.module';
+import { AuthModule } from '../src/modules/auth/auth.module';
 import { BooksModule } from '../src/books/books.module';
 
 export async function createTestModule(): Promise<TestingModule> {
