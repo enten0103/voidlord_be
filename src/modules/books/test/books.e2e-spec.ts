@@ -3,11 +3,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { Repository, DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { createTestModule } from './test-module.factory';
-import { Book } from '../src/entities/book.entity';
-import { Tag } from '../src/entities/tag.entity';
-import { User } from '../src/entities/user.entity';
-import { grantPermissions } from './permissions.seed';
+import { createTestModule } from '../../../../test/test-module.factory';
+import { Book } from '../../../entities/book.entity';
+import { Tag } from '../../../entities/tag.entity';
+import { User } from '../../../entities/user.entity';
+import { grantPermissions } from '../../permissions/test/permissions.seed';
 
 describe('Books (e2e)', () => {
     let app: INestApplication;

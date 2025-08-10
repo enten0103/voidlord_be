@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { UsersService } from '../users.service';
+import { CreateUserDto } from '../dto/create-user.dto';
 import * as bcrypt from 'bcryptjs';
-import { User } from '../../entities/user.entity';
+import { User } from '../../../entities/user.entity';
 
 jest.mock('bcryptjs');
 

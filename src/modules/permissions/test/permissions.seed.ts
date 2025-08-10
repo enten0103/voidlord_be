@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
-import { Permission } from '../src/entities/permission.entity';
-import { UserPermission } from '../src/entities/user-permission.entity';
-import { User } from '../src/entities/user.entity';
+import { Permission } from '../../../entities/permission.entity';
+import { UserPermission } from '../../../entities/user-permission.entity';
+import { User } from '../../../entities/user.entity';
 
 /**
  * Ensure a Permission row exists (idempotent)

@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PermissionsService } from './permissions.service';
+import { PermissionsService } from '../permissions.service';
 import { DataSource, Repository } from 'typeorm';
-import { Permission } from '../../entities/permission.entity';
-import { User } from '../../entities/user.entity';
-import { UserPermission } from '../../entities/user-permission.entity';
+import { Permission } from '../../../entities/permission.entity';
+import { User } from '../../../entities/user.entity';
+import { UserPermission } from '../../../entities/user-permission.entity';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 // Helper to create a mocked repository with only used methods

@@ -1,12 +1,12 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppModule } from '../src/modules/app/app.module';
+import { AppModule } from '../../app/app.module';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from '../src/entities/user.entity';
-import { Permission } from '../src/entities/permission.entity';
-import { UserPermission } from '../src/entities/user-permission.entity';
+import { User } from '../../../entities/user.entity';
+import { Permission } from '../../../entities/permission.entity';
+import { UserPermission } from '../../../entities/user-permission.entity';
 
 /**
  * E2E 场景:

@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
-import { PermissionGuard } from '../auth/guards/permission.guard';
+import { UsersController } from '../users.controller';
+import { UsersService } from '../users.service';
+import { PermissionGuard } from '../../auth/guards/permission.guard';
 import { DataSource } from 'typeorm';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateUserDto } from '../dto/create-user.dto';
+import { UpdateUserDto } from '../dto/update-user.dto';
 
 describe('UsersController', () => {
     let controller: UsersController;

@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PermissionsController } from './permissions.controller';
-import { PermissionsService } from './permissions.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionGuard } from '../auth/guards/permission.guard';
+import { PermissionsController } from '../permissions.controller';
+import { PermissionsService } from '../permissions.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../auth/guards/permission.guard';
 
 const mockPermissionsService = {
     grant: jest.fn(),

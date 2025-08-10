@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { RecommendationsService } from './recommendations.service';
-import { RecommendationSection } from '../../entities/recommendation-section.entity';
-import { RecommendationItem } from '../../entities/recommendation-item.entity';
-import { Book } from '../../entities/book.entity';
+import { RecommendationsService } from '../recommendations.service';
+import { RecommendationSection } from '../../../entities/recommendation-section.entity';
+import { RecommendationItem } from '../../../entities/recommendation-item.entity';
+import { Book } from '../../../entities/book.entity';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('RecommendationsService', () => {

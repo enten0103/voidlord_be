@@ -3,12 +3,12 @@ import request from 'supertest';
 import { Repository, DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppModule } from '../src/modules/app/app.module';
-import { User } from '../src/entities/user.entity';
-import { Book } from '../src/entities/book.entity';
-import { RecommendationSection } from '../src/entities/recommendation-section.entity';
-import { RecommendationItem } from '../src/entities/recommendation-item.entity';
-import { grantPermissions } from './permissions.seed';
+import { AppModule } from '../../app/app.module';
+import { User } from '../../../entities/user.entity';
+import { Book } from '../../../entities/book.entity';
+import { RecommendationSection } from '../../../entities/recommendation-section.entity';
+import { RecommendationItem } from '../../../entities/recommendation-item.entity';
+import { grantPermissions } from '../../permissions/test/permissions.seed';
 
 // 集成测试使用 AppModule（含全部模块）
 describe('Recommendations (e2e)', () => {
