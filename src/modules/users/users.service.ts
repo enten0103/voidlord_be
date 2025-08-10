@@ -1,10 +1,14 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+    ConflictException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcryptjs';
+import { User } from '../../entities/user.entity';
 import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
@@ -59,7 +63,10 @@ export class UsersService {
 
         if (updateUserDto.password) {
             const saltRounds = 10;
-            updateUserDto.password = await bcrypt.hash(updateUserDto.password, saltRounds);
+            updateUserDto.password = await bcrypt.hash(
+                updateUserDto.password,
+                saltRounds,
+            );
         }
 
         Object.assign(user, updateUserDto);
@@ -71,7 +78,10 @@ export class UsersService {
         await this.userRepository.remove(user);
     }
 
-    async validatePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+    async validatePassword(
+        plainPassword: string,
+        hashedPassword: string,
+    ): Promise<boolean> {
         return bcrypt.compare(plainPassword, hashedPassword);
     }
 }

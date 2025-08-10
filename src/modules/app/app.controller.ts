@@ -9,11 +9,14 @@ export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly databaseInitService: DatabaseInitService,
-  ) { }
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get application info' })
-  @ApiResponse({ status: 200, description: 'Application info retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Application info retrieved successfully',
+  })
   getHello(): string {
     return this.appService.getHello();
   }

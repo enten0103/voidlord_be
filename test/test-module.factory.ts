@@ -4,32 +4,32 @@ import { ConfigModule } from '@nestjs/config';
 import { User } from '../src/entities/user.entity';
 import { Book } from '../src/entities/book.entity';
 import { Tag } from '../src/entities/tag.entity';
-import { UsersModule } from '../src/users/users.module';
+import { UsersModule } from '../src/modules/users/users.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
-import { BooksModule } from '../src/books/books.module';
+import { BooksModule } from '../src/modules/books/books.module';
 
 export async function createTestModule(): Promise<TestingModule> {
-    return Test.createTestingModule({
-        imports: [
-            ConfigModule.forRoot({
-                envFilePath: '.env.test',
-                isGlobal: true,
-            }),
-            TypeOrmModule.forRoot({
-                type: 'postgres',
-                host: process.env.DB_HOST || 'localhost',
-                port: parseInt(process.env.DB_PORT || '5433'),
-                username: process.env.DB_USERNAME || 'postgres',
-                password: process.env.DB_PASSWORD || 'postgres',
-                database: process.env.DB_NAME || 'voidlord_test',
-                entities: [User, Book, Tag],
-                synchronize: true,
-                dropSchema: true, // 每次测试都重新创建数据库结构
-            }),
-            TypeOrmModule.forFeature([User, Book, Tag]),
-            UsersModule,
-            AuthModule,
-            BooksModule,
-        ],
-    }).compile();
+  return Test.createTestingModule({
+    imports: [
+      ConfigModule.forRoot({
+        envFilePath: '.env.test',
+        isGlobal: true,
+      }),
+      TypeOrmModule.forRoot({
+        type: 'postgres',
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5433'),
+        username: process.env.DB_USERNAME || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+        database: process.env.DB_NAME || 'voidlord_test',
+        entities: [User, Book, Tag],
+        synchronize: true,
+        dropSchema: true, // 每次测试都重新创建数据库结构
+      }),
+      TypeOrmModule.forFeature([User, Book, Tag]),
+      UsersModule,
+      AuthModule,
+      BooksModule,
+    ],
+  }).compile();
 }

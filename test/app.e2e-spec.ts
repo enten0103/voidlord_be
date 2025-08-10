@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/modules/app/app.module';
@@ -14,6 +15,14 @@ describe('AppController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
+  });
+
+  afterAll(async () => {
+    try {
+      const ds = app.get(DataSource);
+      if (ds?.isInitialized) await ds.destroy();
+    } catch { }
+    await app.close();
   });
 
   it('/ (GET)', () => {
