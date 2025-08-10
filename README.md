@@ -112,6 +112,60 @@ pnpm run start:prod
 - `GET /` - 应用信息
 - `GET /health` - 健康检查（包含数据库连接状态）
 
+## 🔐 权限矩阵 (Permission Matrix)
+
+系统采用 基于“权限 + 等级 (0/1/2/3)” 的精细化授权模型：
+
+| Level | 含义 | 授权 / 管理能力 |
+|-------|------|-----------------|
+| 0 | 无权限 | 不能访问受限制接口 |
+| 1 | 基础访问 | 可调用声明 minLevel<=1 的接口，不能授予/撤销 |
+| 2 | 进阶管理 | 可授予/撤销自己授予的 level1；不能授予 >1 |
+| 3 | 完全管理 | 可授予/提升/撤销任意用户 (至 3) |
+
+内置权限：
+```
+USER_READ
+USER_CREATE
+USER_UPDATE
+USER_DELETE
+BOOK_READ
+BOOK_CREATE
+BOOK_UPDATE
+BOOK_DELETE
+RECOMMENDATION_MANAGE
+```
+
+业务端点与所需权限：
+
+| 领域 | 方法 | 路径 (示例) | 权限 | Min Level | 公开 |
+|------|------|-------------|-------|-----------|------|
+| 用户 | GET | /users | USER_READ | 1 | 否 |
+| 用户 | GET | /users/:id | USER_READ | 1 | 否 |
+| 用户 | PATCH | /users/:id | USER_UPDATE | 1 | 否 |
+| 用户 | DELETE | /users/:id | USER_DELETE | 1 | 否 |
+| 用户 | POST | /users | (开放注册) | - | 是 |
+| 图书 | POST | /books | BOOK_CREATE | 1 | 否 |
+| 图书 | PATCH | /books/:id | BOOK_UPDATE | 1 | 否 |
+| 图书 | DELETE | /books/:id | BOOK_DELETE | 1 | 否 |
+| 图书 | GET | /books /books/search /books/recommend/* | (可选 BOOK_READ) | 0 | 是 |
+| 推荐 | POST | /recommendations/sections | RECOMMENDATION_MANAGE | 1 | 否 |
+| 推荐 | PATCH | /recommendations/sections/:id | RECOMMENDATION_MANAGE | 1 | 否 |
+| 推荐 | DELETE | /recommendations/sections/:id | RECOMMENDATION_MANAGE | 1 | 否 |
+| 推荐 | POST | /recommendations/sections/:id/items | RECOMMENDATION_MANAGE | 1 | 否 |
+| 推荐 | DELETE | /recommendations/sections/:sid/items/:iid | RECOMMENDATION_MANAGE | 1 | 否 |
+| 推荐 | GET | /recommendations/public | (公开) | 0 | 是 |
+| 权限 | POST | /permissions/grant | USER_UPDATE | 2 | 否 |
+| 权限 | POST | /permissions/revoke | USER_UPDATE | 2 | 否 |
+| 权限 | GET | /permissions/user/:id | USER_READ | 1 | 否 |
+
+说明：
+- 读取类图书接口当前不强制 BOOK_READ，若需收紧可加 `@ApiPermission('BOOK_READ',1)` 并在种子或管理员授予。
+- `@ApiPermission` 装饰器在 Swagger 中以 `x-permission` + 描述呈现：`Requires permission: <NAME> (level >= N)`。
+- Level2 与 Level3 的区别主要在是否可授予/升级 >1 级权限及撤销范围。
+
+更多细节见 `docs/PERMISSIONS_GUIDE.md`。
+
 ## API 使用示例
 
 ### 1. 注册用户

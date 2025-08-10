@@ -15,5 +15,6 @@
   },
   "setupFilesAfterEnv": [
     "<rootDir>/test/setup.ts"
-  ]
+  ],
+  "maxWorkers": 1
 }

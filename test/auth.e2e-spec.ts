@@ -3,13 +3,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { default as request } from 'supertest';
 import { AppModule } from '../src/modules/app/app.module';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../src/entities/user.entity';
+import { DataSource as DS2 } from 'typeorm';
 
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
-  let userRepository: Repository<User>;
+  let ds: DS2;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -24,21 +22,20 @@ describe('AuthController (e2e)', () => {
       }),
     );
 
-    userRepository = moduleFixture.get<Repository<User>>(
-      getRepositoryToken(User),
-    );
+    ds = app.get(DataSource);
 
     await app.init();
   });
 
   beforeEach(async () => {
-    // 清理数据库
-    await userRepository.clear();
+    // 清理依赖表 (先 user_permission 再 user)
+    try { await ds.query('DELETE FROM user_permission'); } catch { /* ignore if not exists */ }
+    try { await ds.query('DELETE FROM "user"'); } catch { }
+    // 保留 permissions（或清理）这里不清理以减少重复插入
   });
 
   afterAll(async () => {
     try {
-      const ds = app.get(DataSource);
       if (ds?.isInitialized) await ds.destroy();
     } catch { }
     await app.close();

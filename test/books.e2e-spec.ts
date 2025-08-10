@@ -7,6 +7,7 @@ import { createTestModule } from './test-module.factory';
 import { Book } from '../src/entities/book.entity';
 import { Tag } from '../src/entities/tag.entity';
 import { User } from '../src/entities/user.entity';
+import { grantPermissions } from './permissions.seed';
 
 describe('Books (e2e)', () => {
     let app: INestApplication;
@@ -14,17 +15,18 @@ describe('Books (e2e)', () => {
     let tagRepository: Repository<Tag>;
     let userRepository: Repository<User>;
     let authToken: string;
+    let userId: number;
 
     beforeAll(async () => {
         const moduleFixture: TestingModule = await createTestModule();
         app = moduleFixture.createNestApplication();
+        // 不绕过权限，真实测试 + 预置最小权限数据
         app.useGlobalPipes(
             new ValidationPipe({
                 whitelist: true,
                 transform: true,
             }),
         );
-
         await app.init();
 
         bookRepository = moduleFixture.get<Repository<Book>>(
@@ -42,7 +44,8 @@ describe('Books (e2e)', () => {
             password: 'testpassword123',
         };
 
-        await request(app.getHttpServer()).post('/auth/register').send(testUser);
+        const reg = await request(app.getHttpServer()).post('/auth/register').send(testUser).expect(201);
+        userId = reg.body.user.id;
 
         const loginResponse = await request(app.getHttpServer())
             .post('/auth/login')
@@ -50,9 +53,17 @@ describe('Books (e2e)', () => {
                 username: testUser.username,
                 password: testUser.password,
             });
-
         authToken = loginResponse.body.access_token;
+        // 授予该测试用户书籍相关权限 (level1)
+        const ds = moduleFixture.get(DataSource);
+        await grantPermissions(ds, userId, {
+            BOOK_CREATE: 1,
+            BOOK_UPDATE: 1,
+            BOOK_DELETE: 1,
+        });
     });
+
+    // (seed helper moved to shared permissions.seed.ts)
 
     afterAll(async () => {
         try {

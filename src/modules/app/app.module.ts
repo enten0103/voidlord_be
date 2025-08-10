@@ -8,6 +8,8 @@ import { AuthModule } from '../auth/auth.module';
 import { BooksModule } from '../books/books.module';
 import { DatabaseConfig } from '../../config/database.config';
 import { DatabaseInitService } from '../../config/database-init.service';
+import { RecommendationsModule } from '../recommendations/recommendations.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { DatabaseInitService } from '../../config/database-init.service';
     UsersModule,
     AuthModule,
     BooksModule,
+    RecommendationsModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

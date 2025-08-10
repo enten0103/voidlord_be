@@ -1,0 +1,11 @@
+export const PERMISSIONS = [
+    'USER_READ',
+    'USER_CREATE',
+    'USER_UPDATE',
+    'USER_DELETE',
+    'BOOK_READ',
+    'BOOK_CREATE',
+    'BOOK_UPDATE',
+    'BOOK_DELETE',
+    'RECOMMENDATION_MANAGE',
+];

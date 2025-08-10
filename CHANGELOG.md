@@ -2,7 +2,9 @@
 
 全部显著变更会记录在此文件中。格式参考 Conventional Commits。
 
-## [Unreleased]
+## [released]
+### 💥 Breaking
+- remove(auth): 移除未使用的基于 role 的授权体系 (User.role 字段 / JWT role 声明 / RolesGuard / @Roles 装饰器) 统一仅保留细粒度 permissions；需要前端不再依赖 token 中的 role。
 ### ✨ Feat
 - feat(books): 标签多模式搜索 (tagKeys / 单键值 / 多键值 OR / tagId / tagIds AND) 统一入口 POST /books/search
 - feat(books): 基于标签重叠度的推荐接口 GET /books/recommend/:id?limit=5 (共享标签数降序 + 创建时间降序)

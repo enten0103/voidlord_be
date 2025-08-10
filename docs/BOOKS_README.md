@@ -96,8 +96,9 @@ Authorization: Bearer <jwt_token>
 
 ## 🔐 权限控制
 
-- **公开访问**: GET 请求（查询图书）
-- **需要认证**: POST, PATCH, DELETE 请求（需要 JWT token）
+- **公开访问**: GET 请求（查询 / 搜索 / 推荐）当前允许匿名；可在未来收紧为 `BOOK_READ` level >=1。
+- **写操作**: `BOOK_CREATE` / `BOOK_UPDATE` / `BOOK_DELETE` 需要对应权限 level >=1。
+- **授权模型**: 详见 PERMISSIONS_GUIDE.md （多等级 0/1/2/3）。
 
 ## 🎯 核心功能
 

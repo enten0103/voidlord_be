@@ -13,6 +13,8 @@ describe('DatabaseInitService', () => {
     initialize: jest.fn(),
     runMigrations: jest.fn(),
     query: jest.fn(),
+    // 将在 beforeEach 中重置
+    getRepository: jest.fn(),
   };
 
   const mockConfigService = {
@@ -20,6 +22,42 @@ describe('DatabaseInitService', () => {
   };
 
   beforeEach(async () => {
+    // 为每次测试构建独立的仓库 mock，避免跨测试状态污染
+    const buildRepo = () => {
+      const store: any[] = [];
+      return {
+        create: jest.fn((entity: any) => ({ ...entity })),
+        findOne: jest.fn(async ({ where }: any) => {
+          const entries = Object.entries(where || {});
+          return store.find(item => entries.every(([k, v]) => item?.[k] === v)) || null;
+        }),
+        save: jest.fn(async (entity: any) => {
+          if (!entity.id) entity.id = store.length + 1;
+          store.push(entity);
+          return entity;
+        }),
+        find: jest.fn(async () => [...store]),
+      };
+    };
+
+    const userRepo = buildRepo();
+    const permRepo = buildRepo();
+    const userPermRepo = buildRepo();
+
+    mockDataSource.getRepository.mockImplementation((target: any) => {
+      switch (target?.name) {
+        case 'User':
+          return userRepo;
+        case 'Permission':
+          return permRepo;
+        case 'UserPermission':
+          return userPermRepo;
+        default:
+          // 返回一个通用 repo，保证不会抛错
+          return buildRepo();
+      }
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DatabaseInitService,

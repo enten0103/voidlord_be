@@ -24,7 +24,9 @@
     "docker:dev": "docker-compose up -d postgres",
     "docker:test": "docker-compose up -d postgres-test",
     "docker:restart": "docker-compose down && docker-compose up -d",
-    "docker:clean": "docker-compose down -v"
+    "docker:clean": "docker-compose down -v",
+    "reset:db": "ts-node src/scripts/reset-database.ts",
+    "verify:admin": "ts-node src/scripts/verify-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

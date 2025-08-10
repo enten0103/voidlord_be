@@ -370,11 +370,11 @@ describe('BooksService', () => {
       );
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
         'book.id IN (' +
-          'SELECT bt.book_id FROM book_tags bt ' +
-          'WHERE bt.tag_id IN (:...tagIds) ' +
-          'GROUP BY bt.book_id ' +
-          'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
-          ')',
+        'SELECT bt.book_id FROM book_tags bt ' +
+        'WHERE bt.tag_id IN (:...tagIds) ' +
+        'GROUP BY bt.book_id ' +
+        'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
+        ')',
         { tagIds: [1, 2, 3], tagCount: 3 },
       );
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(

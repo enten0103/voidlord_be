@@ -1,31 +1,33 @@
 import {
-    Controller,
-    Get,
-    Post,
+    BadRequestException,
     Body,
-    Patch,
-    Param,
+    ClassSerializerInterceptor,
+    Controller,
     Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
     Query,
     UseGuards,
     UseInterceptors,
-    ClassSerializerInterceptor,
-    BadRequestException,
 } from '@nestjs/common';
 import {
-    ApiTags,
-    ApiOperation,
-    ApiResponse,
     ApiBearerAuth,
-    ApiQuery,
     ApiBody,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
 } from '@nestjs/swagger';
-import { BooksService } from './books.service';
-import { CreateBookDto } from './dto/create-book.dto';
-import { UpdateBookDto } from './dto/update-book.dto';
-import { BookResponseDto } from './dto/book-response.dto';
-import { SearchBooksDto } from './dto/search-books.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ApiPermission } from '../auth/permissions.decorator';
+import { BooksService } from './books.service';
+import { BookResponseDto } from './dto/book-response.dto';
+import { CreateBookDto } from './dto/create-book.dto';
+import { SearchBooksDto } from './dto/search-books.dto';
+import { UpdateBookDto } from './dto/update-book.dto';
 
 @ApiTags('books')
 @Controller('books')
@@ -34,7 +36,8 @@ export class BooksController {
     constructor(private readonly booksService: BooksService) { }
 
     @Post()
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @ApiPermission('BOOK_CREATE', 1)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Create a new book' })
     @ApiResponse({
@@ -319,7 +322,8 @@ export class BooksController {
     }
 
     @Patch(':id')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @ApiPermission('BOOK_UPDATE', 1)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Update book' })
     @ApiResponse({
@@ -338,7 +342,8 @@ export class BooksController {
     }
 
     @Delete(':id')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @ApiPermission('BOOK_DELETE', 1)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Delete book' })
     @ApiResponse({ status: 200, description: 'Book deleted successfully' })
