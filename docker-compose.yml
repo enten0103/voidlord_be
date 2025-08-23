@@ -39,6 +39,27 @@ services:
       timeout: 10s
       retries: 3
 
+  # 对象存储（MinIO）
+  minio:
+    image: minio/minio:latest
+    container_name: voidlord-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # 控制台
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/ready || wget -qO- http://localhost:9000/minio/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   postgres_data:
   postgres_test_data:
+  minio_data:

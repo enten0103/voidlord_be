@@ -62,6 +62,15 @@ JWT_EXPIRES_IN=1d
 
 # 应用配置
 PORT=3000
+
+# MinIO / S3 对象存储
+MINIO_ENDPOINT=http://localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_REGION=us-east-1
+MINIO_FORCE_PATH_STYLE=true
+MINIO_BUCKET=voidlord
+MINIO_PUBLIC_ENDPOINT=http://localhost:9000
 ```
 
 **重要**: 数据库将通过 TypeORM 自动初始化，无需手动运行 SQL 脚本。应用启动时会：

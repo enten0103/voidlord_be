@@ -10,6 +10,7 @@ import { DatabaseConfig } from '../../config/database.config';
 import { DatabaseInitService } from '../../config/database-init.service';
 import { RecommendationsModule } from '../recommendations/recommendations.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { FilesModule } from '../files/files.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PermissionsModule } from '../permissions/permissions.module';
     BooksModule,
     RecommendationsModule,
     PermissionsModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],
