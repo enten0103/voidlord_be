@@ -8,6 +8,7 @@ import { RecommendationSection } from '../entities/recommendation-section.entity
 import { RecommendationItem } from '../entities/recommendation-item.entity';
 import { Permission } from '../entities/permission.entity';
 import { UserPermission } from '../entities/user-permission.entity';
+import { UserConfig } from '../entities/user-config.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -20,7 +21,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.configService.get<string>('DB_USERNAME', 'postgres'),
       password: this.configService.get<string>('DB_PASSWORD', 'postgres'),
       database: this.configService.get<string>('DB_NAME', 'voidlord'),
-      entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission],
+      entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig],
       synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE', true), // 仅在开发环境使用
       logging: this.configService.get<boolean>('DB_LOGGING', false),
       retryAttempts: 3,

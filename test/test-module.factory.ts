@@ -12,6 +12,8 @@ import { RecommendationItem } from '../src/entities/recommendation-item.entity';
 import { Permission } from '../src/entities/permission.entity';
 import { UserPermission } from '../src/entities/user-permission.entity';
 import { RecommendationsModule } from '../src/modules/recommendations/recommendations.module';
+import { UserConfig } from '../src/entities/user-config.entity';
+import { UserConfigModule } from '../src/modules/user-config/user-config.module';
 
 export async function createTestModule(): Promise<TestingModule> {
   return Test.createTestingModule({
@@ -27,15 +29,16 @@ export async function createTestModule(): Promise<TestingModule> {
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_NAME || 'voidlord_test',
-        entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission],
+        entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig],
         synchronize: true,
         dropSchema: true, // 每次测试都重新创建数据库结构
       }),
-      TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission]),
+      TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig]),
       UsersModule,
       AuthModule,
       BooksModule,
       RecommendationsModule,
+      UserConfigModule,
     ],
   }).compile();
 }
