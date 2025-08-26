@@ -7,6 +7,8 @@ import {
     HeadBucketCommand,
     CreateBucketCommand,
     GetObjectCommand,
+    PutBucketPolicyCommand,
+    DeleteBucketPolicyCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject } from '@nestjs/common';
@@ -102,5 +104,34 @@ export class FilesService implements OnModuleInit {
             .map((seg) => encodeURIComponent(seg))
             .join('/');
         return `${endpoint.replace(/\/$/, '')}/${Bucket}/${encodedKey}`;
+    }
+
+    async setBucketPolicyPublic(bucket?: string) {
+        const Bucket = this.getBucket(bucket);
+        const policy = {
+            Version: '2012-10-17',
+            Statement: [
+                {
+                    Sid: 'PublicReadGetObject',
+                    Effect: 'Allow',
+                    Principal: '*',
+                    Action: ['s3:GetObject'],
+                    Resource: [`arn:aws:s3:::${Bucket}/*`],
+                },
+            ],
+        };
+        await this.s3.send(
+            new PutBucketPolicyCommand({
+                Bucket,
+                Policy: JSON.stringify(policy),
+            }),
+        );
+        this.logger.log(`Bucket ${Bucket} policy set to public-read`);
+    }
+
+    async setBucketPolicyPrivate(bucket?: string) {
+        const Bucket = this.getBucket(bucket);
+        await this.s3.send(new DeleteBucketPolicyCommand({ Bucket }));
+        this.logger.log(`Bucket ${Bucket} policy removed (set to private)`);
     }
 }

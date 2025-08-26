@@ -167,13 +167,15 @@ RECOMMENDATION_MANAGE
 | 权限 | POST | /permissions/grant | USER_UPDATE | 2 | 否 |
 | 权限 | POST | /permissions/revoke | USER_UPDATE | 2 | 否 |
 | 权限 | GET | /permissions/user/:id | USER_READ | 1 | 否 |
+| 文件 | POST | /files/policy/public | SYS_MANAGE | 3 | 否 |
+| 文件 | POST | /files/policy/private | SYS_MANAGE | 3 | 否 |
 
 说明：
 - 读取类图书接口当前不强制 BOOK_READ，若需收紧可加 `@ApiPermission('BOOK_READ',1)` 并在种子或管理员授予。
 - `@ApiPermission` 装饰器在 Swagger 中以 `x-permission` + 描述呈现：`Requires permission: <NAME> (level >= N)`。
 - Level2 与 Level3 的区别主要在是否可授予/升级 >1 级权限及撤销范围。
 
-更多细节见 `docs/PERMISSIONS_GUIDE.md`。
+更多细节见 `docs/PERMISSIONS_GUIDE.md` 和 `docs/FILES_GUIDE.md`。
 
 ## API 使用示例
 
@@ -250,20 +252,25 @@ pnpm run docker:logs
 
 ```
 src/
-├── app/              # 主应用模块
-├── auth/             # 认证模块
-│   ├── dto/         # 数据传输对象
-│   ├── guards/      # 认证守卫
-│   └── strategies/  # Passport 策略
-├── config/           # 配置模块
-│   ├── database.config.ts      # 数据库配置
-│   └── database-init.service.ts # 数据库初始化服务
-├── entities/         # 数据库实体
-├── init/            # 初始化配置
-└── users/           # 用户管理模块
-    └── dto/         # 用户相关 DTO
+├── main.ts           # 应用入口文件
+├── config/           # 应用配置
+│   ├── database.config.ts      # TypeORM 数据库连接配置
+│   └── database-init.service.ts # 数据库初始化服务 (如创建默认用户)
+├── entities/         # TypeORM 数据库实体定义
+├── init/             # 应用初始化逻辑 (如 Swagger)
+├── modules/          # 各业务模块
+│   ├── app/          # 主应用模块 (根路由, 健康检查)
+│   ├── auth/         # 认证与授权模块
+│   ├── books/        # 图书管理模块
+│   ├── files/        # 文件上传与对象存储模块
+│   ├── permissions/  # 权限管理模块
+│   ├── recommendations/ # 推荐管理模块
+│   ├── user-config/  # 用户配置模块 (头像, 偏好设置)
+│   └── users/        # 用户管理模块
+├── scripts/          # 独立脚本 (如重置数据库)
+└── types/            # TypeScript 类型定义
 
-test/                 # E2E 测试
+test/                 # E2E 测试目录
 ```
 
 ## 安全特性

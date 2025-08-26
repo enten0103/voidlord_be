@@ -1,9 +1,12 @@
-import { Body, Controller, Delete, Get, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Post, Query, UploadedFile, UseInterceptors, UseGuards } from '@nestjs/common';
+import { ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesService } from './files.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
 import { randomUUID } from 'crypto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ApiPermission } from '../auth/permissions.decorator';
 
 @ApiTags('files')
 @Controller('files')
@@ -39,6 +42,28 @@ export class FilesController {
     async downloadUrl(@Query('key') key: string, @Query('expiresIn') expiresIn?: string) {
         const url = await this.files.createDownloadUrl(key, expiresIn ? Number(expiresIn) : 600);
         return { url, key };
+    }
+
+    @Post('policy/public')
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @ApiPermission('SYS_MANAGE', 3)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: '将存储桶策略设为公开读取', description: '慎用！这将允许任何人读取桶内所有对象。需要 SYS_MANAGE 权限（level 3）。' })
+    @ApiResponse({ status: 200, description: '策略已更新' })
+    async makePublic() {
+        await this.files.setBucketPolicyPublic();
+        return { ok: true, message: 'Bucket policy updated to public-read.' };
+    }
+
+    @Post('policy/private')
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @ApiPermission('SYS_MANAGE', 3)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: '将存储桶策略设为私有', description: '移除所有策略，恢复默认私有状态。需要 SYS_MANAGE 权限（level 3）。' })
+    @ApiResponse({ status: 200, description: '策略已移除' })
+    async makePrivate() {
+        await this.files.setBucketPolicyPrivate();
+        return { ok: true, message: 'Bucket policy removed (private).' };
     }
 
     // 直传文件（后端转存到 MinIO）
