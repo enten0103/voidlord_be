@@ -22,7 +22,32 @@ export class UserConfigController {
     @Get('me')
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Get my config (create if missing)' })
-    @ApiResponse({ status: 200, description: 'My config returned (created if missing)' })
+    @ApiResponse({
+        status: 200,
+        description: 'My config returned (created if missing)',
+        schema: {
+            example: {
+                id: 1,
+                user: {
+                    id: 42,
+                    username: 'alice',
+                    email: 'alice@example.com',
+                    created_at: '2025-09-01T00:00:00.000Z',
+                    updated_at: '2025-09-01T00:00:00.000Z',
+                },
+                avatar_key: 'avatars/42.png',
+                avatar_url: 'http://localhost:9000/voidlord/avatars/42.png',
+                display_name: 'Alice',
+                bio: 'Hello there',
+                locale: 'en',
+                timezone: 'UTC',
+                theme: 'light',
+                email_notifications: true,
+                created_at: '2025-09-01T00:00:00.000Z',
+                updated_at: '2025-09-01T00:00:00.000Z',
+            },
+        },
+    })
     my(@Req() req: any) {
         return this.service.getOrCreateByUserId(req.user.userId);
     }
