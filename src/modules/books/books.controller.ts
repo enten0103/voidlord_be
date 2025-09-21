@@ -5,6 +5,7 @@ import {
     Controller,
     Delete,
     Get,
+    Req,
     Param,
     Patch,
     Post,
@@ -50,8 +51,12 @@ export class BooksController {
         description: 'Book with this hash already exists',
     })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
-    create(@Body() createBookDto: CreateBookDto) {
-        return this.booksService.create(createBookDto);
+    create(@Body() createBookDto: CreateBookDto, @Req() req?: any) {
+        const userId = req?.user?.userId;
+        if (typeof userId === 'number') {
+            return this.booksService.create(createBookDto, userId);
+        }
+        return this.booksService.create(createBookDto as any);
     }
 
     @Get()
@@ -73,6 +78,20 @@ export class BooksController {
             return this.booksService.findByTags(tagKeys);
         }
         return this.booksService.findAll();
+    }
+
+    @Get('my')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Get books uploaded by current user' })
+    @ApiResponse({ status: 200, description: 'Books retrieved successfully', type: [BookResponseDto] })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    my(@Req() req: any) {
+        const userId = req?.user?.userId;
+        if (typeof userId !== 'number') {
+            throw new BadRequestException('Unauthorized');
+        }
+        return this.booksService.findMine(userId);
     }
 
     @Get(':id')

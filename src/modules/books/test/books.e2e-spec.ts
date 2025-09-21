@@ -235,6 +235,70 @@ describe('Books (e2e)', () => {
         });
     });
 
+    describe('/books/my (GET)', () => {
+        let otherUserToken: string;
+        let myIds: number[] = [];
+        let otherIds: number[] = [];
+
+        beforeEach(async () => {
+            // 注册另一个用户
+            const suffix = Date.now().toString();
+            const other = await request(app.getHttpServer())
+                .post('/auth/register')
+                .send({ username: `other_${suffix}`, email: `other_${suffix}@example.com`, password: 'p@ssw0rd!' })
+                .expect(201);
+            const otherLogin = await request(app.getHttpServer())
+                .post('/auth/login')
+                .send({ username: `other_${suffix}`, password: 'p@ssw0rd!' })
+                .expect(201);
+            otherUserToken = otherLogin.body.access_token;
+
+            // 给其他用户授予创建权限
+            const ds = app.get(DataSource);
+            await grantPermissions(ds, other.body.user.id, { BOOK_CREATE: 1 });
+
+            // 当前用户创建两本书
+            const b1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ hash: 'mine-1', title: 'Mine 1' })
+                .expect(201);
+            const b2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ hash: 'mine-2', title: 'Mine 2' })
+                .expect(201);
+            myIds = [b1.body.id, b2.body.id];
+
+            // 其他用户创建两本书
+            const o1 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${otherUserToken}`)
+                .send({ hash: 'other-1', title: 'Other 1' })
+                .expect(201);
+            const o2 = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${otherUserToken}`)
+                .send({ hash: 'other-2', title: 'Other 2' })
+                .expect(201);
+            otherIds = [o1.body.id, o2.body.id];
+        });
+
+        it('should require auth', async () => {
+            await request(app.getHttpServer()).get('/books/my').expect(401);
+        });
+
+        it("should return only current user's books", async () => {
+            const res = await request(app.getHttpServer())
+                .get('/books/my')
+                .set('Authorization', `Bearer ${authToken}`)
+                .expect(200);
+            const ids = res.body.map((b: any) => b.id);
+            expect(ids).toEqual(expect.arrayContaining(myIds));
+            otherIds.forEach((oid) => expect(ids).not.toContain(oid));
+        });
+    });
+
     describe('/books/:id (GET)', () => {
         let bookId: number;
 

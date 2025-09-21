@@ -117,6 +117,18 @@ pnpm run start:prod
 - `DELETE /users/:id` - 删除用户（需要认证）
 
 ### 系统端点
+### 图书端点
+
+- `POST /books` - 创建图书（需要 `BOOK_CREATE` level ≥ 1）
+- `GET /books` - 获取所有图书（可匿名）
+- `GET /books?tags=...` - 按标签键筛选（可匿名）
+- `GET /books/hash/:hash` - 通过 hash 获取（可匿名）
+- `POST /books/search` - 多模式标签搜索（可匿名）
+- `GET /books/recommend/:id` - 相似推荐（可匿名）
+- `GET /books/my` - 获取本人上传图书（需登录）
+- `PATCH /books/:id` - 更新图书（需要 `BOOK_UPDATE` level ≥ 1）
+- `DELETE /books/:id` - 删除图书（需要 `BOOK_DELETE` level ≥ 1）
+
 
 - `GET /` - 应用信息
 - `GET /health` - 健康检查（包含数据库连接状态）
@@ -158,6 +170,7 @@ RECOMMENDATION_MANAGE
 | 图书 | PATCH | /books/:id | BOOK_UPDATE | 1 | 否 |
 | 图书 | DELETE | /books/:id | BOOK_DELETE | 1 | 否 |
 | 图书 | GET | /books /books/search /books/recommend/* | (可选 BOOK_READ) | 0 | 是 |
+| 图书 | GET | /books/my | (需登录) | 0 | 否 |
 | 推荐 | POST | /recommendations/sections | RECOMMENDATION_MANAGE | 1 | 否 |
 | 推荐 | PATCH | /recommendations/sections/:id | RECOMMENDATION_MANAGE | 1 | 否 |
 | 推荐 | DELETE | /recommendations/sections/:id | RECOMMENDATION_MANAGE | 1 | 否 |

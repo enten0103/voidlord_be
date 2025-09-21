@@ -123,6 +123,19 @@ describe('BooksService', () => {
         });
     });
 
+    describe('findMine', () => {
+        it('should return books created by user', async () => {
+            mockBookRepository.find.mockResolvedValue([mockBook]);
+            const result = await service.findMine(42);
+            expect(result).toEqual([mockBook]);
+            expect(mockBookRepository.find).toHaveBeenCalledWith({
+                where: { create_by: 42 },
+                relations: ['tags'],
+                order: { created_at: 'DESC' },
+            });
+        });
+    });
+
     describe('findOne', () => {
         it('should return a book by ID', async () => {
             mockBookRepository.findOne.mockResolvedValue(mockBook);

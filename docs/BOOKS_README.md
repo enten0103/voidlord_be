@@ -11,6 +11,7 @@ Book 模块是一个完整的图书管理系统，支持图书的 CRUD 操作以
 - `hash` (string): 图书唯一标识符，唯一索引
 - `title` (string): 图书标题
 - `description` (string, 可选): 图书描述
+- `create_by` (number, 可选): 创建者用户 ID，创建时从登录的 JWT 中写入
 - `created_at` (Date): 创建时间
 - `updated_at` (Date): 更新时间
 - `tags` (Tag[]): 关联的标签列表（多对多关系）
@@ -54,6 +55,24 @@ Content-Type: application/json
 }
 ```
 
+成功响应（示例）：
+```json
+{
+  "id": 101,
+  "hash": "unique-book-hash",
+  "title": "图书标题",
+  "description": "图书描述（可选）",
+  "create_by": 12,
+  "tags": [
+    {"id": 5, "key": "author", "value": "作者名", "shown": true, "created_at": "...", "updated_at": "..."}
+  ],
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+说明：服务端会自动根据请求用户写入 `create_by`，无需在请求体中提供。
+
 ### 2. 获取所有图书
 ```http
 GET /books
@@ -69,6 +88,31 @@ GET /books/:id
 ### 4. 根据 hash 获取图书
 ```http
 GET /books/hash/:hash
+```
+
+### 4.1 获取本人上传的图书
+```http
+GET /books/my
+Authorization: Bearer <jwt_token>
+```
+
+说明：
+- 需要登录（JWT）。
+- 仅返回当前登录用户创建的图书（`create_by = 当前用户ID`），结果包含 `tags`，按 `created_at` 倒序。
+
+示例响应：
+```json
+[
+  {
+    "id": 12,
+    "hash": "mine-001",
+    "title": "我的第一本书",
+    "create_by": 5,
+    "tags": [],
+    "created_at": "...",
+    "updated_at": "..."
+  }
+]
 ```
 
 ### 5. 更新图书
@@ -133,6 +177,7 @@ Authorization: Bearer <jwt_token>
 - 测试所有 API 端点
 - 包含认证和权限测试
 - 数据库集成测试
+ - 验证创建接口自动写入 `create_by`
 
 ## 🗄️ 数据库表结构
 
@@ -143,6 +188,7 @@ CREATE TABLE book (
     hash VARCHAR UNIQUE NOT NULL,
     title VARCHAR NOT NULL,
     description TEXT,
+  create_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

@@ -23,6 +23,7 @@ BOOK_CREATE
 BOOK_UPDATE
 BOOK_DELETE
 RECOMMENDATION_MANAGE
+SYS_MANAGE
 ```
 
 ### 1.2 等级含义
@@ -122,13 +123,21 @@ POST /permissions/revoke
 | 图书 | /books/:id | PATCH | BOOK_UPDATE | 1 | 否 |
 | 图书 | /books/:id | DELETE | BOOK_DELETE | 1 | 否 |
 | 图书 | /books/* (读取/搜索/推荐) | GET | BOOK_READ (当前放宽) | 0 | 是 |
+| 图书 | /books/my | GET | (需要登录) | 0 | 否 |
 | 推荐 | /recommendations/sections* (CRUD) | POST/PATCH/DELETE | RECOMMENDATION_MANAGE | 1 | 否 |
 | 推荐 | /recommendations/public | GET | (公开) | 0 | 是 |
 | 权限 | /permissions/grant | POST | USER_UPDATE | 2 | 否 |
 | 权限 | /permissions/revoke | POST | USER_UPDATE | 2 | 否 |
 | 权限 | /permissions/user/:id | GET | USER_READ | 1 | 否 |
+| 文件 | /files/policy/public | POST | SYS_MANAGE | 3 | 否 |
+| 文件 | /files/policy/private | POST | SYS_MANAGE | 3 | 否 |
 
 > 读取类接口目前允许匿名 / 基础访问；如需收紧，给读取接口添加 `@ApiPermission('BOOK_READ',1)` 并在用户初始赋权时授予。
+
+### 6.1 文件策略端点安全建议
+- 强烈建议仅授予极少数管理员 `SYS_MANAGE` level 3。
+- 操作前后做好审计记录（时间、操作者、IP）。
+- 更推荐使用预签名 URL 分享临时访问，避免长期公开桶。
 
 ---
 ## 7. 升级 / 设计建议

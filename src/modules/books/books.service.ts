@@ -17,9 +17,9 @@ export class BooksService {
     private bookRepository: Repository<Book>,
     @InjectRepository(Tag)
     private tagRepository: Repository<Tag>,
-  ) {}
+  ) { }
 
-  async create(createBookDto: CreateBookDto): Promise<Book> {
+  async create(createBookDto: CreateBookDto, userId?: number): Promise<Book> {
     // 检查hash是否已存在
     const existingBook = await this.bookRepository.findOne({
       where: { hash: createBookDto.hash },
@@ -40,6 +40,7 @@ export class BooksService {
       hash: createBookDto.hash,
       title: createBookDto.title,
       description: createBookDto.description,
+      create_by: userId,
       tags,
     });
 
@@ -48,6 +49,14 @@ export class BooksService {
 
   async findAll(): Promise<Book[]> {
     return this.bookRepository.find({
+      relations: ['tags'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findMine(userId: number): Promise<Book[]> {
+    return this.bookRepository.find({
+      where: { create_by: userId },
       relations: ['tags'],
       order: { created_at: 'DESC' },
     });
@@ -172,11 +181,11 @@ export class BooksService {
       .leftJoinAndSelect('book.tags', 'tag')
       .where(
         'book.id IN (' +
-          'SELECT bt.book_id FROM book_tags bt ' +
-          'WHERE bt.tag_id IN (:...tagIds) ' +
-          'GROUP BY bt.book_id ' +
-          'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
-          ')',
+        'SELECT bt.book_id FROM book_tags bt ' +
+        'WHERE bt.tag_id IN (:...tagIds) ' +
+        'GROUP BY bt.book_id ' +
+        'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
+        ')',
         { tagIds, tagCount: tagIds.length },
       )
       .orderBy('book.created_at', 'DESC')

@@ -22,6 +22,7 @@ describe('BooksController', () => {
     const mockBooksService = {
         create: jest.fn(),
         findAll: jest.fn(),
+        findMine: jest.fn(),
         findOne: jest.fn(),
         findByHash: jest.fn(),
         update: jest.fn(),
@@ -92,6 +93,21 @@ describe('BooksController', () => {
 
             expect(result).toEqual([mockBook]);
             expect(service.findByTags).toHaveBeenCalledWith(['author', 'genre']);
+        });
+    });
+
+    describe('my', () => {
+        it('should return current user\'s books', async () => {
+            const req: any = { user: { userId: 42 } };
+            const books = [mockBook];
+            mockBooksService.findMine.mockResolvedValue(books as any);
+            const result = await controller.my(req);
+            expect(result).toEqual(books);
+            expect(service.findMine).toHaveBeenCalledWith(42);
+        });
+
+        it('should throw BadRequest when user missing', async () => {
+            expect(() => controller.my({} as any)).toThrow(BadRequestException);
         });
     });
 
