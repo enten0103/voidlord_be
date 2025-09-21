@@ -197,3 +197,9 @@ services:
 ```
 
 两个数据库完全独立，互不影响，确保开发和测试环境的分离。
+
+## 🧱 模型与结构变更速记
+
+- 新增实体：`user_config`（用户头像/偏好配置），OneToOne `user`，随用户删除级联清理。
+- `book` 表新增列：`create_by INTEGER NULL`，用于记录创建者用户 ID。
+- 开发环境 `synchronize=true` 会自动创建/调整结构；生产环境请使用迁移。

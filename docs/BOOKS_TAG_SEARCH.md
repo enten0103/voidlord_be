@@ -11,6 +11,8 @@ POST /books/search 支持以下字段(优先级从高到低)：
 
 Controller 按顺序匹配第一个命中模式。
 
+注：搜索逻辑不受 `create_by` 字段影响，但返回的 `Book` 对象会包含 `create_by` 以便审计与展示。
+
 ### 示例
 ```bash
 curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{"tagKeys":"author,genre"}'
