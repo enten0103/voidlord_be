@@ -248,6 +248,20 @@ pnpm run test:e2e
 pnpm run test:watch
 ```
 
+### 提交流程（强制测试）
+
+- 本仓库已启用 Git 提交前钩子（pre-commit），在你执行 `git commit` 前会自动运行：
+  - `pnpm test`（单元测试）
+  - `pnpm test:e2e`（端到端测试）
+- 首次克隆或安装依赖后会自动安装钩子（通过 `postinstall` 脚本）。
+- 如需临时跳过钩子（不推荐），可使用：
+
+```bash
+git commit -m "<msg>" --no-verify
+```
+
+注意：跳过验证应仅限于 CI 故障或紧急修复，建议尽快补齐测试并恢复正常提交流程。
+
 ## Docker 命令
 
 ```bash
