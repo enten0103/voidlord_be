@@ -39,6 +39,9 @@ export class BookResponseDto {
   @ApiProperty({ description: 'Book last update date' })
   updated_at: Date;
 
+  @ApiProperty({ description: 'Creator user id', required: false })
+  create_by?: number;
+
   @ApiProperty({ description: 'Associated tags', type: [TagResponseDto] })
   tags: TagResponseDto[];
 }

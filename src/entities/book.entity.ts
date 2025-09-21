@@ -36,6 +36,10 @@ export class Book {
   @UpdateDateColumn()
   updated_at: Date;
 
+  @ApiProperty({ description: 'Creator user id', required: false })
+  @Column({ type: 'int', nullable: true })
+  create_by?: number;
+
   @ApiProperty({ description: 'Associated tags', type: () => [Tag] })
   @ManyToMany(() => Tag, (tag) => tag.books, { cascade: true })
   @JoinTable({
