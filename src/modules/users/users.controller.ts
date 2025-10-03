@@ -31,6 +31,9 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
   @Post()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @ApiPermission('USER_CREATE', 1)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new user' })
   @ApiResponse({
     status: 201,
@@ -38,6 +41,8 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
