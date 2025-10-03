@@ -62,7 +62,7 @@ export class PermissionsController {
     @ApiOperation({ summary: 'List permissions for a user' })
     @ApiPermission('USER_READ', 1)
     @ApiParam({ name: 'id', description: 'Target user ID', type: Number, example: 12 })
-    @ApiResponse({ status: 200, description: 'User permissions', schema: { example: [ { permission: 'USER_READ', level: 1 }, { permission: 'BOOK_UPDATE', level: 2 } ] } })
+    @ApiResponse({ status: 200, description: 'User permissions', schema: { example: [{ permission: 'USER_READ', level: 1 }, { permission: 'BOOK_UPDATE', level: 2 }] } })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     list(@Param('id') id: string) {

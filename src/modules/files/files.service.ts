@@ -14,6 +14,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3_CLIENT } from './tokens';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { FileObject } from '../../entities/file-object.entity';
 
 export interface PresignedUrlOptions {
     bucket?: string;
@@ -29,6 +32,7 @@ export class FilesService implements OnModuleInit {
     constructor(
         @Inject(S3_CLIENT) private s3: S3Client,
         private config: ConfigService,
+        @InjectRepository(FileObject) private fileRepo: Repository<FileObject>,
     ) {
         this.defaultBucket = this.config.get<string>('MINIO_BUCKET', 'voidlord');
     }
@@ -65,17 +69,33 @@ export class FilesService implements OnModuleInit {
         body: Buffer | Uint8Array | Blob | string,
         contentType?: string,
         bucket?: string,
+        ownerId?: number,
     ): Promise<string> {
         const Bucket = this.getBucket(bucket);
         await this.s3.send(
             new PutObjectCommand({ Bucket, Key: key, Body: body, ContentType: contentType }),
         );
+        if (ownerId) {
+            const fo = this.fileRepo.create({ key, bucket: Bucket, owner: { id: ownerId } as any });
+            await this.fileRepo.save(fo);
+        }
         return key;
     }
 
     async deleteObject(key: string, bucket?: string): Promise<void> {
         const Bucket = this.getBucket(bucket);
         await this.s3.send(new DeleteObjectCommand({ Bucket, Key: key }));
+    }
+
+    async findOwnerIdByKey(key: string, bucket?: string): Promise<number | null> {
+        const Bucket = this.getBucket(bucket);
+        const fo = await this.fileRepo.findOne({ where: { key, bucket: Bucket }, relations: ['owner'] });
+        return fo?.owner?.id ?? null;
+    }
+
+    async deleteRecordByKey(key: string, bucket?: string): Promise<void> {
+        const Bucket = this.getBucket(bucket);
+        await this.fileRepo.delete({ key, bucket: Bucket });
     }
 
     async createUploadUrl(options: PresignedUrlOptions): Promise<string> {

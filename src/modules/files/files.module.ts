@@ -4,9 +4,12 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
 import { S3_CLIENT } from './tokens';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { FileObject } from '../../entities/file-object.entity';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-    imports: [ConfigModule],
+    imports: [ConfigModule, TypeOrmModule.forFeature([FileObject]), PermissionsModule],
     providers: [
         {
             provide: S3_CLIENT,
