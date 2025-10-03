@@ -48,6 +48,7 @@ export class UserConfigController {
             },
         },
     })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     my(@Req() req: any) {
         return this.service.getOrCreateByUserId(req.user.userId);
     }
@@ -58,6 +59,7 @@ export class UserConfigController {
     @ApiOperation({ summary: 'Update my config' })
     @ApiBody({ type: UpdateUserConfigDto })
     @ApiResponse({ status: 200, description: 'Updated' })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     update(@Req() req: any, @Body() dto: UpdateUserConfigDto) {
         return this.service.updateMy(req.user.userId, dto);
     }
