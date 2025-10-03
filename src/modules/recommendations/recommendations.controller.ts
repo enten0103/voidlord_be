@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, ParseIntPipe, Patch, Delete, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { RecommendationsService } from './recommendations.service';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
@@ -31,6 +31,8 @@ export class RecommendationsController {
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @ApiPermission('RECOMMENDATION_MANAGE', 1)
     @ApiBearerAuth('JWT-auth')
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     createSection(@Body() dto: CreateSectionDto) {
         return this.svc.createSection(dto);
     }
@@ -46,6 +48,8 @@ export class RecommendationsController {
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @ApiPermission('RECOMMENDATION_MANAGE', 1)
     @ApiBearerAuth('JWT-auth')
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     updateSection(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSectionDto) {
         if (dto.sectionOrder) {
             this.svc.batchReorder(dto.sectionOrder);
@@ -58,6 +62,8 @@ export class RecommendationsController {
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @ApiPermission('RECOMMENDATION_MANAGE', 1)
     @ApiBearerAuth('JWT-auth')
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     deleteSection(@Param('id', ParseIntPipe) id: number) {
         return this.svc.deleteSection(id);
     }
@@ -67,6 +73,8 @@ export class RecommendationsController {
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @ApiPermission('RECOMMENDATION_MANAGE', 1)
     @ApiBearerAuth('JWT-auth')
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     addItem(@Param('id', ParseIntPipe) id: number, @Body() dto: AddItemDto) {
         return this.svc.addItem(id, dto);
     }
@@ -76,6 +84,8 @@ export class RecommendationsController {
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @ApiPermission('RECOMMENDATION_MANAGE', 1)
     @ApiBearerAuth('JWT-auth')
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     removeItem(
         @Param('sectionId', ParseIntPipe) sectionId: number,
         @Param('itemId', ParseIntPipe) itemId: number,
@@ -88,6 +98,8 @@ export class RecommendationsController {
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @RequirePermission('RECOMMENDATION_MANAGE', 1)
     @ApiBearerAuth('JWT-auth')
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     reorderItems(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: ReorderItemsDto,

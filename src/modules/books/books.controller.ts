@@ -50,7 +50,8 @@ export class BooksController {
         status: 409,
         description: 'Book with this hash already exists',
     })
-    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     create(@Body() createBookDto: CreateBookDto, @Req() req?: any) {
         const userId = req?.user?.userId;
         if (typeof userId === 'number') {
@@ -85,7 +86,7 @@ export class BooksController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Get books uploaded by current user' })
     @ApiResponse({ status: 200, description: 'Books retrieved successfully', type: [BookResponseDto] })
-    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     my(@Req() req: any) {
         const userId = req?.user?.userId;
         if (typeof userId !== 'number') {
@@ -355,7 +356,8 @@ export class BooksController {
         status: 409,
         description: 'Book with this hash already exists',
     })
-    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     update(@Param('id') id: string, @Body() updateBookDto: UpdateBookDto) {
         return this.booksService.update(+id, updateBookDto);
     }
@@ -367,7 +369,8 @@ export class BooksController {
     @ApiOperation({ summary: 'Delete book' })
     @ApiResponse({ status: 200, description: 'Book deleted successfully' })
     @ApiResponse({ status: 404, description: 'Book not found' })
-    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     remove(@Param('id') id: string) {
         return this.booksService.remove(+id);
     }
