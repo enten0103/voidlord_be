@@ -116,6 +116,12 @@ describe('Permissions (e2e)', () => {
             .send({ userId: userId, permission: 'USER_READ', level: 1 })
             .expect(403);
 
+        // 未登录访问受保护接口，应返回 401
+        await request(app.getHttpServer())
+            .post('/permissions/grant')
+            .send({ userId: userId, permission: 'USER_READ', level: 1 })
+            .expect(401);
+
         // adminA revoke userB USER_READ
         await request(app.getHttpServer())
             .post('/permissions/revoke')
@@ -131,5 +137,10 @@ describe('Permissions (e2e)', () => {
             .get(`/permissions/user/${userId}`)
             .set('Authorization', `Bearer ${userToken}`)
             .expect(403);
+
+        // 未登录查询，应为 401
+        await request(app.getHttpServer())
+            .get(`/permissions/user/${userId}`)
+            .expect(401);
     });
 });

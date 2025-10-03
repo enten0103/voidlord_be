@@ -16,8 +16,8 @@ export class PermissionGuard implements CanActivate {
         if (!meta) return true; // no permission required
         const { permission, minLevel } = meta;
         const request = context.switchToHttp().getRequest();
-    const user = request.user; // set by JwtStrategy
-    if (!user?.userId) throw new UnauthorizedException('Unauthorized');
+        const user = request.user; // set by JwtStrategy
+        if (!user?.userId) throw new UnauthorizedException('Unauthorized');
 
         // 使用查询构建器以避免 relation where 在某些测试环境下解析失败
         const qb = this.dataSource.getRepository(UserPermission).createQueryBuilder('up')

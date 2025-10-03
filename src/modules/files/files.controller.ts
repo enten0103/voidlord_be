@@ -50,6 +50,8 @@ export class FilesController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: '将存储桶策略设为公开读取', description: '慎用！这将允许任何人读取桶内所有对象。需要 SYS_MANAGE 权限（level 3）。' })
     @ApiResponse({ status: 200, description: '策略已更新' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)' })
     async makePublic() {
         await this.files.setBucketPolicyPublic();
         return { ok: true, message: 'Bucket policy updated to public-read.' };
@@ -61,6 +63,8 @@ export class FilesController {
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: '将存储桶策略设为私有', description: '移除所有策略，恢复默认私有状态。需要 SYS_MANAGE 权限（level 3）。' })
     @ApiResponse({ status: 200, description: '策略已移除' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)' })
     async makePrivate() {
         await this.files.setBucketPolicyPrivate();
         return { ok: true, message: 'Bucket policy removed (private).' };

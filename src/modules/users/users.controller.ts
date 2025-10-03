@@ -52,6 +52,8 @@ export class UsersController {
     description: 'Users retrieved successfully',
     type: [UserResponseDto],
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)' })
   findAll() {
     return this.usersService.findAll();
   }
@@ -67,6 +69,8 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)' })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(+id);
   }
@@ -82,6 +86,8 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(+id, updateUserDto);
   }
@@ -93,6 +99,8 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete user' })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
   }
