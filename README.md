@@ -112,7 +112,7 @@ pnpm run start:prod
 
 - `GET /users` - 获取所有用户（需要认证）
 - `GET /users/:id` - 获取特定用户（需要认证）
-- `POST /users` - 创建用户
+- `POST /users` - 创建用户（需要 `USER_CREATE` level ≥ 1）
 - `PATCH /users/:id` - 更新用户（需要认证）
 - `DELETE /users/:id` - 删除用户（需要认证）
 
@@ -165,7 +165,7 @@ RECOMMENDATION_MANAGE
 | 用户 | GET | /users/:id | USER_READ | 1 | 否 |
 | 用户 | PATCH | /users/:id | USER_UPDATE | 1 | 否 |
 | 用户 | DELETE | /users/:id | USER_DELETE | 1 | 否 |
-| 用户 | POST | /users | (开放注册) | - | 是 |
+| 用户 | POST | /users | USER_CREATE | 1 | 否 |
 | 图书 | POST | /books | BOOK_CREATE | 1 | 否 |
 | 图书 | PATCH | /books/:id | BOOK_UPDATE | 1 | 否 |
 | 图书 | DELETE | /books/:id | BOOK_DELETE | 1 | 否 |
@@ -187,6 +187,7 @@ RECOMMENDATION_MANAGE
 - 读取类图书接口当前不强制 BOOK_READ，若需收紧可加 `@ApiPermission('BOOK_READ',1)` 并在种子或管理员授予。
 - `@ApiPermission` 装饰器在 Swagger 中以 `x-permission` + 描述呈现：`Requires permission: <NAME> (level >= N)`。
 - Level2 与 Level3 的区别主要在是否可授予/升级 >1 级权限及撤销范围。
+ - 若需要开放注册，请使用 `POST /auth/register`；`POST /users` 为受保护的后台创建接口。
 
 更多细节见 `docs/PERMISSIONS_GUIDE.md` 和 `docs/FILES_GUIDE.md`。
 

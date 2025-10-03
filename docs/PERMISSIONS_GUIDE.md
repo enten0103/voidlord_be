@@ -118,7 +118,7 @@ POST /permissions/revoke
 | 用户 | /users/:id | GET | USER_READ | 1 | 否 |
 | 用户 | /users/:id | PATCH | USER_UPDATE | 1 | 否 |
 | 用户 | /users/:id | DELETE | USER_DELETE | 1 | 否 |
-| 用户 | /users (create) | POST | (开放注册) | - | 是 |
+| 用户 | /users (create) | POST | USER_CREATE | 1 | 否 |
 | 图书 | /books | POST | BOOK_CREATE | 1 | 否 |
 | 图书 | /books/:id | PATCH | BOOK_UPDATE | 1 | 否 |
 | 图书 | /books/:id | DELETE | BOOK_DELETE | 1 | 否 |
