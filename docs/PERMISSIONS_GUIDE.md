@@ -174,3 +174,26 @@ POST /permissions/revoke
 
 ---
 如需进一步扩展或接入前端 UI，可基于此文档构建权限配置面板。欢迎继续提出改进需求。
+
+---
+
+## 11. HTTP 状态码约定（401 vs 403）
+
+为了让客户端能明确区分“未登录/凭证无效”与“已登录但权限不足”，本项目对受保护端点统一采用如下约定：
+
+- 401 Unauthorized：请求未通过认证（未携带 JWT、JWT 无效或过期、无法解析用户等）。
+- 403 Forbidden：请求已认证，但不满足权限要求（缺少某项权限或 level 不足）。
+
+实现要点：
+
+- `JwtAuthGuard`：在 `handleRequest` 中对未通过认证的情况直接抛出 401。
+- `PermissionGuard`：当 `request.user` 不存在时抛出 401；当存在但 `userLevel < minLevel` 时抛出 403。
+
+Swagger 文档标准化错误响应示例：
+
+```
+401: { "statusCode": 401, "message": "Unauthorized", "error": "Unauthorized" }
+403: { "statusCode": 403, "message": "Forbidden",   "error": "Forbidden" }
+```
+
+这些示例已在受保护的控制器端点（如 Users、Permissions、Files、Books、Recommendations、User-Config 的受保护接口）中通过 `@ApiResponse` 注解统一呈现，便于前端消费。

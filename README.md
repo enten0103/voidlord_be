@@ -193,6 +193,22 @@ RECOMMENDATION_MANAGE
 
 ## API 使用示例
 
+### HTTP 状态码约定（401 vs 403）
+
+为区分“未认证/凭证无效”和“权限不足”，受保护端点遵循：
+
+- 401 Unauthorized：未通过认证（未携带/无效/过期的 JWT 等）
+- 403 Forbidden：已认证但权限不足（缺少权限或 level 不足）
+
+标准错误响应示例：
+
+```
+401 => { "statusCode": 401, "message": "Unauthorized", "error": "Unauthorized" }
+403 => { "statusCode": 403, "message": "Forbidden",   "error": "Forbidden" }
+```
+
+Swagger 中已为受保护端点统一声明上述示例，便于前端消费。
+
 ### 1. 注册用户
 
 ```bash
