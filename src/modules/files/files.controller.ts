@@ -20,7 +20,7 @@ export class FilesController {
     @ApiOperation({ summary: '生成预签名上传URL', description: '用于前端直传到 MinIO（S3 兼容）。' })
     @ApiQuery({ name: 'key', required: true, description: '对象键（路径/文件名）' })
     @ApiQuery({ name: 'contentType', required: false, description: 'MIME 类型，如 image/png' })
-    @ApiResponse({ status: 200, description: '返回预签名URL 和 key' })
+    @ApiResponse({ status: 200, description: '返回预签名URL 和 key', schema: { example: { url: 'http://minio/presigned/xxx', key: 'uploads/2025-10-06/uuid.png' } } })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     async uploadUrl(@Query('key') key: string, @Query('contentType') contentType?: string) {
         const url = await this.files.createUploadUrl({ key, contentType });
@@ -57,6 +57,7 @@ export class FilesController {
     @ApiOperation({ summary: '生成预签名下载URL', description: '用于私有对象的临时访问。' })
     @ApiQuery({ name: 'key', required: true, description: '对象键' })
     @ApiQuery({ name: 'expiresIn', required: false, description: '秒数，默认 600' })
+    @ApiResponse({ status: 200, description: '返回预签名下载URL 和 key', schema: { example: { url: 'http://minio/presigned-download/xxx', key: 'uploads/2025-10-06/uuid.png' } } })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     async downloadUrl(@Query('key') key: string, @Query('expiresIn') expiresIn?: string) {
         const url = await this.files.createDownloadUrl(key, expiresIn ? Number(expiresIn) : 600);
@@ -101,13 +102,23 @@ export class FilesController {
             type: 'object',
             properties: {
                 file: { type: 'string', format: 'binary', description: '待上传文件' },
-                key: { type: 'string', nullable: true, description: '自定义对象键（不传则自动生成）' },
-                contentType: { type: 'string', nullable: true, description: 'MIME 类型（可选）' },
+                key: { type: 'string', nullable: true, description: '自定义对象键（不传则自动生成），例如 uploads/2025-10-06/uuid.png' },
+                contentType: { type: 'string', nullable: true, description: 'MIME 类型（可选），例如 image/png, application/pdf' },
             },
             required: ['file'],
         },
+        examples: {
+            imagePng: {
+                summary: '上传 PNG 图片（自动生成 key）',
+                value: {},
+            },
+            customKeyPdf: {
+                summary: '自定义 key 上传 PDF',
+                value: { key: 'docs/manuals/voidlord.pdf', contentType: 'application/pdf' },
+            },
+        },
     })
-    @ApiResponse({ status: 201, description: '上传成功，返回对象信息与公开 URL（如配置）。' })
+    @ApiResponse({ status: 201, description: '上传成功，返回对象信息与公开 URL（如配置）。', schema: { example: { ok: true, key: 'uploads/2025-10-06/uuid.png', size: 123456, mime: 'image/png', url: 'http://localhost:9000/voidlord/uploads/2025-10-06/uuid.png' } } })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     async upload(
         @UploadedFile() file: Express.Multer.File,
