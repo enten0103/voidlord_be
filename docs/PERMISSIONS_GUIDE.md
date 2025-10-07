@@ -23,6 +23,7 @@ BOOK_CREATE
 BOOK_UPDATE
 BOOK_DELETE
 RECOMMENDATION_MANAGE
+FILE_MANAGE
 SYS_MANAGE
 ```
 
@@ -131,6 +132,12 @@ POST /permissions/revoke
 | 权限 | /permissions/user/:id | GET | USER_READ | 1 | 否 |
 | 文件 | /files/policy/public | POST | SYS_MANAGE | 3 | 否 |
 | 文件 | /files/policy/private | POST | SYS_MANAGE | 3 | 否 |
+| 文件 | /files/upload-url | GET | (需要登录) | 0 | 否 |
+| 文件 | /files/download-url | GET | (需要登录) | 0 | 否 |
+| 文件 | /files/upload | POST | (需要登录) | 0 | 否 |
+| 文件 | /files/object | DELETE | FILE_MANAGE（非本人/未知） | 1 | 否 |
+
+> 说明：删除对象时，若记录的所有者为当前用户本人，则无需 FILE_MANAGE 也可删除；若所有者不是本人，或对象未记录所有者，则需要 `FILE_MANAGE (>=1)` 才能删除，否则返回 403。
 
 > 读取类接口目前允许匿名 / 基础访问；如需收紧，给读取接口添加 `@ApiPermission('BOOK_READ',1)` 并在用户初始赋权时授予。
 
