@@ -15,7 +15,8 @@ import { PermissionsModule } from '../permissions/permissions.module';
             provide: S3_CLIENT,
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
-                const endpoint = config.get<string>('MINIO_ENDPOINT', 'http://localhost:9000');
+                const publicHost = config.get<string>('PUBLIC_HOST_IP');
+                const endpoint = config.get<string>('MINIO_ENDPOINT') || (publicHost ? `http://${publicHost}:9000` : 'http://localhost:9000');
                 const accessKeyId = config.get<string>('MINIO_ACCESS_KEY', 'minioadmin');
                 const secretAccessKey = config.get<string>('MINIO_SECRET_KEY', 'minioadmin');
                 const forcePathStyle = config.get<boolean>('MINIO_FORCE_PATH_STYLE', true);

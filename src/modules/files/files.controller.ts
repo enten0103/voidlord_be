@@ -7,11 +7,15 @@ import { randomUUID } from 'crypto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { ApiPermission } from '../auth/permissions.decorator';
+import { PermissionsService } from '../permissions/permissions.service';
 
 @ApiTags('files')
 @Controller('files')
 export class FilesController {
-    constructor(private readonly files: FilesService) { }
+    constructor(
+        private readonly files: FilesService,
+        private readonly permissions: PermissionsService,
+    ) { }
 
     // 生成前端直传的预签名URL
     @Get('upload-url')
@@ -29,21 +33,24 @@ export class FilesController {
 
     // 简单删除
     @Delete('object')
-    @UseGuards(JwtAuthGuard, PermissionGuard)
-    @ApiPermission('FILE_MANAGE', 1)
+    @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('JWT-auth')
-    @ApiOperation({ summary: '删除对象（需本人或 FILE_MANAGE）' })
+    @ApiOperation({ summary: '删除对象（本人或拥有 FILE_MANAGE）', description: '若对象所有者为调用者本人可直接删除；否则需具备 FILE_MANAGE≥1；当对象未记录所有者时，仅允许 FILE_MANAGE。' })
     @ApiQuery({ name: 'key', required: true, description: '要删除的对象键' })
     @ApiResponse({ status: 200, description: '删除成功' })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
-    @ApiResponse({ status: 403, description: 'Forbidden (not owner)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (not owner or missing FILE_MANAGE)', schema: { example: { statusCode: 403, message: 'Only owner or FILE_MANAGE can delete', error: 'Forbidden' } } })
     async remove(@Query('key') key: string, @Req() req: any) {
-        const ownerId = await this.files.findOwnerIdByKey(key);
         const currentUserId = req?.user?.userId;
-        // PermissionGuard will attach permission requirement if declared; here we do ownership check manually.
-        if (ownerId && ownerId !== currentUserId) {
-            // Not owner; check FILE_MANAGE permission via PermissionGuard metadata
-            throw new ForbiddenException('Only owner or FILE_MANAGE can delete');
+        const ownerId = await this.files.findOwnerIdByKey(key);
+        if (ownerId == null) {
+            // Unknown owner: only FILE_MANAGE may delete
+            const lvl = await this.permissions.getUserPermissionLevel(currentUserId, 'FILE_MANAGE');
+            if (lvl < 1) throw new ForbiddenException('Only owner or FILE_MANAGE can delete');
+        } else if (ownerId !== currentUserId) {
+            // Not owner: require FILE_MANAGE
+            const lvl = await this.permissions.getUserPermissionLevel(currentUserId, 'FILE_MANAGE');
+            if (lvl < 1) throw new ForbiddenException('Only owner or FILE_MANAGE can delete');
         }
         await this.files.deleteObject(key);
         await this.files.deleteRecordByKey(key);

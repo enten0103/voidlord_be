@@ -155,6 +155,7 @@ BOOK_CREATE
 BOOK_UPDATE
 BOOK_DELETE
 RECOMMENDATION_MANAGE
+FILE_MANAGE
 ```
 
 业务端点与所需权限：
@@ -182,6 +183,10 @@ RECOMMENDATION_MANAGE
 | 权限 | GET | /permissions/user/:id | USER_READ | 1 | 否 |
 | 文件 | POST | /files/policy/public | SYS_MANAGE | 3 | 否 |
 | 文件 | POST | /files/policy/private | SYS_MANAGE | 3 | 否 |
+| 文件 | GET | /files/upload-url | (需登录) | 0 | 否 |
+| 文件 | GET | /files/download-url | (需登录) | 0 | 否 |
+| 文件 | POST | /files/upload | (需登录) | 0 | 否 |
+| 文件 | DELETE | /files/object | FILE_MANAGE 或本人 | 1/0 | 否 |
 
 说明：
 - 读取类图书接口当前不强制 BOOK_READ，若需收紧可加 `@ApiPermission('BOOK_READ',1)` 并在种子或管理员授予。

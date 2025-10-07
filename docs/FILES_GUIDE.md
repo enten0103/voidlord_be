@@ -13,6 +13,17 @@
 - **存储桶策略管理**: 提供（受保护的）API 来动态更改存储桶的访问策略（公开/私有）。
   - 仅限拥有 `SYS_MANAGE (>=3)` 的管理员调用；建议启用审计日志。
 
+## 认证与权限一览
+
+- 所有文件相关端点均需要登录（携带有效 JWT）。
+- 删除对象权限：
+  - 若对象记录的所有者为当前用户本人，可直接删除；
+  - 若所有者不是当前用户，或对象未记录所有者，则需要 `FILE_MANAGE (>=1)` 权限；
+  - 若无上述条件，返回 403 Forbidden。
+  - 标准错误示例：
+    - 401 未登录：`{ "statusCode": 401, "message": "Unauthorized", "error": "Unauthorized" }`
+    - 403 权限不足：`{ "statusCode": 403, "message": "Only owner or FILE_MANAGE can delete", "error": "Forbidden" }`
+
 ## 环境变量配置
 
 请确保在您的 `.env` 文件中配置了以下变量：
@@ -85,7 +96,7 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:9000
 ### 4. 删除对象
 
 - **Endpoint**: `DELETE /files/object`
-- **描述**: 从存储桶中删除一个对象。
+- **描述**: 从存储桶中删除一个对象。需要本人所有权或 `FILE_MANAGE` 权限。当对象未记录所有者时，只有拥有 `FILE_MANAGE` 的用户可以删除。
 - **查询参数**:
   - `key` (string, required): 要删除的对象的键。
 - **成功响应 (200)**:
@@ -94,6 +105,15 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:9000
     "ok": true
   }
   ```
+- **错误响应**：
+  - 401 未认证：
+    ```json
+    { "statusCode": 401, "message": "Unauthorized", "error": "Unauthorized" }
+    ```
+  - 403 非本人且无 FILE_MANAGE：
+    ```json
+    { "statusCode": 403, "message": "Only owner or FILE_MANAGE can delete", "error": "Forbidden" }
+    ```
 
 ### 5. 设置存储桶策略为公开
 
@@ -142,3 +162,8 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:9000
   - 限定只读策略（仅 `s3:GetObject`）。
   - 记录操作者与发生时间；设置提醒尽快恢复私有。
   - 针对敏感前缀（如 `private/`）使用独立桶或不暴露策略。
+
+## 相关文档
+
+- 权限模型与 401/403 语义详见：`docs/PERMISSIONS_GUIDE.md`
+- 顶层概览与端点列表参见：`README.md`

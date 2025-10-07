@@ -116,7 +116,8 @@ export class FilesService implements OnModuleInit {
 
     getPublicUrl(key: string, bucket?: string): string {
         const endpoint = this.config.get<string>('MINIO_PUBLIC_ENDPOINT') ||
-            this.config.get<string>('MINIO_ENDPOINT', 'http://localhost:9000');
+            this.config.get<string>('MINIO_ENDPOINT') ||
+            (this.config.get<string>('PUBLIC_HOST_IP') ? `http://${this.config.get<string>('PUBLIC_HOST_IP')}:9000` : 'http://localhost:9000');
         const Bucket = this.getBucket(bucket);
         // path-style URL: http://host/bucket/key
         const encodedKey = key
