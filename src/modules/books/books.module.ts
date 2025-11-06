@@ -5,9 +5,11 @@ import { BooksController } from './books.controller';
 import { Book } from '../../entities/book.entity';
 import { Tag } from '../../entities/tag.entity';
 import { BookRating } from '../../entities/book-rating.entity';
+import { Comment } from '../../entities/comment.entity';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Book, Tag, BookRating])],
+  imports: [TypeOrmModule.forFeature([Book, Tag, BookRating, Comment]), PermissionsModule],
   controllers: [BooksController],
   providers: [BooksService],
   exports: [BooksService],

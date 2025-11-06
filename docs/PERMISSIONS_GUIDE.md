@@ -24,6 +24,7 @@ BOOK_UPDATE
 BOOK_DELETE
 RECOMMENDATION_MANAGE
 FILE_MANAGE
+COMMENT_MANAGE
 SYS_MANAGE
 ```
 
@@ -136,6 +137,10 @@ POST /permissions/revoke
 | 文件 | /files/download-url | GET | (需要登录) | 0 | 否 |
 | 文件 | /files/upload | POST | (需要登录) | 0 | 否 |
 | 文件 | /files/object | DELETE | FILE_MANAGE（非本人/未知） | 1 | 否 |
+| 评论 | /books/:id/comments | POST | (需要登录) | 0 | 否 |
+| 评论 | /books/:id/comments/:commentId | DELETE | COMMENT_MANAGE（非本人） | 1 | 否 |
+
+> 评论删除规则：评论作者本人可直接删除；非作者需要 `COMMENT_MANAGE (>=1)`；否则返回 403。
 
 > 说明：删除对象时，若记录的所有者为当前用户本人，则无需 FILE_MANAGE 也可删除；若所有者不是本人，或对象未记录所有者，则需要 `FILE_MANAGE (>=1)` 才能删除，否则返回 403。
 

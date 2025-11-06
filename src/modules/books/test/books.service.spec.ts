@@ -6,6 +6,7 @@ import { BooksService } from '../books.service';
 import { Book } from '../../../entities/book.entity';
 import { Tag } from '../../../entities/tag.entity';
 import { BookRating } from '../../../entities/book-rating.entity';
+import { Comment } from '../../../entities/comment.entity';
 
 describe('BooksService', () => {
     let service: BooksService;
@@ -55,6 +56,16 @@ describe('BooksService', () => {
         createQueryBuilder: jest.fn(),
     };
 
+    const mockCommentRepository = {
+        create: jest.fn(),
+        save: jest.fn(),
+        findOne: jest.fn(),
+        remove: jest.fn(),
+        find: jest.fn(),
+        count: jest.fn(),
+        createQueryBuilder: jest.fn(),
+    };
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -70,6 +81,10 @@ describe('BooksService', () => {
                 {
                     provide: getRepositoryToken(BookRating),
                     useValue: mockRatingRepository,
+                },
+                {
+                    provide: getRepositoryToken(Comment),
+                    useValue: mockCommentRepository,
                 },
             ],
         }).compile();

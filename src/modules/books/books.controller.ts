@@ -12,6 +12,7 @@ import {
     Query,
     UseGuards,
     UseInterceptors,
+    ForbiddenException,
 } from '@nestjs/common';
 import {
     ApiBearerAuth,
@@ -30,12 +31,14 @@ import { CreateBookDto } from './dto/create-book.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { RateBookDto } from './dto/rate-book.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { PermissionsService } from '../permissions/permissions.service';
 
 @ApiTags('books')
 @Controller('books')
 @UseInterceptors(ClassSerializerInterceptor)
 export class BooksController {
-    constructor(private readonly booksService: BooksService) { }
+    constructor(private readonly booksService: BooksService, private readonly permissions: PermissionsService) { }
 
     @Post()
     @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -417,5 +420,57 @@ export class BooksController {
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     removeMyRating(@Param('id') id: string, @Req() req: any) {
         return this.booksService.removeMyRating(+id, req?.user?.userId);
+    }
+
+    // Comments
+    @Get(':id/comments')
+    @ApiOperation({ summary: 'List comments for a book (public)' })
+    @ApiQuery({ name: 'limit', required: false, example: 20 })
+    @ApiQuery({ name: 'offset', required: false, example: 0 })
+    @ApiResponse({ status: 200, description: 'Comments list', schema: { example: { bookId: 1, total: 1, limit: 20, offset: 0, items: [{ id: 10, content: 'Nice!', created_at: '2025-01-01T00:00:00.000Z', user: { id: 2, username: 'alice' } }] } } })
+    @ApiResponse({ status: 404, description: 'Book not found' })
+    listComments(@Param('id') id: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+        const lim = limit ? parseInt(limit, 10) : 20;
+        const off = offset ? parseInt(offset, 10) : 0;
+        return this.booksService.listComments(+id, isNaN(lim) ? 20 : lim, isNaN(off) ? 0 : off);
+    }
+
+    @Post(':id/comments')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Add a comment to a book' })
+    @ApiBody({ schema: { properties: { content: { type: 'string', minLength: 1, maxLength: 2000, example: 'Great book!' } }, required: ['content'] } })
+    @ApiResponse({ status: 201, description: 'Comment created', schema: { example: { id: 11, bookId: 1, content: 'Great book!', created_at: '2025-01-01T00:00:00.000Z' } } })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 404, description: 'Book not found' })
+    addComment(@Param('id') id: string, @Body() body: CreateCommentDto, @Req() req: any) {
+        return this.booksService.addComment(+id, req?.user?.userId, body.content);
+    }
+
+    @Delete(':id/comments/:commentId')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Delete a comment (owner or COMMENT_MANAGE)' })
+    @ApiResponse({ status: 200, description: 'Deleted', schema: { example: { ok: true } } })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 403, description: 'Forbidden (not owner or missing COMMENT_MANAGE)', schema: { example: { statusCode: 403, message: 'Only owner or COMMENT_MANAGE can delete', error: 'Forbidden' } } })
+    async deleteComment(@Param('id') id: string, @Param('commentId') commentId: string, @Req() req: any) {
+        const currentUserId = req?.user?.userId as number;
+        const bookId = +id;
+        const cid = +commentId;
+        const ownerId = await this.booksService.getCommentOwnerId(bookId, cid);
+        if (ownerId === null) {
+            // not found -> let service throw proper 404
+            return this.booksService.removeComment(bookId, cid);
+        }
+        if (ownerId && ownerId === currentUserId) {
+            return this.booksService.removeComment(bookId, cid);
+        }
+        const lvl = await this.permissions.getUserPermissionLevel(currentUserId, 'COMMENT_MANAGE');
+        if (lvl < 1) {
+            // mimic files policy wording
+            throw new ForbiddenException('Only owner or COMMENT_MANAGE can delete');
+        }
+        return this.booksService.removeComment(bookId, cid);
     }
 }

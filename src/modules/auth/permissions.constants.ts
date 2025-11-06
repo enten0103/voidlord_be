@@ -9,5 +9,6 @@ export const PERMISSIONS = [
     'BOOK_DELETE',
     'RECOMMENDATION_MANAGE',
     'FILE_MANAGE',
+    'COMMENT_MANAGE',
     'SYS_MANAGE',
 ];

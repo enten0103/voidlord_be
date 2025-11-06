@@ -10,6 +10,7 @@ import { Tag } from '../../entities/tag.entity';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { BookRating } from '../../entities/book-rating.entity';
+import { Comment } from '../../entities/comment.entity';
 
 @Injectable()
 export class BooksService {
@@ -20,6 +21,8 @@ export class BooksService {
     private tagRepository: Repository<Tag>,
     @InjectRepository(BookRating)
     private ratingRepository: Repository<BookRating>,
+    @InjectRepository(Comment)
+    private commentRepository: Repository<Comment>,
   ) { }
 
   async create(createBookDto: CreateBookDto, userId?: number): Promise<Book> {
@@ -173,6 +176,66 @@ export class BooksService {
       .addSelect('AVG(r.score)', 'avg')
       .getRawOne<{ count: string; avg: string }>();
     return { ok: true, bookId, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
+  }
+
+  // Comments
+  async listComments(bookId: number, limit = 20, offset = 0) {
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    if (limit <= 0) limit = 20;
+    if (limit > 100) limit = 100;
+    if (offset < 0) offset = 0;
+    const [items, total] = await this.commentRepository.findAndCount({
+      where: { book: { id: bookId } } as any,
+      order: { created_at: 'DESC' },
+      take: limit,
+      skip: offset,
+      relations: ['user'],
+    });
+    return {
+      bookId,
+      total,
+      limit,
+      offset,
+      items: items.map((c) => ({
+        id: c.id,
+        content: c.content,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        user: c.user ? { id: c.user.id, username: (c.user as any).username } : null,
+      })),
+    };
+  }
+
+  async addComment(bookId: number, userId: number, content: string) {
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      throw new ConflictException('Content is required');
+    }
+    if (content.length > 2000) {
+      throw new ConflictException('Content too long (max 2000)');
+    }
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    const entity = this.commentRepository.create({
+      book: { id: bookId } as any,
+      user: userId ? ({ id: userId } as any) : null,
+      content: content.trim(),
+    });
+    const saved = await this.commentRepository.save(entity);
+    return { id: saved.id, bookId, content: saved.content, created_at: saved.created_at };
+  }
+
+  async removeComment(bookId: number, commentId: number) {
+    const c = await this.commentRepository.findOne({ where: { id: commentId, book: { id: bookId } } as any, relations: ['user'] });
+    if (!c) throw new NotFoundException('Comment not found');
+    await this.commentRepository.remove(c);
+    return { ok: true };
+  }
+
+  async getCommentOwnerId(bookId: number, commentId: number): Promise<number | null> {
+    const c = await this.commentRepository.findOne({ where: { id: commentId, book: { id: bookId } } as any, relations: ['user'] });
+    if (!c) return null;
+    return c.user?.id ?? null;
   }
 
   async findByTags(tagKeys: string[]): Promise<Book[]> {

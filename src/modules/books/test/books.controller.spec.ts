@@ -4,6 +4,7 @@ import { BooksService } from '../books.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../auth/guards/permission.guard';
 import { BadRequestException } from '@nestjs/common';
+import { PermissionsService } from '../../permissions/permissions.service';
 
 describe('BooksController', () => {
     let controller: BooksController;
@@ -35,6 +36,10 @@ describe('BooksController', () => {
         recommendByBook: jest.fn(),
     };
 
+    const mockPermissionsService = {
+        getUserPermissionLevel: jest.fn().mockResolvedValue(0),
+    } as Partial<PermissionsService> as PermissionsService;
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             controllers: [BooksController],
@@ -42,6 +47,10 @@ describe('BooksController', () => {
                 {
                     provide: BooksService,
                     useValue: mockBooksService,
+                },
+                {
+                    provide: PermissionsService,
+                    useValue: mockPermissionsService,
                 },
             ],
         })

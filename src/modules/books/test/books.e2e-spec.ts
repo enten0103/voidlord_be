@@ -1155,4 +1155,87 @@ describe('Books (e2e)', () => {
             expect(agg.body.count).toBeGreaterThanOrEqual(0);
         });
     });
+
+    describe('Book Comments', () => {
+        let createdId: number;
+        let otherUserToken: string;
+        let otherUserId: number;
+
+        beforeEach(async () => {
+            const res = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ hash: 'cmt-1', title: 'Comment Target' })
+                .expect(201);
+            createdId = res.body.id;
+
+            // another user
+            const suffix = Date.now().toString();
+            const otherReg = await request(app.getHttpServer())
+                .post('/auth/register')
+                .send({ username: `c_other_${suffix}`, email: `c_other_${suffix}@example.com`, password: 'p@ssw0rd!' })
+                .expect(201);
+            otherUserId = otherReg.body.user.id;
+            const otherLogin = await request(app.getHttpServer())
+                .post('/auth/login')
+                .send({ username: `c_other_${suffix}`, password: 'p@ssw0rd!' })
+                .expect(201);
+            otherUserToken = otherLogin.body.access_token;
+        });
+
+        it('public can list comments (initially empty)', async () => {
+            const res = await request(app.getHttpServer())
+                .get(`/books/${createdId}/comments`)
+                .expect(200);
+            expect(res.body.total).toBe(0);
+            expect(res.body.items).toEqual([]);
+        });
+
+        it('user can add and list own comment', async () => {
+            const c1 = await request(app.getHttpServer())
+                .post(`/books/${createdId}/comments`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ content: 'Nice book' })
+                .expect(201);
+            expect(c1.body.id).toBeDefined();
+            const list = await request(app.getHttpServer())
+                .get(`/books/${createdId}/comments`)
+                .expect(200);
+            expect(list.body.total).toBe(1);
+            expect(list.body.items[0].content).toBe('Nice book');
+        });
+
+        it('requires auth to add comment', async () => {
+            await request(app.getHttpServer())
+                .post(`/books/${createdId}/comments`)
+                .send({ content: 'x' })
+                .expect(401);
+        });
+
+        it('owner can delete own comment; others cannot unless COMMENT_MANAGE', async () => {
+            // current user adds a comment
+            const c1 = await request(app.getHttpServer())
+                .post(`/books/${createdId}/comments`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ content: 'to be deleted' })
+                .expect(201);
+            const commentId = c1.body.id;
+
+            // other user cannot delete
+            await request(app.getHttpServer())
+                .delete(`/books/${createdId}/comments/${commentId}`)
+                .set('Authorization', `Bearer ${otherUserToken}`)
+                .expect(403);
+
+            // grant other user COMMENT_MANAGE
+            const ds = app.get(DataSource);
+            await grantPermissions(ds, otherUserId, { COMMENT_MANAGE: 1 });
+
+            // now can delete
+            await request(app.getHttpServer())
+                .delete(`/books/${createdId}/comments/${commentId}`)
+                .set('Authorization', `Bearer ${otherUserToken}`)
+                .expect(200);
+        });
+    });
 });

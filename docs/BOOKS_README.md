@@ -272,10 +272,6 @@ const book = await fetch('/books/hash/sci-fi-001').then(r => r.json());
 
 ## ⭐ 附：评分功能（1-5）
 
-- 公共聚合：`GET /books/:id/rating` → `{ bookId, avg, count }`
-- 我的评分：`GET /books/:id/rating/me`（需登录）→ `{ bookId, myRating }`
-- 设置/更新评分：`POST /books/:id/rating`（需登录）Body: `{ "score": 1..5 }` → `{ ok, bookId, myRating, avg, count }`
-- 取消评分：`DELETE /books/:id/rating`（需登录）→ `{ ok, bookId, avg, count }`
 
 示例：
 ```http
@@ -289,4 +285,33 @@ Content-Type: application/json
 响应（示例）：
 ```json
 { "ok": true, "bookId": 1, "myRating": 5, "avg": 4.6, "count": 13 }
+```
+
+### 评论功能
+- 列表（公开）：`GET /books/:id/comments?limit=20&offset=0`
+- 新增（需登录）：`POST /books/:id/comments` Body: `{ "content": "..." }`
+- 删除（需登录）：`DELETE /books/:id/comments/:commentId`
+  - 作者本人可删除
+  - 非作者需要 `COMMENT_MANAGE (>=1)` 才可删除
+
+新增示例：
+```http
+POST /books/1/comments
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{ "content": "Nice book" }
+```
+
+列表示例响应：
+```json
+{
+  "bookId": 1,
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "items": [
+    { "id": 10, "content": "Nice book", "created_at": "2025-01-01T00:00:00.000Z", "user": { "id": 2, "username": "alice" } }
+  ]
+}
 ```
