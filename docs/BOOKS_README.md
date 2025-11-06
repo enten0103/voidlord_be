@@ -287,20 +287,68 @@ Content-Type: application/json
 { "ok": true, "bookId": 1, "myRating": 5, "avg": 4.6, "count": 13 }
 ```
 
-### 评论功能
-- 列表（公开）：`GET /books/:id/comments?limit=20&offset=0`
-- 新增（需登录）：`POST /books/:id/comments` Body: `{ "content": "..." }`
-- 删除（需登录）：`DELETE /books/:id/comments/:commentId`
-  - 作者本人可删除
-  - 非作者需要 `COMMENT_MANAGE (>=1)` 才可删除
+### 💬 评论功能（Comment）
 
-新增示例：
+提供基础的图书评论能力，含分页、内容校验与权限控制。
+
+#### 接口概览
+- 列表 (公开访问)：`GET /books/:id/comments?limit=20&offset=0`
+- 新增 (需登录)：`POST /books/:id/comments`  Body: `{ "content": "..." }`
+- 删除 (需登录)：`DELETE /books/:id/comments/:commentId`
+  - 评论作者本人可删除
+  - 非作者需要 `COMMENT_MANAGE (>=1)` 权限，否则 403
+
+#### 分页与返回字段
+`listComments` 返回结构：
+```json
+{
+  "bookId": 1,
+  "total": 13,
+  "limit": 20,
+  "offset": 0,
+  "items": [
+    {
+      "id": 10,
+      "content": "Nice!",
+      "created_at": "2025-01-01T00:00:00.000Z",
+      "updated_at": "2025-01-01T00:00:00.000Z",
+      "user": { "id": 2, "username": "alice" }
+    }
+  ]
+}
+```
+规则：
+- `limit` 默认 20；`limit <= 0` 复位为 20；`limit > 100` 会被截断为 100。
+- `offset` 默认 0；负数自动归零。
+- 排序：`created_at DESC`。
+- `user` 可能为 `null`（例如用户被删除或匿名评论）。
+
+#### 内容校验
+- 必须为非空字符串（去除首尾空格后长度 ≥ 1）。
+- 最大长度 2000；超过抛出 `409 Conflict`（消息：`Content too long (max 2000)`）。
+- 空内容抛出 `409 Conflict`（消息：`Content is required`）。
+
+#### 错误响应示例
+| 场景 | 状态码 | 示例 |
+|------|--------|------|
+| 书籍不存在 | 404 | `{ "statusCode":404,"message":"Book not found","error":"Not Found" }` |
+| 评论不存在（删除） | 404 | `{ "statusCode":404,"message":"Comment not found","error":"Not Found" }` |
+| 未登录访问新增/删除 | 401 | `{ "statusCode":401,"message":"Unauthorized","error":"Unauthorized" }` |
+| 权限不足删除 | 403 | `{ "statusCode":403,"message":"Only owner or COMMENT_MANAGE can delete","error":"Forbidden" }` |
+| 内容非法（空/过长） | 409 | `{ "statusCode":409,"message":"Content is required","error":"Conflict" }` |
+
+#### 新增示例：
 ```http
 POST /books/1/comments
 Authorization: Bearer <jwt>
 Content-Type: application/json
 
 { "content": "Nice book" }
+```
+
+成功响应：
+```json
+{ "id": 11, "bookId": 1, "content": "Nice book", "created_at": "2025-01-01T00:00:00.000Z" }
 ```
 
 列表示例响应：
@@ -314,4 +362,14 @@ Content-Type: application/json
     { "id": 10, "content": "Nice book", "created_at": "2025-01-01T00:00:00.000Z", "user": { "id": 2, "username": "alice" } }
   ]
 }
+```
+
+#### 删除示例
+```http
+DELETE /books/1/comments/10
+Authorization: Bearer <jwt>
+```
+成功响应：
+```json
+{ "ok": true }
 ```

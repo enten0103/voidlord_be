@@ -63,6 +63,7 @@ describe('BooksService', () => {
         remove: jest.fn(),
         find: jest.fn(),
         count: jest.fn(),
+        findAndCount: jest.fn(),
         createQueryBuilder: jest.fn(),
     };
 
@@ -478,6 +479,112 @@ describe('BooksService', () => {
             const result = await service.recommendByBook(1, 5);
             expect(result.map((b) => b.id)).toEqual([2]);
             expect(mockBookRepository.find).toHaveBeenCalled();
+        });
+    });
+
+    describe('comments', () => {
+        beforeEach(() => {
+            jest.clearAllMocks();
+        });
+
+        describe('listComments', () => {
+            it('should list comments with pagination (default 20/0)', async () => {
+                const now = new Date();
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
+                (mockCommentRepository.findAndCount as any).mockResolvedValueOnce([
+                    [
+                        { id: 10, content: 'Nice!', created_at: now, updated_at: now, user: { id: 2, username: 'alice' } },
+                    ],
+                    1,
+                ]);
+
+                const result = await service.listComments(1);
+                expect(result.bookId).toBe(1);
+                expect(result.total).toBe(1);
+                expect(result.limit).toBe(20);
+                expect(result.offset).toBe(0);
+                expect(result.items[0]).toMatchObject({ id: 10, content: 'Nice!', user: { id: 2, username: 'alice' } });
+
+                expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({
+                    where: { book: { id: 1 } },
+                    take: 20,
+                    skip: 0,
+                }));
+            });
+
+            it('should clamp invalid limit/offset', async () => {
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
+                (mockCommentRepository.findAndCount as any).mockResolvedValueOnce([[], 0]);
+                await service.listComments(1, 1000, -5);
+                expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ take: 100, skip: 0 }));
+            });
+
+            it('should throw NotFoundException when book not found', async () => {
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(null);
+                await expect(service.listComments(999)).rejects.toThrow(NotFoundException);
+            });
+        });
+
+        describe('addComment', () => {
+            it('should add comment successfully', async () => {
+                const now = new Date();
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
+                (mockCommentRepository.create as any).mockReturnValueOnce({ id: 11, content: 'Great book!', created_at: now });
+                (mockCommentRepository.save as any).mockResolvedValueOnce({ id: 11, content: 'Great book!', created_at: now });
+
+                const res = await service.addComment(1, 42, '  Great book!  ');
+                expect(res).toMatchObject({ id: 11, bookId: 1, content: 'Great book!' });
+                expect(mockCommentRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+                    book: { id: 1 }, user: { id: 42 }, content: 'Great book!'
+                }));
+            });
+
+            it('should reject empty content', async () => {
+                await expect(service.addComment(1, 1, '')).rejects.toThrow(ConflictException);
+                await expect(service.addComment(1, 1, '   ')).rejects.toThrow(ConflictException);
+            });
+
+            it('should reject too long content (>2000)', async () => {
+                const long = 'a'.repeat(2001);
+                await expect(service.addComment(1, 1, long)).rejects.toThrow(ConflictException);
+            });
+
+            it('should throw NotFound when book missing', async () => {
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(null);
+                await expect(service.addComment(999, 1, 'x')).rejects.toThrow(NotFoundException);
+            });
+        });
+
+        describe('removeComment', () => {
+            it('should remove comment when exists', async () => {
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce({ id: 10, book: { id: 1 }, user: { id: 2 } });
+                (mockCommentRepository.remove as any).mockResolvedValueOnce(undefined);
+                const res = await service.removeComment(1, 10);
+                expect(res).toEqual({ ok: true });
+                expect(mockCommentRepository.remove).toHaveBeenCalled();
+            });
+
+            it('should throw NotFound when comment missing', async () => {
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce(null);
+                await expect(service.removeComment(1, 999)).rejects.toThrow(NotFoundException);
+            });
+        });
+
+        describe('getCommentOwnerId', () => {
+            it('should return user id when exists', async () => {
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce({ id: 10, book: { id: 1 }, user: { id: 7 } });
+                await expect(service.getCommentOwnerId(1, 10)).resolves.toBe(7);
+            });
+
+            it('should return null when not found', async () => {
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce(null);
+                await expect(service.getCommentOwnerId(1, 999)).resolves.toBeNull();
+            });
+
+            it('should return null when has no user', async () => {
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce({ id: 10, book: { id: 1 }, user: null });
+                await expect(service.getCommentOwnerId(1, 10)).resolves.toBeNull();
+            });
         });
     });
 });

@@ -32,11 +32,11 @@ export async function createTestModule(): Promise<TestingModule> {
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_NAME || 'voidlord_test',
-  entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment],
+        entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment],
         synchronize: true,
         dropSchema: true, // 每次测试都重新创建数据库结构
       }),
-  TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment]),
+      TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment]),
       UsersModule,
       AuthModule,
       BooksModule,
