@@ -269,3 +269,24 @@ const book = await fetch('/books/hash/sci-fi-001').then(r => r.json());
 - 标签不会因为没有关联图书而被自动删除
 - 所有写操作都需要认证
 - E2E 测试需要测试数据库支持；标签搜索与推荐详见 BOOKS_TAG_SEARCH.md
+
+## ⭐ 附：评分功能（1-5）
+
+- 公共聚合：`GET /books/:id/rating` → `{ bookId, avg, count }`
+- 我的评分：`GET /books/:id/rating/me`（需登录）→ `{ bookId, myRating }`
+- 设置/更新评分：`POST /books/:id/rating`（需登录）Body: `{ "score": 1..5 }` → `{ ok, bookId, myRating, avg, count }`
+- 取消评分：`DELETE /books/:id/rating`（需登录）→ `{ ok, bookId, avg, count }`
+
+示例：
+```http
+POST /books/1/rating
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{ "score": 5 }
+```
+
+响应（示例）：
+```json
+{ "ok": true, "bookId": 1, "myRating": 5, "avg": 4.6, "count": 13 }
+```
