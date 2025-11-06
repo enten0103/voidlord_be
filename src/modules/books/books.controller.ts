@@ -425,8 +425,20 @@ export class BooksController {
     // Comments
     @Get(':id/comments')
     @ApiOperation({ summary: 'List comments for a book (public)' })
-    @ApiQuery({ name: 'limit', required: false, example: 20 })
-    @ApiQuery({ name: 'offset', required: false, example: 0 })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        description: 'Page size (1-100). Defaults to 20; values <= 0 reset to 20; > 100 clamp to 100.',
+        schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        example: 20,
+    })
+    @ApiQuery({
+        name: 'offset',
+        required: false,
+        description: 'Offset (>= 0). Defaults to 0; negative values reset to 0.',
+        schema: { type: 'integer', minimum: 0, default: 0 },
+        example: 0,
+    })
     @ApiResponse({ status: 200, description: 'Comments list', schema: { example: { bookId: 1, total: 1, limit: 20, offset: 0, items: [{ id: 10, content: 'Nice!', created_at: '2025-01-01T00:00:00.000Z', user: { id: 2, username: 'alice' } }] } } })
     @ApiResponse({ status: 404, description: 'Book not found' })
     listComments(@Param('id') id: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
@@ -442,6 +454,24 @@ export class BooksController {
     @ApiBody({ schema: { properties: { content: { type: 'string', minLength: 1, maxLength: 2000, example: 'Great book!' } }, required: ['content'] } })
     @ApiResponse({ status: 201, description: 'Comment created', schema: { example: { id: 11, bookId: 1, content: 'Great book!', created_at: '2025-01-01T00:00:00.000Z' } } })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({
+        status: 409,
+        description: 'Invalid content',
+        content: {
+            'application/json': {
+                examples: {
+                    empty: {
+                        summary: 'Empty content',
+                        value: { statusCode: 409, message: 'Content is required', error: 'Conflict' },
+                    },
+                    tooLong: {
+                        summary: 'Content too long (>2000)',
+                        value: { statusCode: 409, message: 'Content too long (max 2000)', error: 'Conflict' },
+                    },
+                },
+            },
+        },
+    })
     @ApiResponse({ status: 404, description: 'Book not found' })
     addComment(@Param('id') id: string, @Body() body: CreateCommentDto, @Req() req: any) {
         return this.booksService.addComment(+id, req?.user?.userId, body.content);
@@ -454,6 +484,7 @@ export class BooksController {
     @ApiResponse({ status: 200, description: 'Deleted', schema: { example: { ok: true } } })
     @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
     @ApiResponse({ status: 403, description: 'Forbidden (not owner or missing COMMENT_MANAGE)', schema: { example: { statusCode: 403, message: 'Only owner or COMMENT_MANAGE can delete', error: 'Forbidden' } } })
+    @ApiResponse({ status: 404, description: 'Comment not found' })
     async deleteComment(@Param('id') id: string, @Param('commentId') commentId: string, @Req() req: any) {
         const currentUserId = req?.user?.userId as number;
         const bookId = +id;
