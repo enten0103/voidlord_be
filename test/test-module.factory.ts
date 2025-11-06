@@ -24,18 +24,18 @@ export async function createTestModule(): Promise<TestingModule> {
         envFilePath: '.env.test',
         isGlobal: true,
       }),
-  TypeOrmModule.forRoot({
+      TypeOrmModule.forRoot({
         type: 'postgres',
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '5433'),
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_NAME || 'voidlord_test',
-  entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating],
+        entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating],
         synchronize: true,
         dropSchema: true, // 每次测试都重新创建数据库结构
       }),
-  TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating]),
+      TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating]),
       UsersModule,
       AuthModule,
       BooksModule,
