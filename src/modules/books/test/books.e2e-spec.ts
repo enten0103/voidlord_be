@@ -1081,4 +1081,78 @@ describe('Books (e2e)', () => {
             expect(res.body).toEqual([]);
         });
     });
+
+    describe('Book Ratings', () => {
+        let createdId: number;
+
+        beforeEach(async () => {
+            const res = await request(app.getHttpServer())
+                .post('/books')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ hash: 'rate-1', title: 'Rate Target' })
+                .expect(201);
+            createdId = res.body.id;
+        });
+
+        it('public can read aggregate rating (initially zero)', async () => {
+            const res = await request(app.getHttpServer())
+                .get(`/books/${createdId}/rating`)
+                .expect(200);
+            expect(res.body).toEqual({ bookId: createdId, avg: 0, count: 0 });
+        });
+
+        it('user can set and update own rating (1-5)', async () => {
+            // set 5
+            const r1 = await request(app.getHttpServer())
+                .post(`/books/${createdId}/rating`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ score: 5 })
+                .expect(201);
+            expect(r1.body.ok).toBe(true);
+            expect(r1.body.myRating).toBe(5);
+            expect(r1.body.count).toBeGreaterThanOrEqual(1);
+
+            // update to 3
+            const r2 = await request(app.getHttpServer())
+                .post(`/books/${createdId}/rating`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ score: 3 })
+                .expect(201);
+            expect(r2.body.myRating).toBe(3);
+
+            // get my rating
+            const me = await request(app.getHttpServer())
+                .get(`/books/${createdId}/rating/me`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .expect(200);
+            expect(me.body.myRating).toBe(3);
+        });
+
+        it('requires auth to rate and delete my rating', async () => {
+            await request(app.getHttpServer())
+                .post(`/books/${createdId}/rating`)
+                .send({ score: 4 })
+                .expect(401);
+            await request(app.getHttpServer())
+                .delete(`/books/${createdId}/rating`)
+                .expect(401);
+        });
+
+        it('deleting my rating adjusts aggregate', async () => {
+            await request(app.getHttpServer())
+                .post(`/books/${createdId}/rating`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ score: 4 })
+                .expect(201);
+            const del = await request(app.getHttpServer())
+                .delete(`/books/${createdId}/rating`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .expect(200);
+            expect(del.body.ok).toBe(true);
+            const agg = await request(app.getHttpServer())
+                .get(`/books/${createdId}/rating`)
+                .expect(200);
+            expect(agg.body.count).toBeGreaterThanOrEqual(0);
+        });
+    });
 });

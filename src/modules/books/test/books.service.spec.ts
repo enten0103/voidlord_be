@@ -5,6 +5,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { BooksService } from '../books.service';
 import { Book } from '../../../entities/book.entity';
 import { Tag } from '../../../entities/tag.entity';
+import { BookRating } from '../../../entities/book-rating.entity';
 
 describe('BooksService', () => {
     let service: BooksService;
@@ -46,6 +47,14 @@ describe('BooksService', () => {
         findOne: jest.fn(),
     };
 
+    const mockRatingRepository = {
+        create: jest.fn(),
+        save: jest.fn(),
+        findOne: jest.fn(),
+        remove: jest.fn(),
+        createQueryBuilder: jest.fn(),
+    };
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -57,6 +66,10 @@ describe('BooksService', () => {
                 {
                     provide: getRepositoryToken(Tag),
                     useValue: mockTagRepository,
+                },
+                {
+                    provide: getRepositoryToken(BookRating),
+                    useValue: mockRatingRepository,
                 },
             ],
         }).compile();

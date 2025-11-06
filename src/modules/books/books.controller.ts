@@ -29,6 +29,7 @@ import { BookResponseDto } from './dto/book-response.dto';
 import { CreateBookDto } from './dto/create-book.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { RateBookDto } from './dto/rate-book.dto';
 
 @ApiTags('books')
 @Controller('books')
@@ -373,5 +374,48 @@ export class BooksController {
     @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
     remove(@Param('id') id: string) {
         return this.booksService.remove(+id);
+    }
+
+    // Ratings
+    @Get(':id/rating')
+    @ApiOperation({ summary: 'Get book rating aggregate (public)' })
+    @ApiResponse({ status: 200, description: 'Aggregate rating', schema: { example: { bookId: 1, avg: 4.5, count: 12 } } })
+    @ApiResponse({ status: 404, description: 'Book not found' })
+    getRating(@Param('id') id: string) {
+        return this.booksService.getRating(+id);
+    }
+
+    @Get(':id/rating/me')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Get my rating for a book' })
+    @ApiResponse({ status: 200, description: 'My rating', schema: { example: { bookId: 1, myRating: 5 } } })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 404, description: 'Book not found' })
+    getMyRating(@Param('id') id: string, @Req() req: any) {
+        return this.booksService.getMyRating(+id, req?.user?.userId);
+    }
+
+    @Post(':id/rating')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Rate a book (1-5)' })
+    @ApiBody({ schema: { properties: { score: { type: 'number', minimum: 1, maximum: 5, example: 5 } }, required: ['score'] } })
+    @ApiResponse({ status: 201, description: 'Rating set', schema: { example: { ok: true, bookId: 1, myRating: 5, avg: 4.5, count: 13 } } })
+    @ApiResponse({ status: 400, description: 'Invalid score' })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 404, description: 'Book not found' })
+    rate(@Param('id') id: string, @Body() body: RateBookDto, @Req() req: any) {
+        return this.booksService.rateBook(+id, req?.user?.userId, body.score);
+    }
+
+    @Delete(':id/rating')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Remove my rating' })
+    @ApiResponse({ status: 200, description: 'Removed', schema: { example: { ok: true, bookId: 1, avg: 4.3, count: 12 } } })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    removeMyRating(@Param('id') id: string, @Req() req: any) {
+        return this.booksService.removeMyRating(+id, req?.user?.userId);
     }
 }

@@ -9,6 +9,7 @@ import { Book } from '../../entities/book.entity';
 import { Tag } from '../../entities/tag.entity';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { BookRating } from '../../entities/book-rating.entity';
 
 @Injectable()
 export class BooksService {
@@ -17,6 +18,8 @@ export class BooksService {
     private bookRepository: Repository<Book>,
     @InjectRepository(Tag)
     private tagRepository: Repository<Tag>,
+    @InjectRepository(BookRating)
+    private ratingRepository: Repository<BookRating>,
   ) { }
 
   async create(createBookDto: CreateBookDto, userId?: number): Promise<Book> {
@@ -120,6 +123,56 @@ export class BooksService {
   async remove(id: number): Promise<void> {
     const book = await this.findOne(id);
     await this.bookRepository.remove(book);
+  }
+
+  async rateBook(bookId: number, userId: number, score: number) {
+    if (!Number.isInteger(score) || score < 1 || score > 5) {
+      throw new ConflictException('Score must be an integer between 1 and 5');
+    }
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    let rating = await this.ratingRepository.findOne({ where: { book: { id: bookId }, user: { id: userId } } as any });
+    if (!rating) {
+      rating = this.ratingRepository.create({ book: { id: bookId } as any, user: { id: userId } as any, score });
+    } else {
+      rating.score = score;
+    }
+    await this.ratingRepository.save(rating);
+    const agg = await this.ratingRepository.createQueryBuilder('r')
+      .where('r.bookId = :bid', { bid: bookId })
+      .select('COUNT(1)', 'count')
+      .addSelect('AVG(r.score)', 'avg')
+      .getRawOne<{ count: string; avg: string }>();
+    return { ok: true, bookId, myRating: score, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
+  }
+
+  async getRating(bookId: number) {
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    const agg = await this.ratingRepository.createQueryBuilder('r')
+      .where('r.bookId = :bid', { bid: bookId })
+      .select('COUNT(1)', 'count')
+      .addSelect('AVG(r.score)', 'avg')
+      .getRawOne<{ count: string; avg: string }>();
+    return { bookId, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
+  }
+
+  async getMyRating(bookId: number, userId: number) {
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    const r = await this.ratingRepository.findOne({ where: { book: { id: bookId }, user: { id: userId } } as any });
+    return { bookId, myRating: r?.score ?? null };
+  }
+
+  async removeMyRating(bookId: number, userId: number) {
+    const r = await this.ratingRepository.findOne({ where: { book: { id: bookId }, user: { id: userId } } as any });
+    if (r) await this.ratingRepository.remove(r);
+    const agg = await this.ratingRepository.createQueryBuilder('r')
+      .where('r.bookId = :bid', { bid: bookId })
+      .select('COUNT(1)', 'count')
+      .addSelect('AVG(r.score)', 'avg')
+      .getRawOne<{ count: string; avg: string }>();
+    return { ok: true, bookId, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
   }
 
   async findByTags(tagKeys: string[]): Promise<Book[]> {
