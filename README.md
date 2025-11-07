@@ -17,28 +17,10 @@
 - ✅ 自动数据库迁移和种子数据
 
 ## 技术栈
-
-- **框架**: NestJS
-- **数据库**: PostgreSQL
-- **ORM**: TypeORM
-- **认证**: JWT + Passport
-- **测试**: Jest + Supertest
-- **文档**: Swagger/OpenAPI
-- **容器化**: Docker & Docker Compose
-
-## 快速开始
-
 ### 1. 安装依赖
-
+# Book 模块使用指南
 ```bash
 pnpm install
-```
-
-### 2. 启动数据库
-
-确保 Docker Desktop 正在运行，然后启动 PostgreSQL：
-
-```bash
 pnpm run docker:up
 ```
 
@@ -51,10 +33,10 @@ pnpm run docker:up
 DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
-DB_PASSWORD=postgres
+### 数据验证
 DB_NAME=voidlord
 DB_SYNCHRONIZE=true    # 开发环境自动同步数据库结构
-DB_LOGGING=false       # 数据库查询日志
+## 🧪 测试覆盖
 
 # JWT配置
 JWT_SECRET=your-super-secret-jwt-key-change-in-production

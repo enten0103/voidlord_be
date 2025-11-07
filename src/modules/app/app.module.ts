@@ -12,6 +12,7 @@ import { RecommendationsModule } from '../recommendations/recommendations.module
 import { PermissionsModule } from '../permissions/permissions.module';
 import { FilesModule } from '../files/files.module';
 import { UserConfigModule } from '../user-config/user-config.module';
+import { BookListsModule } from '../book-lists/book-lists.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { UserConfigModule } from '../user-config/user-config.module';
     RecommendationsModule,
     PermissionsModule,
     FilesModule,
-    UserConfigModule,
+  UserConfigModule,
+  BookListsModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

@@ -17,6 +17,9 @@ import { FileObject } from '../src/entities/file-object.entity';
 import { UserConfigModule } from '../src/modules/user-config/user-config.module';
 import { BookRating } from '../src/entities/book-rating.entity';
 import { Comment } from '../src/entities/comment.entity';
+import { FavoriteList } from '../src/entities/favorite-list.entity';
+import { FavoriteListItem } from '../src/entities/favorite-list-item.entity';
+import { BookListsModule } from '../src/modules/book-lists/book-lists.module';
 
 export async function createTestModule(): Promise<TestingModule> {
   return Test.createTestingModule({
@@ -25,23 +28,24 @@ export async function createTestModule(): Promise<TestingModule> {
         envFilePath: '.env.test',
         isGlobal: true,
       }),
-      TypeOrmModule.forRoot({
+  TypeOrmModule.forRoot({
         type: 'postgres',
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '5433'),
         username: process.env.DB_USERNAME || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_NAME || 'voidlord_test',
-        entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment],
+  entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment, FavoriteList, FavoriteListItem],
         synchronize: true,
         dropSchema: true, // 每次测试都重新创建数据库结构
       }),
-      TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment]),
+  TypeOrmModule.forFeature([User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment, FavoriteList, FavoriteListItem]),
       UsersModule,
       AuthModule,
       BooksModule,
       RecommendationsModule,
       UserConfigModule,
+      BookListsModule,
     ],
   }).compile();
 }
