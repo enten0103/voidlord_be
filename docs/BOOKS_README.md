@@ -301,7 +301,7 @@ Content-Type: application/json
   - 非作者需要 `COMMENT_MANAGE (>=1)` 权限，否则 403
 
 #### 分页与返回字段
-`listComments`（仅返回顶层评论）返回结构：
+`listComments`（仅返回顶层评论）返回结构（含子评论数量 reply_count）：
 ```json
 {
   "bookId": 1,
@@ -314,7 +314,8 @@ Content-Type: application/json
       "content": "Nice!",
       "created_at": "2025-01-01T00:00:00.000Z",
       "updated_at": "2025-01-01T00:00:00.000Z",
-      "user": { "id": 2, "username": "alice" }
+  "user": { "id": 2, "username": "alice" },
+  "reply_count": 3
     }
   ]
 }

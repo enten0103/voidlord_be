@@ -424,7 +424,7 @@ export class BooksController {
 
     // Comments
     @Get(':id/comments')
-    @ApiOperation({ summary: 'List top-level comments for a book (public)' })
+    @ApiOperation({ summary: 'List top-level comments for a book (public) with reply_count' })
     @ApiQuery({
         name: 'limit',
         required: false,
@@ -439,7 +439,7 @@ export class BooksController {
         schema: { type: 'integer', minimum: 0, default: 0 },
         example: 0,
     })
-    @ApiResponse({ status: 200, description: 'Comments list', schema: { example: { bookId: 1, total: 1, limit: 20, offset: 0, items: [{ id: 10, content: 'Nice!', created_at: '2025-01-01T00:00:00.000Z', user: { id: 2, username: 'alice' } }] } } })
+    @ApiResponse({ status: 200, description: 'Comments list', schema: { example: { bookId: 1, total: 1, limit: 20, offset: 0, items: [{ id: 10, content: 'Nice!', created_at: '2025-01-01T00:00:00.000Z', user: { id: 2, username: 'alice' }, reply_count: 3 }] } } })
     @ApiResponse({ status: 404, description: 'Book not found' })
     listComments(@Param('id') id: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
         const lim = limit ? parseInt(limit, 10) : 20;

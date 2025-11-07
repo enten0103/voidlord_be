@@ -1203,6 +1203,7 @@ describe('Books (e2e)', () => {
                 .expect(200);
             expect(list.body.total).toBe(1);
             expect(list.body.items[0].content).toBe('Nice book');
+            expect(list.body.items[0].reply_count).toBe(0);
         });
 
         it('requires auth to add comment', async () => {
@@ -1261,6 +1262,12 @@ describe('Books (e2e)', () => {
                 .expect(200);
             expect(list.body.total).toBe(1);
             expect(list.body.items[0].content).toBe('First reply');
+
+            // list top-level again should show reply_count = 1
+            const tops = await request(app.getHttpServer())
+                .get(`/books/${createdId}/comments`)
+                .expect(200);
+            expect(tops.body.items[0].reply_count).toBe(1);
 
             // delete parent comment -> should cascade delete replies
             await request(app.getHttpServer())

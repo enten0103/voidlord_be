@@ -497,13 +497,15 @@ describe('BooksService', () => {
                     ],
                     1,
                 ]);
+                // reply count for comment id=10
+                (mockCommentRepository.count as any).mockResolvedValueOnce(3);
 
                 const result = await service.listComments(1);
                 expect(result.bookId).toBe(1);
                 expect(result.total).toBe(1);
                 expect(result.limit).toBe(20);
                 expect(result.offset).toBe(0);
-                expect(result.items[0]).toMatchObject({ id: 10, content: 'Nice!', user: { id: 2, username: 'alice' } });
+                expect(result.items[0]).toMatchObject({ id: 10, content: 'Nice!', user: { id: 2, username: 'alice' }, reply_count: 3 });
 
                 expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({
                     where: expect.objectContaining({ book: { id: 1 } }),

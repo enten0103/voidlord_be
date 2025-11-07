@@ -192,17 +192,24 @@ export class BooksService {
       skip: offset,
       relations: ['user'],
     });
+    // compute reply counts for each top-level comment
+    const counts = await Promise.all(
+      items.map((c) =>
+        this.commentRepository.count({ where: { book: { id: bookId }, parent: { id: c.id } } as any })
+      )
+    );
     return {
       bookId,
       total,
       limit,
       offset,
-      items: items.map((c) => ({
+      items: items.map((c, idx) => ({
         id: c.id,
         content: c.content,
         created_at: c.created_at,
         updated_at: c.updated_at,
         user: c.user ? { id: c.user.id, username: (c.user as any).username } : null,
+        reply_count: counts[idx] ?? 0,
       })),
     };
   }
