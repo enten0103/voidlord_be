@@ -506,7 +506,7 @@ describe('BooksService', () => {
                 expect(result.items[0]).toMatchObject({ id: 10, content: 'Nice!', user: { id: 2, username: 'alice' } });
 
                 expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({
-                    where: { book: { id: 1 } },
+                    where: expect.objectContaining({ book: { id: 1 } }),
                     take: 20,
                     skip: 0,
                 }));
@@ -584,6 +584,46 @@ describe('BooksService', () => {
             it('should return null when has no user', async () => {
                 (mockCommentRepository.findOne as any).mockResolvedValueOnce({ id: 10, book: { id: 1 }, user: null });
                 await expect(service.getCommentOwnerId(1, 10)).resolves.toBeNull();
+            });
+        });
+
+        describe('replies', () => {
+            it('should add a reply successfully', async () => {
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook); // book exists
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce({ id: 10, book: { id: 1 } }); // parent exists
+                (mockCommentRepository.create as any).mockReturnValueOnce({ id: 12, content: 'Thanks!', created_at: new Date() });
+                (mockCommentRepository.save as any).mockResolvedValueOnce({ id: 12, content: 'Thanks!', created_at: new Date() });
+
+                const res = await service.addReply(1, 42, 10, ' Thanks! ');
+                expect(res).toMatchObject({ id: 12, bookId: 1, parentId: 10, content: 'Thanks!' });
+                expect(mockCommentRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+                    book: { id: 1 }, parent: { id: 10 }, user: { id: 42 }, content: 'Thanks!'
+                }));
+            });
+
+            it('should list replies with pagination', async () => {
+                const now = new Date();
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook); // book
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce({ id: 10, book: { id: 1 } }); // parent
+                (mockCommentRepository.findAndCount as any).mockResolvedValueOnce([[{ id: 12, content: 'r', created_at: now, updated_at: now, user: { id: 5, username: 'bob' } }], 1]);
+                const res = await service.listReplies(1, 10, 50, 0);
+                expect(res).toMatchObject({ bookId: 1, parentId: 10, total: 1, limit: 50, offset: 0 });
+                expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({
+                    where: { book: { id: 1 }, parent: { id: 10 } }, take: 50, skip: 0
+                }));
+            });
+
+            it('should throw NotFound when parent missing', async () => {
+                (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
+                (mockCommentRepository.findOne as any).mockResolvedValueOnce(null);
+                await expect(service.listReplies(1, 999)).rejects.toThrow(NotFoundException);
+                await expect(service.addReply(1, 1, 999, 'x')).rejects.toThrow(NotFoundException);
+            });
+
+            it('should validate reply content', async () => {
+                await expect(service.addReply(1, 1, 10, '')).rejects.toThrow(ConflictException);
+                const long = 'a'.repeat(2001);
+                await expect(service.addReply(1, 1, 10, long)).rejects.toThrow(ConflictException);
             });
         });
     });

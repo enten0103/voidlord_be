@@ -1237,5 +1237,41 @@ describe('Books (e2e)', () => {
                 .set('Authorization', `Bearer ${otherUserToken}`)
                 .expect(200);
         });
+
+        it('supports replies (楼中楼): add/list and cascade delete with parent', async () => {
+            // add a top-level comment
+            const c1 = await request(app.getHttpServer())
+                .post(`/books/${createdId}/comments`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ content: 'Parent Cmt' })
+                .expect(201);
+            const parentId = c1.body.id;
+
+            // reply to that comment
+            const r1 = await request(app.getHttpServer())
+                .post(`/books/${createdId}/comments/${parentId}/replies`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({ content: 'First reply' })
+                .expect(201);
+            expect(r1.body.parentId).toBe(parentId);
+
+            // list replies
+            const list = await request(app.getHttpServer())
+                .get(`/books/${createdId}/comments/${parentId}/replies`)
+                .expect(200);
+            expect(list.body.total).toBe(1);
+            expect(list.body.items[0].content).toBe('First reply');
+
+            // delete parent comment -> should cascade delete replies
+            await request(app.getHttpServer())
+                .delete(`/books/${createdId}/comments/${parentId}`)
+                .set('Authorization', `Bearer ${authToken}`)
+                .expect(200);
+
+            // now parent missing -> listing replies should return 404
+            await request(app.getHttpServer())
+                .get(`/books/${createdId}/comments/${parentId}/replies`)
+                .expect(404);
+        });
     });
 });

@@ -424,7 +424,7 @@ export class BooksController {
 
     // Comments
     @Get(':id/comments')
-    @ApiOperation({ summary: 'List comments for a book (public)' })
+    @ApiOperation({ summary: 'List top-level comments for a book (public)' })
     @ApiQuery({
         name: 'limit',
         required: false,
@@ -503,5 +503,53 @@ export class BooksController {
             throw new ForbiddenException('Only owner or COMMENT_MANAGE can delete');
         }
         return this.booksService.removeComment(bookId, cid);
+    }
+
+    @Get(':id/comments/:commentId/replies')
+    @ApiOperation({ summary: 'List replies of a comment (public)' })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        description: 'Page size (1-100). Defaults to 20; values <= 0 reset to 20; > 100 clamp to 100.',
+        schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        example: 20,
+    })
+    @ApiQuery({
+        name: 'offset',
+        required: false,
+        description: 'Offset (>= 0). Defaults to 0; negative values reset to 0.',
+        schema: { type: 'integer', minimum: 0, default: 0 },
+        example: 0,
+    })
+    @ApiResponse({ status: 200, description: 'Replies list', schema: { example: { bookId: 1, parentId: 10, total: 1, limit: 20, offset: 0, items: [{ id: 12, content: 'Reply text', created_at: '2025-01-01T00:00:00.000Z', user: { id: 3, username: 'bob' } }] } } })
+    @ApiResponse({ status: 404, description: 'Book or parent comment not found', schema: { example: { statusCode: 404, message: 'Parent comment not found', error: 'Not Found' } } })
+    listReplies(@Param('id') id: string, @Param('commentId') commentId: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+        const lim = limit ? parseInt(limit, 10) : 20;
+        const off = offset ? parseInt(offset, 10) : 0;
+        return this.booksService.listReplies(+id, +commentId, isNaN(lim) ? 20 : lim, isNaN(off) ? 0 : off);
+    }
+
+    @Post(':id/comments/:commentId/replies')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Reply to a comment' })
+    @ApiBody({ schema: { properties: { content: { type: 'string', minLength: 1, maxLength: 2000, example: 'I agree' } }, required: ['content'] } })
+    @ApiResponse({ status: 201, description: 'Reply created', schema: { example: { id: 12, bookId: 1, parentId: 10, content: 'I agree', created_at: '2025-01-01T00:00:00.000Z' } } })
+    @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
+    @ApiResponse({ status: 404, description: 'Book or parent comment not found', content: { 'application/json': { examples: { book: { summary: 'Book missing', value: { statusCode: 404, message: 'Book not found', error: 'Not Found' } }, parent: { summary: 'Parent missing', value: { statusCode: 404, message: 'Parent comment not found', error: 'Not Found' } } } } } })
+    @ApiResponse({
+        status: 409,
+        description: 'Invalid content',
+        content: {
+            'application/json': {
+                examples: {
+                    empty: { summary: 'Empty content', value: { statusCode: 409, message: 'Content is required', error: 'Conflict' } },
+                    tooLong: { summary: 'Content too long (>2000)', value: { statusCode: 409, message: 'Content too long (max 2000)', error: 'Conflict' } },
+                },
+            },
+        },
+    })
+    reply(@Param('id') id: string, @Param('commentId') commentId: string, @Body() body: CreateCommentDto, @Req() req: any) {
+        return this.booksService.addReply(+id, req?.user?.userId, +commentId, body.content);
     }
 }

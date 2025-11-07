@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Book } from './book.entity';
 import { User } from './user.entity';
@@ -28,4 +28,11 @@ export class Comment {
     @ApiProperty({ description: 'Author user ID' })
     @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
     user: User | null;
+
+    @ApiProperty({ description: 'Parent comment (for replies)', required: false, nullable: true })
+    @ManyToOne(() => Comment, (c) => c.replies, { onDelete: 'CASCADE', nullable: true })
+    parent?: Comment | null;
+
+    @OneToMany(() => Comment, (c) => c.parent)
+    replies?: Comment[];
 }

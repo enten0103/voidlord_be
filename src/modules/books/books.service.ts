@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Book } from '../../entities/book.entity';
 import { Tag } from '../../entities/tag.entity';
 import { CreateBookDto } from './dto/create-book.dto';
@@ -186,7 +186,7 @@ export class BooksService {
     if (limit > 100) limit = 100;
     if (offset < 0) offset = 0;
     const [items, total] = await this.commentRepository.findAndCount({
-      where: { book: { id: bookId } } as any,
+      where: { book: { id: bookId }, parent: IsNull() } as any,
       order: { created_at: 'DESC' },
       take: limit,
       skip: offset,
@@ -236,6 +236,58 @@ export class BooksService {
     const c = await this.commentRepository.findOne({ where: { id: commentId, book: { id: bookId } } as any, relations: ['user'] });
     if (!c) return null;
     return c.user?.id ?? null;
+  }
+
+  async addReply(bookId: number, userId: number, parentCommentId: number, content: string) {
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      throw new ConflictException('Content is required');
+    }
+    if (content.length > 2000) {
+      throw new ConflictException('Content too long (max 2000)');
+    }
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    const parent = await this.commentRepository.findOne({ where: { id: parentCommentId, book: { id: bookId } } as any });
+    if (!parent) throw new NotFoundException('Parent comment not found');
+    const entity = this.commentRepository.create({
+      book: { id: bookId } as any,
+      user: userId ? ({ id: userId } as any) : null,
+      content: content.trim(),
+      parent: { id: parentCommentId } as any,
+    });
+    const saved = await this.commentRepository.save(entity);
+    return { id: saved.id, bookId, parentId: parentCommentId, content: saved.content, created_at: saved.created_at };
+  }
+
+  async listReplies(bookId: number, parentCommentId: number, limit = 20, offset = 0) {
+    const book = await this.bookRepository.findOne({ where: { id: bookId } });
+    if (!book) throw new NotFoundException('Book not found');
+    const parent = await this.commentRepository.findOne({ where: { id: parentCommentId, book: { id: bookId } } as any });
+    if (!parent) throw new NotFoundException('Parent comment not found');
+    if (limit <= 0) limit = 20;
+    if (limit > 100) limit = 100;
+    if (offset < 0) offset = 0;
+    const [items, total] = await this.commentRepository.findAndCount({
+      where: { book: { id: bookId }, parent: { id: parentCommentId } } as any,
+      order: { created_at: 'DESC' },
+      take: limit,
+      skip: offset,
+      relations: ['user'],
+    });
+    return {
+      bookId,
+      parentId: parentCommentId,
+      total,
+      limit,
+      offset,
+      items: items.map((c) => ({
+        id: c.id,
+        content: c.content,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        user: c.user ? { id: c.user.id, username: (c.user as any).username } : null,
+      })),
+    };
   }
 
   async findByTags(tagKeys: string[]): Promise<Book[]> {
