@@ -21,7 +21,7 @@ describe('AppController (e2e)', () => {
     try {
       const ds = app.get(DataSource);
       if (ds?.isInitialized) await ds.destroy();
-    } catch { }
+    } catch {}
     await app.close();
   });
 

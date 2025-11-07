@@ -7,9 +7,11 @@ import { RecommendationsService } from './recommendations.service';
 import { RecommendationsController } from './recommendations.controller';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([RecommendationSection, RecommendationItem, Book])],
-    providers: [RecommendationsService],
-    controllers: [RecommendationsController],
-    exports: [RecommendationsService],
+  imports: [
+    TypeOrmModule.forFeature([RecommendationSection, RecommendationItem, Book]),
+  ],
+  providers: [RecommendationsService],
+  controllers: [RecommendationsController],
+  exports: [RecommendationsService],
 })
-export class RecommendationsModule { }
+export class RecommendationsModule {}

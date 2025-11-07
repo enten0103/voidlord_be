@@ -23,7 +23,7 @@ export class BooksService {
     private ratingRepository: Repository<BookRating>,
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
-  ) { }
+  ) {}
 
   async create(createBookDto: CreateBookDto, userId?: number): Promise<Book> {
     // 检查hash是否已存在
@@ -134,48 +134,76 @@ export class BooksService {
     }
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
-    let rating = await this.ratingRepository.findOne({ where: { book: { id: bookId }, user: { id: userId } } as any });
+    let rating = await this.ratingRepository.findOne({
+      where: { book: { id: bookId }, user: { id: userId } } as any,
+    });
     if (!rating) {
-      rating = this.ratingRepository.create({ book: { id: bookId } as any, user: { id: userId } as any, score });
+      rating = this.ratingRepository.create({
+        book: { id: bookId } as any,
+        user: { id: userId } as any,
+        score,
+      });
     } else {
       rating.score = score;
     }
     await this.ratingRepository.save(rating);
-    const agg = await this.ratingRepository.createQueryBuilder('r')
+    const agg = await this.ratingRepository
+      .createQueryBuilder('r')
       .where('r.bookId = :bid', { bid: bookId })
       .select('COUNT(1)', 'count')
       .addSelect('AVG(r.score)', 'avg')
       .getRawOne<{ count: string; avg: string }>();
-    return { ok: true, bookId, myRating: score, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
+    return {
+      ok: true,
+      bookId,
+      myRating: score,
+      count: Number(agg?.count ?? 0),
+      avg: agg?.avg ? Number(agg.avg) : 0,
+    };
   }
 
   async getRating(bookId: number) {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
-    const agg = await this.ratingRepository.createQueryBuilder('r')
+    const agg = await this.ratingRepository
+      .createQueryBuilder('r')
       .where('r.bookId = :bid', { bid: bookId })
       .select('COUNT(1)', 'count')
       .addSelect('AVG(r.score)', 'avg')
       .getRawOne<{ count: string; avg: string }>();
-    return { bookId, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
+    return {
+      bookId,
+      count: Number(agg?.count ?? 0),
+      avg: agg?.avg ? Number(agg.avg) : 0,
+    };
   }
 
   async getMyRating(bookId: number, userId: number) {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
-    const r = await this.ratingRepository.findOne({ where: { book: { id: bookId }, user: { id: userId } } as any });
+    const r = await this.ratingRepository.findOne({
+      where: { book: { id: bookId }, user: { id: userId } } as any,
+    });
     return { bookId, myRating: r?.score ?? null };
   }
 
   async removeMyRating(bookId: number, userId: number) {
-    const r = await this.ratingRepository.findOne({ where: { book: { id: bookId }, user: { id: userId } } as any });
+    const r = await this.ratingRepository.findOne({
+      where: { book: { id: bookId }, user: { id: userId } } as any,
+    });
     if (r) await this.ratingRepository.remove(r);
-    const agg = await this.ratingRepository.createQueryBuilder('r')
+    const agg = await this.ratingRepository
+      .createQueryBuilder('r')
       .where('r.bookId = :bid', { bid: bookId })
       .select('COUNT(1)', 'count')
       .addSelect('AVG(r.score)', 'avg')
       .getRawOne<{ count: string; avg: string }>();
-    return { ok: true, bookId, count: Number(agg?.count ?? 0), avg: agg?.avg ? Number(agg.avg) : 0 };
+    return {
+      ok: true,
+      bookId,
+      count: Number(agg?.count ?? 0),
+      avg: agg?.avg ? Number(agg.avg) : 0,
+    };
   }
 
   // Comments
@@ -195,8 +223,10 @@ export class BooksService {
     // compute reply counts for each top-level comment
     const counts = await Promise.all(
       items.map((c) =>
-        this.commentRepository.count({ where: { book: { id: bookId }, parent: { id: c.id } } as any })
-      )
+        this.commentRepository.count({
+          where: { book: { id: bookId }, parent: { id: c.id } } as any,
+        }),
+      ),
     );
     return {
       bookId,
@@ -208,14 +238,20 @@ export class BooksService {
         content: c.content,
         created_at: c.created_at,
         updated_at: c.updated_at,
-        user: c.user ? { id: c.user.id, username: (c.user as any).username } : null,
+        user: c.user
+          ? { id: c.user.id, username: (c.user as any).username }
+          : null,
         reply_count: counts[idx] ?? 0,
       })),
     };
   }
 
   async addComment(bookId: number, userId: number, content: string) {
-    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    if (
+      !content ||
+      typeof content !== 'string' ||
+      content.trim().length === 0
+    ) {
       throw new ConflictException('Content is required');
     }
     if (content.length > 2000) {
@@ -229,24 +265,47 @@ export class BooksService {
       content: content.trim(),
     });
     const saved = await this.commentRepository.save(entity);
-    return { id: saved.id, bookId, content: saved.content, created_at: saved.created_at };
+    return {
+      id: saved.id,
+      bookId,
+      content: saved.content,
+      created_at: saved.created_at,
+    };
   }
 
   async removeComment(bookId: number, commentId: number) {
-    const c = await this.commentRepository.findOne({ where: { id: commentId, book: { id: bookId } } as any, relations: ['user'] });
+    const c = await this.commentRepository.findOne({
+      where: { id: commentId, book: { id: bookId } } as any,
+      relations: ['user'],
+    });
     if (!c) throw new NotFoundException('Comment not found');
     await this.commentRepository.remove(c);
     return { ok: true };
   }
 
-  async getCommentOwnerId(bookId: number, commentId: number): Promise<number | null> {
-    const c = await this.commentRepository.findOne({ where: { id: commentId, book: { id: bookId } } as any, relations: ['user'] });
+  async getCommentOwnerId(
+    bookId: number,
+    commentId: number,
+  ): Promise<number | null> {
+    const c = await this.commentRepository.findOne({
+      where: { id: commentId, book: { id: bookId } } as any,
+      relations: ['user'],
+    });
     if (!c) return null;
     return c.user?.id ?? null;
   }
 
-  async addReply(bookId: number, userId: number, parentCommentId: number, content: string) {
-    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+  async addReply(
+    bookId: number,
+    userId: number,
+    parentCommentId: number,
+    content: string,
+  ) {
+    if (
+      !content ||
+      typeof content !== 'string' ||
+      content.trim().length === 0
+    ) {
       throw new ConflictException('Content is required');
     }
     if (content.length > 2000) {
@@ -254,7 +313,9 @@ export class BooksService {
     }
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
-    const parent = await this.commentRepository.findOne({ where: { id: parentCommentId, book: { id: bookId } } as any });
+    const parent = await this.commentRepository.findOne({
+      where: { id: parentCommentId, book: { id: bookId } } as any,
+    });
     if (!parent) throw new NotFoundException('Parent comment not found');
     const entity = this.commentRepository.create({
       book: { id: bookId } as any,
@@ -263,13 +324,26 @@ export class BooksService {
       parent: { id: parentCommentId } as any,
     });
     const saved = await this.commentRepository.save(entity);
-    return { id: saved.id, bookId, parentId: parentCommentId, content: saved.content, created_at: saved.created_at };
+    return {
+      id: saved.id,
+      bookId,
+      parentId: parentCommentId,
+      content: saved.content,
+      created_at: saved.created_at,
+    };
   }
 
-  async listReplies(bookId: number, parentCommentId: number, limit = 20, offset = 0) {
+  async listReplies(
+    bookId: number,
+    parentCommentId: number,
+    limit = 20,
+    offset = 0,
+  ) {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
-    const parent = await this.commentRepository.findOne({ where: { id: parentCommentId, book: { id: bookId } } as any });
+    const parent = await this.commentRepository.findOne({
+      where: { id: parentCommentId, book: { id: bookId } } as any,
+    });
     if (!parent) throw new NotFoundException('Parent comment not found');
     if (limit <= 0) limit = 20;
     if (limit > 100) limit = 100;
@@ -292,7 +366,9 @@ export class BooksService {
         content: c.content,
         created_at: c.created_at,
         updated_at: c.updated_at,
-        user: c.user ? { id: c.user.id, username: (c.user as any).username } : null,
+        user: c.user
+          ? { id: c.user.id, username: (c.user as any).username }
+          : null,
       })),
     };
   }
@@ -356,11 +432,11 @@ export class BooksService {
       .leftJoinAndSelect('book.tags', 'tag')
       .where(
         'book.id IN (' +
-        'SELECT bt.book_id FROM book_tags bt ' +
-        'WHERE bt.tag_id IN (:...tagIds) ' +
-        'GROUP BY bt.book_id ' +
-        'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
-        ')',
+          'SELECT bt.book_id FROM book_tags bt ' +
+          'WHERE bt.tag_id IN (:...tagIds) ' +
+          'GROUP BY bt.book_id ' +
+          'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
+          ')',
         { tagIds, tagCount: tagIds.length },
       )
       .orderBy('book.created_at', 'DESC')

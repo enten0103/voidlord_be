@@ -17,7 +17,7 @@ import { FavoriteListItem } from '../entities/favorite-list-item.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {}
   createTypeOrmOptions(): TypeOrmModuleOptions {
     return {
       type: 'postgres',
@@ -26,7 +26,21 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: this.configService.get<string>('DB_USERNAME', 'postgres'),
       password: this.configService.get<string>('DB_PASSWORD', 'postgres'),
       database: this.configService.get<string>('DB_NAME', 'voidlord'),
-  entities: [User, Book, Tag, RecommendationSection, RecommendationItem, Permission, UserPermission, UserConfig, FileObject, BookRating, Comment, FavoriteList, FavoriteListItem],
+      entities: [
+        User,
+        Book,
+        Tag,
+        RecommendationSection,
+        RecommendationItem,
+        Permission,
+        UserPermission,
+        UserConfig,
+        FileObject,
+        BookRating,
+        Comment,
+        FavoriteList,
+        FavoriteListItem,
+      ],
       synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE', true), // 仅在开发环境使用
       logging: this.configService.get<boolean>('DB_LOGGING', false),
       retryAttempts: 3,

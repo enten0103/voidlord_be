@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, Unique } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  CreateDateColumn,
+  Unique,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { FavoriteList } from './favorite-list.entity';
 import { Book } from './book.entity';

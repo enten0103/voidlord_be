@@ -1,5 +1,24 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Req,
+    UseGuards,
+} from '@nestjs/common';
+import {
+    ApiBearerAuth,
+    ApiBody,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BookListsService } from './book-lists.service';
 import { CreateListDto } from './dto/create-list.dto';
@@ -9,83 +28,187 @@ import { AddBookDto } from './dto/add-book.dto';
 @ApiTags('book-lists')
 @Controller('book-lists')
 export class BookListsController {
-  constructor(private readonly service: BookListsService) {}
+    constructor(private readonly service: BookListsService) { }
 
-  @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a new book list' })
-  @ApiResponse({ status: 201, description: 'Created', schema: { example: { id: 1, name: 'Favorites', is_public: false, created_at: '2025-01-01T00:00:00.000Z' } } })
-  @ApiResponse({ status: 409, description: 'List name already exists' })
-  create(@Body() dto: CreateListDto, @Req() req: any) {
-    return this.service.create(req?.user?.userId, dto);
-  }
+    @Post()
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Create a new book list' })
+    @ApiResponse({
+        status: 201,
+        description: 'Created',
+        schema: {
+            example: {
+                id: 1,
+                name: 'Favorites',
+                is_public: false,
+                created_at: '2025-01-01T00:00:00.000Z',
+            },
+        },
+    })
+    @ApiResponse({ status: 409, description: 'List name already exists' })
+    create(@Body() dto: CreateListDto, @Req() req: any) {
+        return this.service.create(req?.user?.userId, dto);
+    }
 
-  @Get('my')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'List my book lists' })
-  @ApiResponse({ status: 200, description: 'OK', schema: { example: [{ id: 1, name: 'Favorites', items_count: 3, is_public: false, created_at: '2025-01-01T00:00:00.000Z' }] } })
-  my(@Req() req: any) {
-    return this.service.listMine(req?.user?.userId);
-  }
+    @Get('my')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'List my book lists' })
+    @ApiResponse({
+        status: 200,
+        description: 'OK',
+        schema: {
+            example: [
+                {
+                    id: 1,
+                    name: 'Favorites',
+                    items_count: 3,
+                    is_public: false,
+                    created_at: '2025-01-01T00:00:00.000Z',
+                },
+            ],
+        },
+    })
+    my(@Req() req: any) {
+        return this.service.listMine(req?.user?.userId);
+    }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a book list by ID (owner or public)' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Optional pagination for items (1-100). Default 100 (no pagination used server-side here, full load).', example: 100 })
-  @ApiResponse({ status: 200, description: 'OK', schema: { example: { id: 1, name: 'Favorites', is_public: true, items_count: 2, items: [{ id: 10, book: { id: 1, title: 'Three-Body', hash: '...' } }] } } })
-  @ApiResponse({ status: 403, description: 'List is private' })
-  @ApiResponse({ status: 404, description: 'List not found' })
-  getOne(@Param('id') id: string, @Req() req: any) {
-    const listId = parseInt(id, 10);
-    if (isNaN(listId) || listId <= 0) throw new BadRequestException('Invalid list ID');
-    return this.service.getOne(listId, req?.user?.userId);
-  }
+    @Get(':id')
+    @ApiOperation({ summary: 'Get a book list by ID (owner or public)' })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        description:
+            'Optional pagination for items (1-100). Default 100 (no pagination used server-side here, full load).',
+        example: 100,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'OK',
+        schema: {
+            example: {
+                id: 1,
+                name: 'Favorites',
+                is_public: true,
+                items_count: 2,
+                items: [{ id: 10, book: { id: 1, title: 'Three-Body', hash: '...' } }],
+            },
+        },
+    })
+    @ApiResponse({ status: 403, description: 'List is private' })
+    @ApiResponse({ status: 404, description: 'List not found' })
+    getOne(@Param('id') id: string, @Req() req: any) {
+        const listId = parseInt(id, 10);
+        if (isNaN(listId) || listId <= 0)
+            throw new BadRequestException('Invalid list ID');
+        return this.service.getOne(listId, req?.user?.userId);
+    }
 
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Update a book list' })
-  @ApiResponse({ status: 200, description: 'Updated', schema: { example: { id: 1, name: 'New Name', is_public: true, updated_at: '2025-01-02T00:00:00.000Z' } } })
-  @ApiResponse({ status: 403, description: 'Not owner' })
-  @ApiResponse({ status: 404, description: 'List not found' })
-  @ApiResponse({ status: 409, description: 'List name already exists' })
-  update(@Param('id') id: string, @Body() dto: UpdateListDto, @Req() req: any) {
-    return this.service.update(+id, req?.user?.userId, dto);
-  }
+    @Patch(':id')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Update a book list' })
+    @ApiResponse({
+        status: 200,
+        description: 'Updated',
+        schema: {
+            example: {
+                id: 1,
+                name: 'New Name',
+                is_public: true,
+                updated_at: '2025-01-02T00:00:00.000Z',
+            },
+        },
+    })
+    @ApiResponse({ status: 403, description: 'Not owner' })
+    @ApiResponse({ status: 404, description: 'List not found' })
+    @ApiResponse({ status: 409, description: 'List name already exists' })
+    update(@Param('id') id: string, @Body() dto: UpdateListDto, @Req() req: any) {
+        return this.service.update(+id, req?.user?.userId, dto);
+    }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Delete a book list (owner only)' })
-  @ApiResponse({ status: 200, description: 'Deleted', schema: { example: { ok: true } } })
-  @ApiResponse({ status: 403, description: 'Not owner' })
-  @ApiResponse({ status: 404, description: 'List not found' })
-  remove(@Param('id') id: string, @Req() req: any) {
-    return this.service.remove(+id, req?.user?.userId);
-  }
+    @Delete(':id')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Delete a book list (owner only)' })
+    @ApiResponse({
+        status: 200,
+        description: 'Deleted',
+        schema: { example: { ok: true } },
+    })
+    @ApiResponse({ status: 403, description: 'Not owner' })
+    @ApiResponse({ status: 404, description: 'List not found' })
+    remove(@Param('id') id: string, @Req() req: any) {
+        return this.service.remove(+id, req?.user?.userId);
+    }
 
-  @Post(':id/books')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Add a book to the list (owner only)' })
-  @ApiBody({ type: AddBookDto })
-  @ApiResponse({ status: 201, description: 'Added', schema: { example: { id: 11, listId: 1, bookId: 2, added_at: '2025-01-01T00:00:00.000Z' } } })
-  @ApiResponse({ status: 404, description: 'List or Book not found' })
-  @ApiResponse({ status: 403, description: 'Not owner' })
-  @ApiResponse({ status: 409, description: 'Book already in list' })
-  addBook(@Param('id') id: string, @Body() dto: AddBookDto, @Req() req: any) {
-    return this.service.addBook(+id, req?.user?.userId, dto.bookId);
-  }
+    @Post(':id/books')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Add a book to the list (owner only)' })
+    @ApiBody({ type: AddBookDto })
+    @ApiResponse({
+        status: 201,
+        description: 'Added',
+        schema: {
+            example: {
+                id: 11,
+                listId: 1,
+                bookId: 2,
+                added_at: '2025-01-01T00:00:00.000Z',
+            },
+        },
+    })
+    @ApiResponse({ status: 404, description: 'List or Book not found' })
+    @ApiResponse({ status: 403, description: 'Not owner' })
+    @ApiResponse({ status: 409, description: 'Book already in list' })
+    addBook(@Param('id') id: string, @Body() dto: AddBookDto, @Req() req: any) {
+        return this.service.addBook(+id, req?.user?.userId, dto.bookId);
+    }
 
-  @Delete(':id/books/:bookId')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Remove a book from the list (owner only)' })
-  @ApiResponse({ status: 200, description: 'Removed', schema: { example: { ok: true } } })
-  @ApiResponse({ status: 404, description: 'List or Book not in list' })
-  @ApiResponse({ status: 403, description: 'Not owner' })
-  removeBook(@Param('id') id: string, @Param('bookId') bookId: string, @Req() req: any) {
-    return this.service.removeBook(+id, req?.user?.userId, +bookId);
-  }
+    @Delete(':id/books/:bookId')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Remove a book from the list (owner only)' })
+    @ApiResponse({
+        status: 200,
+        description: 'Removed',
+        schema: { example: { ok: true } },
+    })
+    @ApiResponse({ status: 404, description: 'List or Book not in list' })
+    @ApiResponse({ status: 403, description: 'Not owner' })
+    removeBook(
+        @Param('id') id: string,
+        @Param('bookId') bookId: string,
+        @Req() req: any,
+    ) {
+        return this.service.removeBook(+id, req?.user?.userId, +bookId);
+    }
+
+    @Post(':id/copy')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary:
+            'Copy a public list (or own private) into my lists (new list becomes private)',
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Copied',
+        schema: {
+            example: {
+                id: 99,
+                name: 'Favorites (copy)',
+                items_count: 5,
+                is_public: false,
+                copied_from: 12,
+            },
+        },
+    })
+    @ApiResponse({ status: 403, description: 'List is private' })
+    @ApiResponse({ status: 404, description: 'List not found' })
+    copy(@Param('id') id: string, @Req() req: any) {
+        return this.service.copy(+id, req?.user?.userId);
+    }
 }

@@ -16,7 +16,7 @@ export class DatabaseInitService implements OnModuleInit {
     @InjectDataSource()
     private dataSource: DataSource,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     // 在测试环境中跳过自动初始化
@@ -64,26 +64,50 @@ export class DatabaseInitService implements OnModuleInit {
         if (!existing) await permRepo.save(permRepo.create({ name: p }));
       }
 
-      const adminUsername = this.configService.get<string>('ADMIN_USERNAME', 'admin');
-      const adminEmail = this.configService.get<string>('ADMIN_EMAIL', 'admin@example.com');
-      const adminPassword = this.configService.get<string>('ADMIN_PASSWORD', 'admin123');
+      const adminUsername = this.configService.get<string>(
+        'ADMIN_USERNAME',
+        'admin',
+      );
+      const adminEmail = this.configService.get<string>(
+        'ADMIN_EMAIL',
+        'admin@example.com',
+      );
+      const adminPassword = this.configService.get<string>(
+        'ADMIN_PASSWORD',
+        'admin123',
+      );
 
-      let admin = await userRepo.findOne({ where: { username: adminUsername } });
+      let admin = await userRepo.findOne({
+        where: { username: adminUsername },
+      });
       if (!admin) {
         const hashed = await bcrypt.hash(adminPassword, 10);
-        admin = await userRepo.save(userRepo.create({
-          username: adminUsername,
-          email: adminEmail,
-          password: hashed,
-        }));
-        this.logger.log(`System admin created: username=${adminUsername}${adminPassword === 'admin123' ? ' (default password used)' : ''}`);
+        admin = await userRepo.save(
+          userRepo.create({
+            username: adminUsername,
+            email: adminEmail,
+            password: hashed,
+          }),
+        );
+        this.logger.log(
+          `System admin created: username=${adminUsername}${adminPassword === 'admin123' ? ' (default password used)' : ''}`,
+        );
       }
 
       const allPerms = await permRepo.find();
       for (const perm of allPerms) {
-        const existingUP = await userPermRepo.findOne({ where: { user: { id: admin.id }, permission: { id: perm.id } } });
+        const existingUP = await userPermRepo.findOne({
+          where: { user: { id: admin.id }, permission: { id: perm.id } },
+        });
         if (!existingUP) {
-          await userPermRepo.save(userPermRepo.create({ user: admin, permission: perm, level: 3, grantedBy: null }));
+          await userPermRepo.save(
+            userPermRepo.create({
+              user: admin,
+              permission: perm,
+              level: 3,
+              grantedBy: null,
+            }),
+          );
         }
       }
 

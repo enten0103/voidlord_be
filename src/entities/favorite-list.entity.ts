@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Unique,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { FavoriteListItem } from './favorite-list-item.entity';
@@ -14,7 +23,11 @@ export class FavoriteList {
   @Column({ type: 'varchar', length: 200 })
   name: string;
 
-  @ApiProperty({ description: 'List description', required: false, nullable: true })
+  @ApiProperty({
+    description: 'List description',
+    required: false,
+    nullable: true,
+  })
   @Column({ type: 'text', nullable: true })
   description?: string | null;
 

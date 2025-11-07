@@ -29,15 +29,21 @@ describe('AuthController (e2e)', () => {
 
   beforeEach(async () => {
     // 清理依赖表 (先 user_permission 再 user)
-    try { await ds.query('DELETE FROM user_permission'); } catch { /* ignore if not exists */ }
-    try { await ds.query('DELETE FROM "user"'); } catch { }
+    try {
+      await ds.query('DELETE FROM user_permission');
+    } catch {
+      /* ignore if not exists */
+    }
+    try {
+      await ds.query('DELETE FROM "user"');
+    } catch {}
     // 保留 permissions（或清理）这里不清理以减少重复插入
   });
 
   afterAll(async () => {
     try {
       if (ds?.isInitialized) await ds.destroy();
-    } catch { }
+    } catch {}
     await app.close();
   });
 

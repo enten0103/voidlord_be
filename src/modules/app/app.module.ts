@@ -28,10 +28,10 @@ import { BookListsModule } from '../book-lists/book-lists.module';
     RecommendationsModule,
     PermissionsModule,
     FilesModule,
-  UserConfigModule,
-  BookListsModule,
+    UserConfigModule,
+    BookListsModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],
 })
-export class AppModule { }
+export class AppModule {}

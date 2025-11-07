@@ -7,9 +7,9 @@ import { UserConfigService } from './user-config.service';
 import { FilesModule } from '../files/files.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([UserConfig, User]), FilesModule],
-    controllers: [UserConfigController],
-    providers: [UserConfigService],
-    exports: [UserConfigService],
+  imports: [TypeOrmModule.forFeature([UserConfig, User]), FilesModule],
+  controllers: [UserConfigController],
+  providers: [UserConfigService],
+  exports: [UserConfigService],
 })
-export class UserConfigModule { }
+export class UserConfigModule {}

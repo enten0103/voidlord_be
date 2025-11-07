@@ -22,13 +22,16 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
-import { RequirePermission, ApiPermission } from '../auth/permissions.decorator';
+import {
+  RequirePermission,
+  ApiPermission,
+} from '../auth/permissions.decorator';
 
 @ApiTags('users')
 @Controller('users')
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -41,8 +44,24 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 409, description: 'Username or email already exists' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
-  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden (insufficient permission)',
+    schema: {
+      example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
+    },
+  })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
@@ -57,8 +76,24 @@ export class UsersController {
     description: 'Users retrieved successfully',
     type: [UserResponseDto],
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
-  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden (insufficient permission)',
+    schema: {
+      example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
+    },
+  })
   findAll() {
     return this.usersService.findAll();
   }
@@ -74,8 +109,24 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
-  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden (insufficient permission)',
+    schema: {
+      example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
+    },
+  })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(+id);
   }
@@ -91,8 +142,24 @@ export class UsersController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
-  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden (insufficient permission)',
+    schema: {
+      example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
+    },
+  })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(+id, updateUserDto);
   }
@@ -104,8 +171,24 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete user' })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: { example: { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' } } })
-  @ApiResponse({ status: 403, description: 'Forbidden (insufficient permission)', schema: { example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' } } })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden (insufficient permission)',
+    schema: {
+      example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
+    },
+  })
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
   }

@@ -9,29 +9,44 @@ import { FileObject } from '../../entities/file-object.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-    imports: [ConfigModule, TypeOrmModule.forFeature([FileObject]), PermissionsModule],
-    providers: [
-        {
-            provide: S3_CLIENT,
-            inject: [ConfigService],
-            useFactory: (config: ConfigService) => {
-                const publicHost = config.get<string>('PUBLIC_HOST_IP');
-                const endpoint = config.get<string>('MINIO_ENDPOINT') || (publicHost ? `http://${publicHost}:9000` : 'http://localhost:9000');
-                const accessKeyId = config.get<string>('MINIO_ACCESS_KEY', 'minioadmin');
-                const secretAccessKey = config.get<string>('MINIO_SECRET_KEY', 'minioadmin');
-                const forcePathStyle = config.get<boolean>('MINIO_FORCE_PATH_STYLE', true);
-                const region = config.get<string>('MINIO_REGION', 'us-east-1');
-                return new S3Client({
-                    region,
-                    endpoint,
-                    credentials: { accessKeyId, secretAccessKey },
-                    forcePathStyle,
-                });
-            },
-        },
-        FilesService,
-    ],
-    exports: [FilesService, S3_CLIENT],
-    controllers: [FilesController],
+  imports: [
+    ConfigModule,
+    TypeOrmModule.forFeature([FileObject]),
+    PermissionsModule,
+  ],
+  providers: [
+    {
+      provide: S3_CLIENT,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const publicHost = config.get<string>('PUBLIC_HOST_IP');
+        const endpoint =
+          config.get<string>('MINIO_ENDPOINT') ||
+          (publicHost ? `http://${publicHost}:9000` : 'http://localhost:9000');
+        const accessKeyId = config.get<string>(
+          'MINIO_ACCESS_KEY',
+          'minioadmin',
+        );
+        const secretAccessKey = config.get<string>(
+          'MINIO_SECRET_KEY',
+          'minioadmin',
+        );
+        const forcePathStyle = config.get<boolean>(
+          'MINIO_FORCE_PATH_STYLE',
+          true,
+        );
+        const region = config.get<string>('MINIO_REGION', 'us-east-1');
+        return new S3Client({
+          region,
+          endpoint,
+          credentials: { accessKeyId, secretAccessKey },
+          forcePathStyle,
+        });
+      },
+    },
+    FilesService,
+  ],
+  exports: [FilesService, S3_CLIENT],
+  controllers: [FilesController],
 })
-export class FilesModule { }
+export class FilesModule {}

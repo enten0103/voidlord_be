@@ -28,6 +28,7 @@
 - 书单详情（公开或 owner）：GET /book-lists/:id
 - 添加书籍到书单（需登录/仅 owner）：POST /book-lists/:id/books
 - 从书单移除书籍（需登录/仅 owner）：DELETE /book-lists/:id/books/:bookId
+ - 复制公开书单到自己名下（需登录）：POST /book-lists/:id/copy
 
 ## 示例
 
@@ -99,6 +100,24 @@ Authorization: Bearer <jwt>
 - 读操作：
   - /book-lists/my 需登录返回自己的书单
   - /book-lists/:id 公开书单任何人可读；私有书单仅 owner 可读（否则 403）
+
+## 复制公开书单
+
+```http
+POST /book-lists/:id/copy
+Authorization: Bearer <jwt>
+```
+
+行为说明：
+- 仅当目标书单为公开，或你是该书单的 owner 时可复制；否则返回 403。
+- 若书单不存在返回 404。
+- 复制后新书单默认设置为私有（is_public=false）。
+- 新书单名称在你的名下需要唯一，若发生冲突会自动追加后缀 "(copy)"、"(copy 2)"、"(copy 3)"... 直至唯一。
+
+成功响应（示例）：
+```json
+{ "id": 42, "name": "收藏夹 (copy)", "is_public": false, "items_count": 3 }
+```
 
 ## 错误码对照
 - 401 未认证：访问需要登录的接口

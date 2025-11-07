@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateListDto {
   @ApiProperty({ description: 'List name', minLength: 1, maxLength: 200 })
@@ -8,13 +14,21 @@ export class CreateListDto {
   @MaxLength(200)
   name: string;
 
-  @ApiProperty({ description: 'List description', required: false, maxLength: 2000 })
+  @ApiProperty({
+    description: 'List description',
+    required: false,
+    maxLength: 2000,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
   description?: string;
 
-  @ApiProperty({ description: 'Whether public visible', default: false, required: false })
+  @ApiProperty({
+    description: 'Whether public visible',
+    default: false,
+    required: false,
+  })
   @IsOptional()
   @IsBoolean()
   is_public?: boolean;

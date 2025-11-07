@@ -27,7 +27,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private usersService: UsersService,
-  ) { }
+  ) {}
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
