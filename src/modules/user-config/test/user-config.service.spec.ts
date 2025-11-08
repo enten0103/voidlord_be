@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,15 +13,15 @@ describe('UserConfigService', () => {
   let userRepo: jest.Mocked<Repository<User>>;
   let files: jest.Mocked<FilesService>;
 
-  const mockConfigRepo = {
+  const mockConfigRepo: Partial<jest.Mocked<Repository<UserConfig>>> = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-  } as any;
+  };
 
-  const mockUserRepo = {
+  const mockUserRepo: Partial<jest.Mocked<Repository<User>>> = {
     findOne: jest.fn(),
-  } as any;
+  };
 
   const mockFiles: Partial<FilesService> = {
     getPublicUrl: jest.fn((key: string) => `http://cdn/bucket/${key}`),
@@ -47,14 +48,14 @@ describe('UserConfigService', () => {
     configRepo.findOne.mockResolvedValueOnce(null);
     userRepo.findOne.mockResolvedValueOnce({ id: 1 } as User);
     configRepo.create.mockReturnValueOnce({
-      user: { id: 1 },
+      user: { id: 1 } as User,
       locale: 'en',
-    } as any);
+    } as unknown as UserConfig);
     configRepo.save.mockResolvedValueOnce({
       id: 10,
-      user: { id: 1 },
+      user: { id: 1 } as User,
       locale: 'en',
-    } as any);
+    } as unknown as UserConfig);
 
     const cfg = await service.getOrCreateByUserId(1);
     expect(cfg.id).toBe(10);
@@ -64,12 +65,12 @@ describe('UserConfigService', () => {
 
   it('should return public profile with derived avatar', async () => {
     configRepo.findOne.mockResolvedValueOnce({
-      user: { id: 1 },
+      user: { id: 1 } as User,
       avatar_key: 'a/b.png',
       avatar_url: null,
       display_name: 'Alice',
       bio: 'hi',
-    } as any);
+    } as unknown as UserConfig);
 
     const res = await service.getPublicByUserId(1);
     expect(res.avatar_url).toContain('a/b.png');
@@ -79,12 +80,12 @@ describe('UserConfigService', () => {
   it('should update avatar_url from key when missing', async () => {
     jest
       .spyOn(service, 'getOrCreateByUserId')
-      .mockResolvedValueOnce({ id: 5 } as any);
+      .mockResolvedValueOnce({ id: 5 } as unknown as UserConfig);
     const saved = {
       id: 5,
       avatar_key: 'k.png',
       avatar_url: 'http://cdn/bucket/k.png',
-    } as any;
+    } as unknown as UserConfig;
     configRepo.save.mockResolvedValueOnce(saved);
 
     const res = await service.updateMy(1, { avatar_key: 'k.png' });

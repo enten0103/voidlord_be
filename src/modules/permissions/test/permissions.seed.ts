@@ -11,12 +11,12 @@ export async function ensurePermission(
   name: string,
 ): Promise<Permission> {
   const repo = ds.getRepository(Permission);
-  let p = await repo.findOne({ where: { name } });
-  if (!p) {
-    p = repo.create({ name });
-    p = await repo.save(p);
+  let existing = await repo.findOne({ where: { name } });
+  if (!existing) {
+    const created = repo.create({ name });
+    existing = await repo.save(created);
   }
-  return p;
+  return existing;
 }
 
 /**
@@ -29,27 +29,27 @@ export async function grantPermission(
   targetUserId: number,
   permissionName: string,
   level: number,
-) {
+): Promise<void> {
   const userRepo = ds.getRepository(User);
   const upRepo = ds.getRepository(UserPermission);
   const targetUser = await userRepo.findOne({ where: { id: targetUserId } });
   if (!targetUser) throw new Error('Target user not found for granting');
   const perm = await ensurePermission(ds, permissionName);
-  let up = await upRepo.findOne({
+  let existing = await upRepo.findOne({
     where: { user: { id: targetUser.id }, permission: { id: perm.id } },
   });
-  if (!up) {
-    up = upRepo.create({
+  if (!existing) {
+    existing = upRepo.create({
       user: targetUser,
       permission: perm,
       level,
-      grantedBy: { id: granterUserId } as any,
+      grantedBy: { id: granterUserId } as User,
     });
   } else {
-    up.level = level;
-    if (!up.grantedBy) up.grantedBy = { id: granterUserId } as any;
+    existing.level = level;
+    if (!existing.grantedBy) existing.grantedBy = { id: granterUserId } as User;
   }
-  await upRepo.save(up);
+  await upRepo.save(existing);
 }
 
 /**

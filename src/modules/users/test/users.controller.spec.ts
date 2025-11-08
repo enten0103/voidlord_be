@@ -8,9 +8,10 @@ import { UpdateUserDto } from '../dto/update-user.dto';
 
 describe('UsersController', () => {
   let controller: UsersController;
-  let service: UsersService;
 
-  const mockUsersService = {
+  const mockUsersService: jest.Mocked<
+    Pick<UsersService, 'create' | 'findAll' | 'findOne' | 'update' | 'remove'>
+  > = {
     create: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
@@ -40,14 +41,13 @@ describe('UsersController', () => {
           useValue: { canActivate: jest.fn().mockReturnValue(true) },
         },
         {
-          provide: DataSource as any,
+          provide: DataSource,
           useValue: { getRepository: jest.fn() },
         },
       ],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
-    service = module.get<UsersService>(UsersService);
   });
 
   afterEach(() => {
@@ -70,7 +70,7 @@ describe('UsersController', () => {
 
       const result = await controller.create(createUserDto);
 
-      expect(service.create).toHaveBeenCalledWith(createUserDto);
+      expect(mockUsersService.create).toHaveBeenCalledWith(createUserDto);
       expect(result).toEqual(mockUser);
     });
   });
@@ -82,7 +82,7 @@ describe('UsersController', () => {
 
       const result = await controller.findAll();
 
-      expect(service.findAll).toHaveBeenCalled();
+      expect(mockUsersService.findAll).toHaveBeenCalled();
       expect(result).toEqual(users);
     });
   });
@@ -93,7 +93,7 @@ describe('UsersController', () => {
 
       const result = await controller.findOne('1');
 
-      expect(service.findOne).toHaveBeenCalledWith(1);
+      expect(mockUsersService.findOne).toHaveBeenCalledWith(1);
       expect(result).toEqual(mockUser);
     });
   });
@@ -109,7 +109,7 @@ describe('UsersController', () => {
 
       const result = await controller.update('1', updateUserDto);
 
-      expect(service.update).toHaveBeenCalledWith(1, updateUserDto);
+      expect(mockUsersService.update).toHaveBeenCalledWith(1, updateUserDto);
       expect(result).toEqual(updatedUser);
     });
   });
@@ -120,7 +120,7 @@ describe('UsersController', () => {
 
       await controller.remove('1');
 
-      expect(service.remove).toHaveBeenCalledWith(1);
+      expect(mockUsersService.remove).toHaveBeenCalledWith(1);
     });
   });
 });

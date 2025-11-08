@@ -7,7 +7,9 @@ import { UserPermission } from '../entities/user-permission.entity';
 import { PERMISSIONS } from '../modules/auth/permissions.constants';
 
 (async () => {
-  const config = new ConfigService(process.env as any);
+  const config = new ConfigService(
+    process.env as Record<string, string | undefined>,
+  );
   const adminUsername = config.get<string>('ADMIN_USERNAME', 'admin');
 
   const ds = new DataSource({
@@ -76,4 +78,9 @@ import { PERMISSIONS } from '../modules/auth/permissions.constants';
 
   await ds.destroy();
   console.log('[verify-admin] 完成');
-})();
+})().catch((err) => {
+  // 统一输出错误并设置退出码
+
+  console.error('[verify-admin] Failed', err);
+  process.exit(1);
+});

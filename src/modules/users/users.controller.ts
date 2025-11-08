@@ -22,10 +22,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
-import {
-  RequirePermission,
-  ApiPermission,
-} from '../auth/permissions.decorator';
+import { ApiPermission } from '../auth/permissions.decorator';
 
 @ApiTags('users')
 @Controller('users')

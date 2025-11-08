@@ -1,6 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
+import request, { Response } from 'supertest';
+import { Server } from 'http';
+// removed duplicate import of guards
+import { isPagedResult } from '../../../../test/response-guards';
 import { Repository, DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { createTestModule } from '../../../../test/test-module.factory';
@@ -16,6 +19,34 @@ describe('Books (e2e)', () => {
   let userRepository: Repository<User>;
   let authToken: string;
   let userId: number;
+  let httpServer: Server;
+
+  interface CreatedBookLite {
+    id: number;
+    hash: string;
+    title: string;
+    description?: string;
+    tags?: Array<{ key: string; value: string }>;
+  }
+
+  function parseBody<T>(data: unknown, guard: (o: unknown) => o is T): T {
+    if (guard(data)) return data;
+    throw new Error('Unexpected body shape');
+  }
+
+  const isBookLite = (o: unknown): o is CreatedBookLite => {
+    if (typeof o !== 'object' || o === null) return false;
+    const r = o as Record<string, unknown>;
+    return (
+      typeof r.id === 'number' &&
+      typeof r.hash === 'string' &&
+      typeof r.title === 'string'
+    );
+  };
+
+  const isBookLiteArray = (o: unknown): o is CreatedBookLite[] => {
+    return Array.isArray(o) && o.every(isBookLite);
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await createTestModule();
@@ -28,6 +59,7 @@ describe('Books (e2e)', () => {
       }),
     );
     await app.init();
+    httpServer = app.getHttpServer() as unknown as Server;
 
     bookRepository = moduleFixture.get<Repository<Book>>(
       getRepositoryToken(Book),
@@ -44,19 +76,32 @@ describe('Books (e2e)', () => {
       password: 'testpassword123',
     };
 
-    const reg = await request(app.getHttpServer())
+    const reg: Response = await request(httpServer)
       .post('/auth/register')
       .send(testUser)
       .expect(201);
-    userId = reg.body.user.id;
+    userId = parseBody(reg.body, (d): d is { user: { id: number } } => {
+      if (typeof d !== 'object' || d === null) return false;
+      const r = d as Record<string, unknown>;
+      const u = r.user as Record<string, unknown> | undefined;
+      return typeof u === 'object' && u !== null && typeof u.id === 'number';
+    }).user.id;
 
-    const loginResponse = await request(app.getHttpServer())
+    const loginResponse: Response = await request(httpServer)
       .post('/auth/login')
       .send({
         username: testUser.username,
         password: testUser.password,
-      });
-    authToken = loginResponse.body.access_token;
+      })
+      .expect(201);
+    authToken = parseBody(
+      loginResponse.body,
+      (d): d is { access_token: string } => {
+        if (typeof d !== 'object' || d === null) return false;
+        const r = d as Record<string, unknown>;
+        return typeof r.access_token === 'string';
+      },
+    ).access_token;
     // 授予该测试用户书籍相关权限 (level1)
     const ds = moduleFixture.get(DataSource);
     await grantPermissions(ds, userId, {
@@ -76,15 +121,16 @@ describe('Books (e2e)', () => {
       await tagRepository.query('DELETE FROM tag');
       await userRepository.query('DELETE FROM "user"');
     } catch (error) {
-      console.log('Error cleaning up test data:', error.message);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log('Error cleaning up test data:', msg);
     }
     try {
       const ds = app.get(DataSource);
       if (ds?.isInitialized) {
         await ds.destroy();
       }
-    } catch (e) {
-      // ignore
+    } catch {
+      /* ignore */
     }
     await app.close();
   });
@@ -97,7 +143,8 @@ describe('Books (e2e)', () => {
       await tagRepository.query('DELETE FROM tag');
     } catch (error) {
       // 忽略清理错误，因为表可能不存在
-      console.log('Error cleaning up before test:', error.message);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log('Error cleaning up before test:', msg);
     }
   });
 
@@ -113,16 +160,17 @@ describe('Books (e2e)', () => {
         ],
       };
 
-      return request(app.getHttpServer())
+      return request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createBookDto)
         .expect(201)
         .expect((res) => {
-          expect(res.body.hash).toBe(createBookDto.hash);
-          expect(res.body.title).toBe(createBookDto.title);
-          expect(res.body.description).toBe(createBookDto.description);
-          expect(res.body.tags).toHaveLength(2);
+          const body = parseBody(res.body, isBookLite);
+          expect(body.hash).toBe(createBookDto.hash);
+          expect(body.title).toBe(createBookDto.title);
+          expect(body.description).toBe(createBookDto.description);
+          expect(body.tags).toHaveLength(2);
         });
     });
 
@@ -132,15 +180,16 @@ describe('Books (e2e)', () => {
         title: 'Simple Book',
       };
 
-      return request(app.getHttpServer())
+      return request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createBookDto)
         .expect(201)
         .expect((res) => {
-          expect(res.body.hash).toBe(createBookDto.hash);
-          expect(res.body.title).toBe(createBookDto.title);
-          expect(res.body.tags).toHaveLength(0);
+          const body = parseBody(res.body, isBookLite);
+          expect(body.hash).toBe(createBookDto.hash);
+          expect(body.title).toBe(createBookDto.title);
+          expect(body.tags).toHaveLength(0);
         });
     });
 
@@ -151,14 +200,14 @@ describe('Books (e2e)', () => {
       };
 
       // 创建第一本书
-      await request(app.getHttpServer())
+      await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createBookDto)
         .expect(201);
 
       // 尝试创建相同hash的书
-      return request(app.getHttpServer())
+      return request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ ...createBookDto, title: 'Second Book' })
@@ -171,10 +220,7 @@ describe('Books (e2e)', () => {
         title: 'Unauthorized Book',
       };
 
-      return request(app.getHttpServer())
-        .post('/books')
-        .send(createBookDto)
-        .expect(401);
+      return request(httpServer).post('/books').send(createBookDto).expect(401);
     });
   });
 
@@ -214,27 +260,23 @@ describe('Books (e2e)', () => {
       await bookRepository.save(book2);
     });
 
-    it('should return all books', () => {
-      return request(app.getHttpServer())
-        .get('/books')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toHaveLength(2);
-          expect(res.body[0].title).toBeDefined();
-          expect(res.body[0].tags).toBeDefined();
-        });
+    it('should return all books', async () => {
+      const res: Response = await request(httpServer).get('/books').expect(200);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body).toHaveLength(2);
+      expect(body[0].title).toBeDefined();
+      expect(body[0].tags).toBeDefined();
     });
 
-    it('should filter books by tags', () => {
-      return request(app.getHttpServer())
+    it('should filter books by tags', async () => {
+      const res: Response = await request(httpServer)
         .get('/books?tags=author')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.length).toBeGreaterThan(0);
-          res.body.forEach((book) => {
-            expect(book.tags.some((tag) => tag.key === 'author')).toBe(true);
-          });
-        });
+        .expect(200);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.length).toBeGreaterThan(0);
+      body.forEach((book) => {
+        expect(book.tags?.some((tag) => tag.key === 'author')).toBe(true);
+      });
     });
   });
 
@@ -246,7 +288,7 @@ describe('Books (e2e)', () => {
     beforeEach(async () => {
       // 注册另一个用户
       const suffix = Date.now().toString();
-      const other = await request(app.getHttpServer())
+      const other = await request(httpServer)
         .post('/auth/register')
         .send({
           username: `other_${suffix}`,
@@ -254,53 +296,78 @@ describe('Books (e2e)', () => {
           password: 'p@ssw0rd!',
         })
         .expect(201);
-      const otherLogin = await request(app.getHttpServer())
+      const otherLogin = await request(httpServer)
         .post('/auth/login')
         .send({ username: `other_${suffix}`, password: 'p@ssw0rd!' })
         .expect(201);
-      otherUserToken = otherLogin.body.access_token;
+      otherUserToken = parseBody(
+        otherLogin.body,
+        (d): d is { access_token: string } => {
+          if (typeof d !== 'object' || d === null) return false;
+          const r = d as Record<string, unknown>;
+          return typeof r.access_token === 'string';
+        },
+      ).access_token;
 
       // 给其他用户授予创建权限
       const ds = app.get(DataSource);
-      await grantPermissions(ds, other.body.user.id, { BOOK_CREATE: 1 });
+      const otherUser = parseBody(
+        other.body,
+        (d): d is { user: { id: number } } => {
+          if (typeof d !== 'object' || d === null) return false;
+          const r = d as Record<string, unknown>;
+          const u = r.user as Record<string, unknown> | undefined;
+          return (
+            typeof u === 'object' && u !== null && typeof u.id === 'number'
+          );
+        },
+      ).user;
+      await grantPermissions(ds, otherUser.id, { BOOK_CREATE: 1 });
 
       // 当前用户创建两本书
-      const b1 = await request(app.getHttpServer())
+      const b1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ hash: 'mine-1', title: 'Mine 1' })
         .expect(201);
-      const b2 = await request(app.getHttpServer())
+      const b2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ hash: 'mine-2', title: 'Mine 2' })
         .expect(201);
-      myIds = [b1.body.id, b2.body.id];
+      myIds = [
+        parseBody(b1.body, isBookLite).id,
+        parseBody(b2.body, isBookLite).id,
+      ];
 
       // 其他用户创建两本书
-      const o1 = await request(app.getHttpServer())
+      const o1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${otherUserToken}`)
         .send({ hash: 'other-1', title: 'Other 1' })
         .expect(201);
-      const o2 = await request(app.getHttpServer())
+      const o2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${otherUserToken}`)
         .send({ hash: 'other-2', title: 'Other 2' })
         .expect(201);
-      otherIds = [o1.body.id, o2.body.id];
+      otherIds = [
+        parseBody(o1.body, isBookLite).id,
+        parseBody(o2.body, isBookLite).id,
+      ];
     });
 
     it('should require auth', async () => {
-      await request(app.getHttpServer()).get('/books/my').expect(401);
+      await request(httpServer).get('/books/my').expect(401);
     });
 
     it("should return only current user's books", async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .get('/books/my')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
-      const ids = res.body.map((b: any) => b.id);
+      const myBooks = parseBody(res.body, isBookLiteArray);
+      const ids = myBooks.map((b) => b.id);
       expect(ids).toEqual(expect.arrayContaining(myIds));
       otherIds.forEach((oid) => expect(ids).not.toContain(oid));
     });
@@ -319,19 +386,18 @@ describe('Books (e2e)', () => {
       bookId = book.id;
     });
 
-    it('should return a book by ID', () => {
-      return request(app.getHttpServer())
+    it('should return a book by ID', async () => {
+      const res: Response = await request(httpServer)
         .get(`/books/${bookId}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(bookId);
-          expect(res.body.hash).toBe('single-book-hash');
-          expect(res.body.title).toBe('Single Book');
-        });
+        .expect(200);
+      const body = parseBody(res.body, isBookLite);
+      expect(body.id).toBe(bookId);
+      expect(body.hash).toBe('single-book-hash');
+      expect(body.title).toBe('Single Book');
     });
 
     it('should return 404 for non-existent book', () => {
-      return request(app.getHttpServer()).get('/books/999999').expect(404);
+      return request(httpServer).get('/books/999999').expect(404);
     });
   });
 
@@ -345,18 +411,17 @@ describe('Books (e2e)', () => {
       });
     });
 
-    it('should return a book by hash', () => {
-      return request(app.getHttpServer())
+    it('should return a book by hash', async () => {
+      const res: Response = await request(httpServer)
         .get('/books/hash/findable-hash')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.hash).toBe('findable-hash');
-          expect(res.body.title).toBe('Findable Book');
-        });
+        .expect(200);
+      const body = parseBody(res.body, isBookLite);
+      expect(body.hash).toBe('findable-hash');
+      expect(body.title).toBe('Findable Book');
     });
 
     it('should return 404 for non-existent hash', () => {
-      return request(app.getHttpServer())
+      return request(httpServer)
         .get('/books/hash/non-existent-hash')
         .expect(404);
     });
@@ -375,24 +440,23 @@ describe('Books (e2e)', () => {
       bookId = book.id;
     });
 
-    it('should update a book', () => {
+    it('should update a book', async () => {
       const updateDto = {
         title: 'Updated Title',
         description: 'Updated description',
       };
 
-      return request(app.getHttpServer())
+      const res = await request(httpServer)
         .patch(`/books/${bookId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.title).toBe('Updated Title');
-          expect(res.body.description).toBe('Updated description');
-        });
+        .expect(200);
+      const body = parseBody(res.body, isBookLite);
+      expect(body.title).toBe('Updated Title');
+      expect(body.description).toBe('Updated description');
     });
 
-    it('should update book tags', () => {
+    it('should update book tags', async () => {
       const updateDto = {
         tags: [
           { key: 'author', value: 'New Author' },
@@ -400,23 +464,22 @@ describe('Books (e2e)', () => {
         ],
       };
 
-      return request(app.getHttpServer())
+      const res = await request(httpServer)
         .patch(`/books/${bookId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.tags).toHaveLength(2);
-          expect(
-            res.body.tags.some(
-              (tag) => tag.key === 'author' && tag.value === 'New Author',
-            ),
-          ).toBe(true);
-        });
+        .expect(200);
+      const body = parseBody(res.body, isBookLite);
+      expect(body.tags).toHaveLength(2);
+      expect(
+        body.tags?.some(
+          (tag) => tag.key === 'author' && tag.value === 'New Author',
+        ),
+      ).toBe(true);
     });
 
     it('should return 401 without authentication', () => {
-      return request(app.getHttpServer())
+      return request(httpServer)
         .patch(`/books/${bookId}`)
         .send({ title: 'Unauthorized Update' })
         .expect(401);
@@ -441,7 +504,7 @@ describe('Books (e2e)', () => {
       }
 
       // 创建测试数据
-      const book1 = await request(app.getHttpServer())
+      const book1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -454,9 +517,9 @@ describe('Books (e2e)', () => {
             { key: 'year', value: '1950' },
           ],
         });
-      bookId1 = book1.body.id;
+      bookId1 = parseBody(book1.body, isBookLite).id;
 
-      const book2 = await request(app.getHttpServer())
+      const book2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -469,9 +532,9 @@ describe('Books (e2e)', () => {
             { key: 'year', value: '1954' },
           ],
         });
-      bookId2 = book2.body.id;
+      bookId2 = parseBody(book2.body, isBookLite).id;
 
-      const book3 = await request(app.getHttpServer())
+      const book3 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -484,40 +547,40 @@ describe('Books (e2e)', () => {
             { key: 'year', value: '1951' },
           ],
         });
-      bookId3 = book3.body.id;
+      bookId3 = parseBody(book3.body, isBookLite).id;
     });
 
     it('should search books by tag keys', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagKeys: 'author,genre',
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(3);
-      expect(response.body.map((book: any) => book.id).sort()).toEqual(
+      const body1 = parseBody(response.body, isBookLiteArray);
+      expect(body1).toHaveLength(3);
+      expect(body1.map((book) => book.id).sort()).toEqual(
         [bookId1, bookId2, bookId3].sort(),
       );
     });
 
     it('should search books by specific tag key-value pair', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagKey: 'author',
           tagValue: 'Isaac Asimov',
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(2);
-      expect(response.body.map((book: any) => book.id).sort()).toEqual(
+      const body2 = parseBody(response.body, isBookLiteArray);
+      expect(body2).toHaveLength(2);
+      expect(body2.map((book) => book.id).sort()).toEqual(
         [bookId1, bookId3].sort(),
       );
     });
 
     it('should search books by multiple tag filters', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagFilters: [
@@ -526,32 +589,30 @@ describe('Books (e2e)', () => {
           ],
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(2);
-      expect(response.body.map((book: any) => book.id).sort()).toEqual(
+      const body3 = parseBody(response.body, isBookLiteArray);
+      expect(body3).toHaveLength(2);
+      expect(body3.map((book) => book.id).sort()).toEqual(
         [bookId1, bookId2].sort(),
       );
     });
 
     it('should return all books when no search criteria provided', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({})
         .expect(201);
-
-      expect(response.body).toHaveLength(3);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(3);
     });
 
     it('should return empty array when no books match criteria', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagKey: 'author',
           tagValue: 'Nonexistent Author',
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(0);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
     });
   });
 
@@ -572,7 +633,7 @@ describe('Books (e2e)', () => {
       }
 
       // 创建测试数据
-      const book1 = await request(app.getHttpServer())
+      const book1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -583,9 +644,9 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Science Fiction' },
           ],
         });
-      bookId1 = book1.body.id;
+      bookId1 = parseBody(book1.body, isBookLite).id;
 
-      const book2 = await request(app.getHttpServer())
+      const book2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -596,42 +657,39 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Science Fiction' },
           ],
         });
-      bookId2 = book2.body.id;
+      bookId2 = parseBody(book2.body, isBookLite).id;
     });
 
     it('should return books with specific tag key-value pair', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get('/books/tags/author/Isaac%20Asimov')
         .expect(200);
-
-      expect(response.body).toHaveLength(2);
-      expect(response.body.map((book: any) => book.id).sort()).toEqual(
+      const body = parseBody(response.body, isBookLiteArray);
+      expect(body).toHaveLength(2);
+      expect(body.map((book) => book.id).sort()).toEqual(
         [bookId1, bookId2].sort(),
       );
-
-      response.body.forEach((book: any) => {
+      body.forEach((book) => {
         expect(
-          book.tags.some(
-            (tag: any) => tag.key === 'author' && tag.value === 'Isaac Asimov',
+          book.tags?.some(
+            (tag) => tag.key === 'author' && tag.value === 'Isaac Asimov',
           ),
         ).toBe(true);
       });
     });
 
     it('should return empty array when no books match the tag', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get('/books/tags/author/Nonexistent%20Author')
         .expect(200);
-
-      expect(response.body).toHaveLength(0);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
     });
 
     it('should handle URL encoded values correctly', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get('/books/tags/genre/Science%20Fiction')
         .expect(200);
-
-      expect(response.body).toHaveLength(2);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(2);
     });
   });
 
@@ -648,7 +706,7 @@ describe('Books (e2e)', () => {
     });
 
     it('should delete a book', async () => {
-      await request(app.getHttpServer())
+      await request(httpServer)
         .delete(`/books/${bookId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -661,13 +719,11 @@ describe('Books (e2e)', () => {
     });
 
     it('should return 401 without authentication', () => {
-      return request(app.getHttpServer())
-        .delete(`/books/${bookId}`)
-        .expect(401);
+      return request(httpServer).delete(`/books/${bookId}`).expect(401);
     });
 
     it('should return 404 for non-existent book', () => {
-      return request(app.getHttpServer())
+      return request(httpServer)
         .delete('/books/999999')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
@@ -692,7 +748,7 @@ describe('Books (e2e)', () => {
       }
 
       // 创建测试数据
-      const book1 = await request(app.getHttpServer())
+      const book1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -703,9 +759,9 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Science Fiction' },
           ],
         });
-      bookId1 = book1.body.id;
+      bookId1 = parseBody(book1.body, isBookLite).id;
 
-      const book2 = await request(app.getHttpServer())
+      const book2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -716,7 +772,7 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Fantasy' },
           ],
         });
-      bookId2 = book2.body.id;
+      bookId2 = parseBody(book2.body, isBookLite).id;
 
       // 获取author tag的ID
       const authorTag = await tagRepository.findOne({
@@ -729,40 +785,35 @@ describe('Books (e2e)', () => {
     });
 
     it('should return books by tag ID', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get(`/books/tag-id/${tagId}`)
         .expect(200);
-
-      expect(response.body).toHaveLength(2);
-      expect(response.body.map((book: any) => book.id).sort()).toEqual(
+      const body = parseBody(response.body, isBookLiteArray);
+      expect(body).toHaveLength(2);
+      expect(body.map((book) => book.id).sort()).toEqual(
         [bookId1, bookId2].sort(),
       );
-      expect(response.body[0]).toHaveProperty('tags');
+      expect(body[0].tags).toBeDefined();
     });
 
     it('should return empty array for non-existent tag ID', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get('/books/tag-id/999999')
         .expect(200);
-
-      expect(response.body).toHaveLength(0);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
     });
 
     it('should return 400 for invalid tag ID', async () => {
-      await request(app.getHttpServer())
-        .get('/books/tag-id/invalid')
-        .expect(400);
+      await request(httpServer).get('/books/tag-id/invalid').expect(400);
     });
 
     it('should return 400 for negative tag ID', async () => {
-      await request(app.getHttpServer()).get('/books/tag-id/-1').expect(400);
+      await request(httpServer).get('/books/tag-id/-1').expect(400);
     });
   });
 
   describe('/books/tag-ids/:ids (GET)', () => {
     let bookId1: number;
-    let bookId2: number;
-    let bookId3: number;
     let authorTagId: number;
     let genreTagId: number;
 
@@ -779,7 +830,7 @@ describe('Books (e2e)', () => {
       }
 
       // 创建测试数据
-      const book1 = await request(app.getHttpServer())
+      const book1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -790,9 +841,9 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Science Fiction' },
           ],
         });
-      bookId1 = book1.body.id;
+      bookId1 = parseBody(book1.body, isBookLite).id;
 
-      const book2 = await request(app.getHttpServer())
+      await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -802,10 +853,10 @@ describe('Books (e2e)', () => {
             { key: 'author', value: 'J.R.R. Tolkien' },
             { key: 'genre', value: 'Science Fiction' },
           ],
-        });
-      bookId2 = book2.body.id;
+        })
+        .expect(201);
 
-      const book3 = await request(app.getHttpServer())
+      await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -815,8 +866,8 @@ describe('Books (e2e)', () => {
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Fantasy' },
           ],
-        });
-      bookId3 = book3.body.id;
+        })
+        .expect(201);
 
       // 获取tag IDs
       const authorTag = await tagRepository.findOne({
@@ -833,35 +884,32 @@ describe('Books (e2e)', () => {
     });
 
     it('should return books by multiple tag IDs', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get(`/books/tag-ids/${authorTagId},${genreTagId}`)
         .expect(200);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].id).toBe(bookId1);
+      const body = parseBody(response.body, isBookLiteArray);
+      expect(body).toHaveLength(1);
+      expect(body[0].id).toBe(bookId1);
     });
 
     it('should filter out invalid tag IDs', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get(`/books/tag-ids/${authorTagId},invalid,${genreTagId},0`)
         .expect(200);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].id).toBe(bookId1);
+      const body2 = parseBody(response.body, isBookLiteArray);
+      expect(body2).toHaveLength(1);
+      expect(body2[0].id).toBe(bookId1);
     });
 
     it('should return 400 when no valid tag IDs provided', async () => {
-      await request(app.getHttpServer())
-        .get('/books/tag-ids/invalid,0,-1')
-        .expect(400);
+      await request(httpServer).get('/books/tag-ids/invalid,0,-1').expect(400);
     });
 
     it('should return empty array for non-existent tag IDs', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .get('/books/tag-ids/999999,888888')
         .expect(200);
-
-      expect(response.body).toHaveLength(0);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
     });
   });
 
@@ -884,7 +932,7 @@ describe('Books (e2e)', () => {
       }
 
       // 创建测试数据
-      const book1 = await request(app.getHttpServer())
+      const book1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -895,9 +943,9 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Science Fiction' },
           ],
         });
-      bookId1 = book1.body.id;
+      bookId1 = parseBody(book1.body, isBookLite).id;
 
-      const book2 = await request(app.getHttpServer())
+      const book2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -908,7 +956,7 @@ describe('Books (e2e)', () => {
             { key: 'genre', value: 'Fantasy' },
           ],
         });
-      bookId2 = book2.body.id;
+      bookId2 = parseBody(book2.body, isBookLite).id;
 
       // 获取tag IDs
       const authorTag = await tagRepository.findOne({
@@ -925,40 +973,39 @@ describe('Books (e2e)', () => {
     });
 
     it('should search books by single tag ID', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagId: authorTagId,
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(2);
-      expect(response.body.map((book: any) => book.id).sort()).toEqual(
+      const body = parseBody(response.body, isBookLiteArray);
+      expect(body).toHaveLength(2);
+      expect(body.map((book) => book.id).sort()).toEqual(
         [bookId1, bookId2].sort(),
       );
     });
 
     it('should search books by multiple tag IDs', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagIds: `${authorTagId},${genreTagId}`,
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].id).toBe(bookId1);
+      const body = parseBody(response.body, isBookLiteArray);
+      expect(body).toHaveLength(1);
+      expect(body[0].id).toBe(bookId1);
     });
 
     it('should return empty array for non-existent tag ID', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(httpServer)
         .post('/books/search')
         .send({
           tagId: 999999,
         })
         .expect(201);
-
-      expect(response.body).toHaveLength(0);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
     });
   });
 
@@ -974,7 +1021,7 @@ describe('Books (e2e)', () => {
       await tagRepository.query('DELETE FROM tag');
 
       // 基础书籍（tags: a,b,c）
-      const base = await request(app.getHttpServer())
+      const base = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -986,10 +1033,10 @@ describe('Books (e2e)', () => {
             { key: 'level', value: 'Advanced' },
           ],
         });
-      baseId = base.body.id;
+      baseId = parseBody(base.body, isBookLite).id;
 
       // 共享2个标签 (topic:AI, lang:TS)
-      const b1 = await request(app.getHttpServer())
+      const b1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -1001,7 +1048,7 @@ describe('Books (e2e)', () => {
           ],
         });
       // 共享1个标签 (topic:AI)
-      const b2 = await request(app.getHttpServer())
+      const b2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -1013,7 +1060,7 @@ describe('Books (e2e)', () => {
           ],
         });
       // 共享3个标签 (topic:AI, lang:TS, level:Advanced) => 应排在最前
-      const b3 = await request(app.getHttpServer())
+      const b3 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -1026,7 +1073,7 @@ describe('Books (e2e)', () => {
           ],
         });
       // 无共享标签
-      const u = await request(app.getHttpServer())
+      const u = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -1034,16 +1081,21 @@ describe('Books (e2e)', () => {
           title: 'Unrelated',
           tags: [{ key: 'topic', value: 'Math' }],
         });
-      relatedIds = [b1.body.id, b2.body.id, b3.body.id];
-      unrelatedId = u.body.id;
+      relatedIds = [
+        parseBody(b1.body, isBookLite).id,
+        parseBody(b2.body, isBookLite).id,
+        parseBody(b3.body, isBookLite).id,
+      ];
+      unrelatedId = parseBody(u.body, isBookLite).id;
     });
 
     it('should return ordered recommendations by overlap desc', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .get(`/books/recommend/${baseId}`)
         .expect(200);
       // 期望包含 b3 (3 overlap) -> b1 (2) -> b2 (1)
-      const ids = res.body.map((b: any) => b.id);
+      const recs = parseBody(res.body, isBookLiteArray);
+      const ids = recs.map((b) => b.id);
       expect(ids).toEqual(expect.arrayContaining(relatedIds));
       // 检查顺序前3
       const indexB3 = ids.indexOf(relatedIds[2]); // b3
@@ -1056,34 +1108,31 @@ describe('Books (e2e)', () => {
     });
 
     it('should respect limit parameter', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .get(`/books/recommend/${baseId}?limit=2`)
         .expect(200);
-      expect(res.body).toHaveLength(2);
+      expect(parseBody(res.body, isBookLiteArray)).toHaveLength(2);
     });
 
     it('should return 400 for invalid id', async () => {
-      await request(app.getHttpServer())
-        .get('/books/recommend/invalid')
-        .expect(400);
+      await request(httpServer).get('/books/recommend/invalid').expect(400);
     });
 
     it('should return 404 for non-existent book id', async () => {
-      await request(app.getHttpServer())
-        .get('/books/recommend/999999')
-        .expect(404);
+      await request(httpServer).get('/books/recommend/999999').expect(404);
     });
 
     it('should return empty array when base book has no tags', async () => {
       // 创建无标签书籍
-      const empty = await request(app.getHttpServer())
+      const empty = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ hash: 'rec-empty', title: 'Empty' });
-      const res = await request(app.getHttpServer())
-        .get(`/books/recommend/${empty.body.id}`)
+      const emptyBody = parseBody(empty.body, isBookLite);
+      const res = await request(httpServer)
+        .get(`/books/recommend/${emptyBody.id}`)
         .expect(200);
-      expect(res.body).toEqual([]);
+      expect(parseBody(res.body, isBookLiteArray)).toEqual([]);
     });
   });
 
@@ -1091,73 +1140,113 @@ describe('Books (e2e)', () => {
     let createdId: number;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ hash: 'rate-1', title: 'Rate Target' })
         .expect(201);
-      createdId = res.body.id;
+      createdId = parseBody(res.body, isBookLite).id;
     });
 
     it('public can read aggregate rating (initially zero)', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .get(`/books/${createdId}/rating`)
         .expect(200);
-      expect(res.body).toEqual({ bookId: createdId, avg: 0, count: 0 });
+      const agg0 = parseBody(
+        res.body,
+        (o): o is { bookId: number; avg: number; count: number } => {
+          if (typeof o !== 'object' || o === null) return false;
+          const r = o as Record<string, unknown>;
+          return (
+            typeof r.bookId === 'number' &&
+            typeof r.avg === 'number' &&
+            typeof r.count === 'number'
+          );
+        },
+      );
+      expect(agg0).toEqual({ bookId: createdId, avg: 0, count: 0 });
     });
 
     it('user can set and update own rating (1-5)', async () => {
       // set 5
-      const r1 = await request(app.getHttpServer())
+      const r1 = await request(httpServer)
         .post(`/books/${createdId}/rating`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ score: 5 })
         .expect(201);
-      expect(r1.body.ok).toBe(true);
-      expect(r1.body.myRating).toBe(5);
-      expect(r1.body.count).toBeGreaterThanOrEqual(1);
+      const r1b = parseBody(
+        r1.body,
+        (o): o is { ok: boolean; myRating: number; count: number } => {
+          if (typeof o !== 'object' || o === null) return false;
+          const r = o as Record<string, unknown>;
+          return (
+            typeof r.ok === 'boolean' &&
+            typeof r.myRating === 'number' &&
+            typeof r.count === 'number'
+          );
+        },
+      );
+      expect(r1b.ok).toBe(true);
+      expect(r1b.myRating).toBe(5);
+      expect(r1b.count).toBeGreaterThanOrEqual(1);
 
       // update to 3
-      const r2 = await request(app.getHttpServer())
+      const r2 = await request(httpServer)
         .post(`/books/${createdId}/rating`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ score: 3 })
         .expect(201);
-      expect(r2.body.myRating).toBe(3);
+      const r2b = parseBody(r2.body, (o): o is { myRating: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).myRating === 'number';
+      });
+      expect(r2b.myRating).toBe(3);
 
       // get my rating
-      const me = await request(app.getHttpServer())
+      const me = await request(httpServer)
         .get(`/books/${createdId}/rating/me`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
-      expect(me.body.myRating).toBe(3);
+      const meb = parseBody(me.body, (o): o is { myRating: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).myRating === 'number';
+      });
+      expect(meb.myRating).toBe(3);
     });
 
     it('requires auth to rate and delete my rating', async () => {
-      await request(app.getHttpServer())
+      await request(httpServer)
         .post(`/books/${createdId}/rating`)
         .send({ score: 4 })
         .expect(401);
-      await request(app.getHttpServer())
+      await request(httpServer)
         .delete(`/books/${createdId}/rating`)
         .expect(401);
     });
 
     it('deleting my rating adjusts aggregate', async () => {
-      await request(app.getHttpServer())
+      await request(httpServer)
         .post(`/books/${createdId}/rating`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ score: 4 })
         .expect(201);
-      const del = await request(app.getHttpServer())
+      const del = await request(httpServer)
         .delete(`/books/${createdId}/rating`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
-      expect(del.body.ok).toBe(true);
-      const agg = await request(app.getHttpServer())
+      const delBody = parseBody(del.body, (o): o is { ok: boolean } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).ok === 'boolean';
+      });
+      expect(delBody.ok).toBe(true);
+      const agg = await request(httpServer)
         .get(`/books/${createdId}/rating`)
         .expect(200);
-      expect(agg.body.count).toBeGreaterThanOrEqual(0);
+      const aggb = parseBody(agg.body, (o): o is { count: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).count === 'number';
+      });
+      expect(aggb.count).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -1167,16 +1256,16 @@ describe('Books (e2e)', () => {
     let otherUserId: number;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ hash: 'cmt-1', title: 'Comment Target' })
         .expect(201);
-      createdId = res.body.id;
+      createdId = parseBody(res.body, isBookLite).id;
 
       // another user
       const suffix = Date.now().toString();
-      const otherReg = await request(app.getHttpServer())
+      const otherReg = await request(httpServer)
         .post('/auth/register')
         .send({
           username: `c_other_${suffix}`,
@@ -1184,39 +1273,86 @@ describe('Books (e2e)', () => {
           password: 'p@ssw0rd!',
         })
         .expect(201);
-      otherUserId = otherReg.body.user.id;
-      const otherLogin = await request(app.getHttpServer())
+      otherUserId = parseBody(
+        otherReg.body,
+        (d): d is { user: { id: number } } => {
+          if (typeof d !== 'object' || d === null) return false;
+          const r = d as Record<string, unknown>;
+          const u = r.user as Record<string, unknown> | undefined;
+          return (
+            typeof u === 'object' && u !== null && typeof u.id === 'number'
+          );
+        },
+      ).user.id;
+      const otherLogin = await request(httpServer)
         .post('/auth/login')
         .send({ username: `c_other_${suffix}`, password: 'p@ssw0rd!' })
         .expect(201);
-      otherUserToken = otherLogin.body.access_token;
+      otherUserToken = parseBody(
+        otherLogin.body,
+        (d): d is { access_token: string } => {
+          if (typeof d !== 'object' || d === null) return false;
+          return (
+            typeof (d as Record<string, unknown>).access_token === 'string'
+          );
+        },
+      ).access_token;
     });
 
     it('public can list comments (initially empty)', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(httpServer)
         .get(`/books/${createdId}/comments`)
         .expect(200);
-      expect(res.body.total).toBe(0);
-      expect(res.body.items).toEqual([]);
+      const page0 = parseBody(
+        res.body,
+        (o): o is { total: number; items: unknown[] } =>
+          isPagedResult(o, (_): _ is unknown => true),
+      );
+      expect(page0.total).toBe(0);
+      expect(page0.items).toEqual([]);
     });
 
     it('user can add and list own comment', async () => {
-      const c1 = await request(app.getHttpServer())
+      const c1 = await request(httpServer)
         .post(`/books/${createdId}/comments`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ content: 'Nice book' })
         .expect(201);
-      expect(c1.body.id).toBeDefined();
-      const list = await request(app.getHttpServer())
+      const c1Body = parseBody(c1.body, (o): o is { id: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).id === 'number';
+      });
+      expect(c1Body.id).toBeDefined();
+      const list = await request(httpServer)
         .get(`/books/${createdId}/comments`)
         .expect(200);
-      expect(list.body.total).toBe(1);
-      expect(list.body.items[0].content).toBe('Nice book');
-      expect(list.body.items[0].reply_count).toBe(0);
+      const page1 = parseBody(
+        list.body,
+        (
+          o,
+        ): o is {
+          total: number;
+          items: Array<{ content: string; reply_count: number }>;
+        } =>
+          isPagedResult(
+            o,
+            (x): x is { content: string; reply_count: number } => {
+              if (typeof x !== 'object' || x === null) return false;
+              const r = x as Record<string, unknown>;
+              return (
+                typeof r.content === 'string' &&
+                typeof r.reply_count === 'number'
+              );
+            },
+          ),
+      );
+      expect(page1.total).toBe(1);
+      expect(page1.items[0].content).toBe('Nice book');
+      expect(page1.items[0].reply_count).toBe(0);
     });
 
     it('requires auth to add comment', async () => {
-      await request(app.getHttpServer())
+      await request(httpServer)
         .post(`/books/${createdId}/comments`)
         .send({ content: 'x' })
         .expect(401);
@@ -1224,15 +1360,18 @@ describe('Books (e2e)', () => {
 
     it('owner can delete own comment; others cannot unless COMMENT_MANAGE', async () => {
       // current user adds a comment
-      const c1 = await request(app.getHttpServer())
+      const c1 = await request(httpServer)
         .post(`/books/${createdId}/comments`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ content: 'to be deleted' })
         .expect(201);
-      const commentId = c1.body.id;
+      const commentId = parseBody(c1.body, (o): o is { id: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).id === 'number';
+      }).id;
 
       // other user cannot delete
-      await request(app.getHttpServer())
+      await request(httpServer)
         .delete(`/books/${createdId}/comments/${commentId}`)
         .set('Authorization', `Bearer ${otherUserToken}`)
         .expect(403);
@@ -1242,7 +1381,7 @@ describe('Books (e2e)', () => {
       await grantPermissions(ds, otherUserId, { COMMENT_MANAGE: 1 });
 
       // now can delete
-      await request(app.getHttpServer())
+      await request(httpServer)
         .delete(`/books/${createdId}/comments/${commentId}`)
         .set('Authorization', `Bearer ${otherUserToken}`)
         .expect(200);
@@ -1250,42 +1389,71 @@ describe('Books (e2e)', () => {
 
     it('supports replies (楼中楼): add/list and cascade delete with parent', async () => {
       // add a top-level comment
-      const c1 = await request(app.getHttpServer())
+      const c1 = await request(httpServer)
         .post(`/books/${createdId}/comments`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ content: 'Parent Cmt' })
         .expect(201);
-      const parentId = c1.body.id;
+      const parentId = parseBody(c1.body, (o): o is { id: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).id === 'number';
+      }).id;
 
       // reply to that comment
-      const r1 = await request(app.getHttpServer())
+      const r1 = await request(httpServer)
         .post(`/books/${createdId}/comments/${parentId}/replies`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ content: 'First reply' })
         .expect(201);
-      expect(r1.body.parentId).toBe(parentId);
+      const r1Body = parseBody(r1.body, (o): o is { parentId: number } => {
+        if (typeof o !== 'object' || o === null) return false;
+        return typeof (o as Record<string, unknown>).parentId === 'number';
+      });
+      expect(r1Body.parentId).toBe(parentId);
 
       // list replies
-      const list = await request(app.getHttpServer())
+      const list = await request(httpServer)
         .get(`/books/${createdId}/comments/${parentId}/replies`)
         .expect(200);
-      expect(list.body.total).toBe(1);
-      expect(list.body.items[0].content).toBe('First reply');
+      const repliesPage = parseBody(
+        list.body,
+        (o): o is { total: number; items: Array<{ content: string }> } =>
+          isPagedResult(
+            o,
+            (x): x is { content: string } =>
+              typeof x === 'object' &&
+              x !== null &&
+              typeof (x as Record<string, unknown>).content === 'string',
+          ),
+      );
+      expect(repliesPage.total).toBe(1);
+      expect(repliesPage.items[0].content).toBe('First reply');
 
       // list top-level again should show reply_count = 1
-      const tops = await request(app.getHttpServer())
+      const tops = await request(httpServer)
         .get(`/books/${createdId}/comments`)
         .expect(200);
-      expect(tops.body.items[0].reply_count).toBe(1);
+      const topsPage = parseBody(
+        tops.body,
+        (o): o is { items: Array<{ reply_count: number }> } =>
+          isPagedResult(
+            o,
+            (x): x is { reply_count: number } =>
+              typeof x === 'object' &&
+              x !== null &&
+              typeof (x as Record<string, unknown>).reply_count === 'number',
+          ),
+      );
+      expect(topsPage.items[0].reply_count).toBe(1);
 
       // delete parent comment -> should cascade delete replies
-      await request(app.getHttpServer())
+      await request(httpServer)
         .delete(`/books/${createdId}/comments/${parentId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       // now parent missing -> listing replies should return 404
-      await request(app.getHttpServer())
+      await request(httpServer)
         .get(`/books/${createdId}/comments/${parentId}/replies`)
         .expect(404);
     });

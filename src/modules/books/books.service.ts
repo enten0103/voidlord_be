@@ -4,13 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { Book } from '../../entities/book.entity';
 import { Tag } from '../../entities/tag.entity';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { BookRating } from '../../entities/book-rating.entity';
 import { Comment } from '../../entities/comment.entity';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class BooksService {
@@ -135,12 +136,15 @@ export class BooksService {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     let rating = await this.ratingRepository.findOne({
-      where: { book: { id: bookId }, user: { id: userId } } as any,
+      where: {
+        book: { id: bookId } as Book,
+        user: { id: userId } as User,
+      } as FindOptionsWhere<BookRating>,
     });
     if (!rating) {
       rating = this.ratingRepository.create({
-        book: { id: bookId } as any,
-        user: { id: userId } as any,
+        book: { id: bookId } as Book,
+        user: { id: userId } as User, // user entity id reference
         score,
       });
     } else {
@@ -182,14 +186,20 @@ export class BooksService {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     const r = await this.ratingRepository.findOne({
-      where: { book: { id: bookId }, user: { id: userId } } as any,
+      where: {
+        book: { id: bookId } as Book,
+        user: { id: userId } as User,
+      } as FindOptionsWhere<BookRating>,
     });
     return { bookId, myRating: r?.score ?? null };
   }
 
   async removeMyRating(bookId: number, userId: number) {
     const r = await this.ratingRepository.findOne({
-      where: { book: { id: bookId }, user: { id: userId } } as any,
+      where: {
+        book: { id: bookId } as Book,
+        user: { id: userId } as User,
+      } as FindOptionsWhere<BookRating>,
     });
     if (r) await this.ratingRepository.remove(r);
     const agg = await this.ratingRepository
@@ -214,7 +224,10 @@ export class BooksService {
     if (limit > 100) limit = 100;
     if (offset < 0) offset = 0;
     const [items, total] = await this.commentRepository.findAndCount({
-      where: { book: { id: bookId }, parent: IsNull() } as any,
+      where: {
+        book: { id: bookId } as Book,
+        parent: IsNull(),
+      } as FindOptionsWhere<Comment>,
       order: { created_at: 'DESC' },
       take: limit,
       skip: offset,
@@ -224,7 +237,10 @@ export class BooksService {
     const counts = await Promise.all(
       items.map((c) =>
         this.commentRepository.count({
-          where: { book: { id: bookId }, parent: { id: c.id } } as any,
+          where: {
+            book: { id: bookId } as Book,
+            parent: { id: c.id } as Comment,
+          } as FindOptionsWhere<Comment>,
         }),
       ),
     );
@@ -238,9 +254,7 @@ export class BooksService {
         content: c.content,
         created_at: c.created_at,
         updated_at: c.updated_at,
-        user: c.user
-          ? { id: c.user.id, username: (c.user as any).username }
-          : null,
+        user: c.user ? { id: c.user.id, username: c.user.username } : null,
         reply_count: counts[idx] ?? 0,
       })),
     };
@@ -260,8 +274,8 @@ export class BooksService {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     const entity = this.commentRepository.create({
-      book: { id: bookId } as any,
-      user: userId ? ({ id: userId } as any) : null,
+      book: { id: bookId } as Book,
+      user: userId ? ({ id: userId } as User) : null,
       content: content.trim(),
     });
     const saved = await this.commentRepository.save(entity);
@@ -275,7 +289,10 @@ export class BooksService {
 
   async removeComment(bookId: number, commentId: number) {
     const c = await this.commentRepository.findOne({
-      where: { id: commentId, book: { id: bookId } } as any,
+      where: {
+        id: commentId,
+        book: { id: bookId } as Book,
+      } as FindOptionsWhere<Comment>,
       relations: ['user'],
     });
     if (!c) throw new NotFoundException('Comment not found');
@@ -288,7 +305,10 @@ export class BooksService {
     commentId: number,
   ): Promise<number | null> {
     const c = await this.commentRepository.findOne({
-      where: { id: commentId, book: { id: bookId } } as any,
+      where: {
+        id: commentId,
+        book: { id: bookId } as Book,
+      } as FindOptionsWhere<Comment>,
       relations: ['user'],
     });
     if (!c) return null;
@@ -314,14 +334,17 @@ export class BooksService {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     const parent = await this.commentRepository.findOne({
-      where: { id: parentCommentId, book: { id: bookId } } as any,
+      where: {
+        id: parentCommentId,
+        book: { id: bookId } as Book,
+      } as FindOptionsWhere<Comment>,
     });
     if (!parent) throw new NotFoundException('Parent comment not found');
     const entity = this.commentRepository.create({
-      book: { id: bookId } as any,
-      user: userId ? ({ id: userId } as any) : null,
+      book: { id: bookId } as Book,
+      user: userId ? ({ id: userId } as User) : null,
       content: content.trim(),
-      parent: { id: parentCommentId } as any,
+      parent: { id: parentCommentId } as Comment,
     });
     const saved = await this.commentRepository.save(entity);
     return {
@@ -342,14 +365,20 @@ export class BooksService {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     const parent = await this.commentRepository.findOne({
-      where: { id: parentCommentId, book: { id: bookId } } as any,
+      where: {
+        id: parentCommentId,
+        book: { id: bookId } as Book,
+      } as FindOptionsWhere<Comment>,
     });
     if (!parent) throw new NotFoundException('Parent comment not found');
     if (limit <= 0) limit = 20;
     if (limit > 100) limit = 100;
     if (offset < 0) offset = 0;
     const [items, total] = await this.commentRepository.findAndCount({
-      where: { book: { id: bookId }, parent: { id: parentCommentId } } as any,
+      where: {
+        book: { id: bookId } as Book,
+        parent: { id: parentCommentId } as Comment,
+      } as FindOptionsWhere<Comment>,
       order: { created_at: 'DESC' },
       take: limit,
       skip: offset,
@@ -366,9 +395,7 @@ export class BooksService {
         content: c.content,
         created_at: c.created_at,
         updated_at: c.updated_at,
-        user: c.user
-          ? { id: c.user.id, username: (c.user as any).username }
-          : null,
+        user: c.user ? { id: c.user.id, username: c.user.username } : null,
       })),
     };
   }
@@ -405,11 +432,14 @@ export class BooksService {
       )
       .join(' OR ');
 
-    const parameters = tagFilters.reduce((params, filter, index) => {
-      params[`key${index}`] = filter.key;
-      params[`value${index}`] = filter.value;
-      return params;
-    }, {} as any);
+    const parameters: Record<string, string> = tagFilters.reduce(
+      (params, filter, index) => {
+        params[`key${index}`] = filter.key;
+        params[`value${index}`] = filter.value;
+        return params;
+      },
+      {},
+    );
 
     return queryBuilder
       .where(conditions, parameters)
@@ -462,6 +492,10 @@ export class BooksService {
 
     const tagIds = base.tags.map((t) => t.id);
 
+    interface RawOverlapRow {
+      id: string;
+      overlap: string;
+    }
     const raw = await this.bookRepository
       .createQueryBuilder('book')
       .innerJoin('book.tags', 'tag')
@@ -473,7 +507,7 @@ export class BooksService {
       .orderBy('overlap', 'DESC')
       .addOrderBy('book.created_at', 'DESC')
       .limit(limit)
-      .getRawMany();
+      .getRawMany<RawOverlapRow>();
 
     if (raw.length === 0) return [];
     const ids = raw.map((r) => Number(r.id));
@@ -485,7 +519,9 @@ export class BooksService {
     return ids.map((id) => map.get(id)).filter((b): b is Book => !!b);
   }
 
-  private async processTags(tagDtos: any[]): Promise<Tag[]> {
+  private async processTags(
+    tagDtos: { key: string; value: string; shown?: boolean }[],
+  ): Promise<Tag[]> {
     const tags: Tag[] = [];
 
     for (const tagDto of tagDtos) {

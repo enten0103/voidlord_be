@@ -1,13 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { default as request } from 'supertest';
+import request from 'supertest';
+import {
+  registerAndLogin,
+  LoginResult,
+  parseLoginResult,
+} from '../../../../test/test-module.factory';
+import { expectGuard } from '../../../../test/response-guards';
 import { AppModule } from '../../app/app.module';
 import { DataSource as DS2 } from 'typeorm';
+// parseLoginResult 不再直接在此使用，集中通过 registerAndLogin 获取结构化结果
 
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
   let ds: DS2;
+  let server: import('http').Server;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -22,28 +30,33 @@ describe('AuthController (e2e)', () => {
       }),
     );
 
-    ds = app.get(DataSource);
+    ds = app.get<DataSource>(DataSource);
 
     await app.init();
+    server = app.getHttpServer() as unknown as import('http').Server;
   });
 
   beforeEach(async () => {
-    // 清理依赖表 (先 user_permission 再 user)
+    // 清理依赖表 (先 user_permission 再 user)；捕获异常但不留下空块
     try {
       await ds.query('DELETE FROM user_permission');
     } catch {
-      /* ignore if not exists */
+      /* ignore if table absent */
     }
     try {
       await ds.query('DELETE FROM "user"');
-    } catch {}
-    // 保留 permissions（或清理）这里不清理以减少重复插入
+    } catch {
+      /* ignore if table absent */
+    }
+    // permissions 不清理以减少重复插入
   });
 
   afterAll(async () => {
     try {
       if (ds?.isInitialized) await ds.destroy();
-    } catch {}
+    } catch {
+      /* ignore destroy errors */
+    }
     await app.close();
   });
 
@@ -55,17 +68,16 @@ describe('AuthController (e2e)', () => {
         password: 'password123',
       };
 
-      return request(app.getHttpServer())
+      return request(server)
         .post('/auth/register')
         .send(createUserDto)
         .expect(201)
         .expect((res) => {
-          expect(res.body).toHaveProperty('access_token');
-          expect(res.body.user).toEqual({
-            id: expect.any(Number),
-            username: createUserDto.username,
-            email: createUserDto.email,
-          });
+          const parsed = parseLoginResult(res.body);
+          expect(parsed.access_token).toEqual(expect.any(String));
+          expect(parsed.user.username).toBe(createUserDto.username);
+          expect(parsed.user.email).toBe(createUserDto.email);
+          expect(parsed.user.id).toEqual(expect.any(Number));
         });
     });
 
@@ -77,13 +89,13 @@ describe('AuthController (e2e)', () => {
       };
 
       // 第一次注册
-      await request(app.getHttpServer())
+      await request(server)
         .post('/auth/register')
         .send(createUserDto)
         .expect(201);
 
       // 第二次注册相同用户名
-      return request(app.getHttpServer())
+      return request(server)
         .post('/auth/register')
         .send({
           ...createUserDto,
@@ -95,8 +107,8 @@ describe('AuthController (e2e)', () => {
 
   describe('/auth/login (POST)', () => {
     beforeEach(async () => {
-      // 先注册一个用户
-      await request(app.getHttpServer()).post('/auth/register').send({
+      // 使用共享辅助函数注册 + 登录一次，便于后续重复登录测试
+      await registerAndLogin(app, {
         username: 'testuser',
         email: 'test@example.com',
         password: 'password123',
@@ -104,7 +116,7 @@ describe('AuthController (e2e)', () => {
     });
 
     it('should login with valid credentials', () => {
-      return request(app.getHttpServer())
+      return request(server)
         .post('/auth/login')
         .send({
           username: 'testuser',
@@ -112,17 +124,16 @@ describe('AuthController (e2e)', () => {
         })
         .expect(201)
         .expect((res) => {
-          expect(res.body).toHaveProperty('access_token');
-          expect(res.body.user).toEqual({
-            id: expect.any(Number),
-            username: 'testuser',
-            email: 'test@example.com',
-          });
+          const parsed = parseLoginResult(res.body);
+          expect(parsed.access_token).toEqual(expect.any(String));
+          expect(parsed.user.username).toBe('testuser');
+          expect(parsed.user.email).toBe('test@example.com');
+          expect(parsed.user.id).toEqual(expect.any(Number));
         });
     });
 
     it('should return 401 for invalid credentials', () => {
-      return request(app.getHttpServer())
+      return request(server)
         .post('/auth/login')
         .send({
           username: 'testuser',
@@ -133,73 +144,79 @@ describe('AuthController (e2e)', () => {
   });
 
   describe('/auth/profile (GET)', () => {
-    let accessToken: string;
+    let login: LoginResult;
 
     beforeEach(async () => {
-      // 注册并登录获取token
-      const response = await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          username: 'testuser',
-          email: 'test@example.com',
-          password: 'password123',
-        });
-
-      accessToken = response.body.access_token;
+      login = await registerAndLogin(app, {
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password123',
+      });
     });
 
     it('should return user profile with valid token', () => {
-      return request(app.getHttpServer())
+      return request(server)
         .get('/auth/profile')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${login.access_token}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toEqual({
-            userId: expect.any(Number),
-            username: 'testuser',
+          const body = res.body as unknown;
+          expectGuard(body, (o): o is { id: number; username: string } => {
+            if (typeof o !== 'object' || o === null) return false;
+            const r = o as Record<string, unknown>;
+            return typeof r.id === 'number' && typeof r.username === 'string';
           });
+          expect((body as { username: string }).username).toBe('testuser');
         });
     });
 
     it('should return 401 without token', () => {
-      return request(app.getHttpServer()).get('/auth/profile').expect(401);
+      return request(server).get('/auth/profile').expect(401);
     });
   });
 
   describe('/auth/protected (GET)', () => {
-    let accessToken: string;
+    let login: LoginResult;
 
     beforeEach(async () => {
-      // 注册并登录获取token
-      const response = await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          username: 'testuser',
-          email: 'test@example.com',
-          password: 'password123',
-        });
-
-      accessToken = response.body.access_token;
+      login = await registerAndLogin(app, {
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password123',
+      });
     });
 
     it('should access protected route with valid token', () => {
-      return request(app.getHttpServer())
+      return request(server)
         .get('/auth/protected')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${login.access_token}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toEqual({
-            message: 'This is a protected route',
-            user: {
-              userId: expect.any(Number),
-              username: 'testuser',
+          const body = res.body as unknown;
+          expectGuard(
+            body,
+            (
+              o,
+            ): o is {
+              message: string;
+              user: { id: number; username: string };
+            } => {
+              if (typeof o !== 'object' || o === null) return false;
+              const r = o as Record<string, unknown>;
+              if (typeof r.message !== 'string') return false;
+              if (typeof r.user !== 'object' || r.user === null) return false;
+              const u = r.user as Record<string, unknown>;
+              return typeof u.id === 'number' && typeof u.username === 'string';
             },
-          });
+          );
+          expect((body as { user: { username: string } }).user.username).toBe(
+            'testuser',
+          );
         });
     });
 
     it('should return 401 without token', () => {
-      return request(app.getHttpServer()).get('/auth/protected').expect(401);
+      return request(server).get('/auth/protected').expect(401);
     });
   });
 });

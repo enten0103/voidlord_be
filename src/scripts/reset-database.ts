@@ -12,8 +12,12 @@ import { PERMISSIONS } from '../modules/auth/permissions.constants';
 import * as bcrypt from 'bcryptjs';
 
 // 简单读取 process.env，不加载完整 Nest 应用，保持脚本轻量
+// 使用立即执行的 async 函数并显式忽略其 Promise
 (async () => {
-  const config = new ConfigService(process.env as any);
+  // ConfigService 构造函数参数为 Record<string, any> | undefined，这里进行类型断言但保持只读，不向下游传播 any
+  const config = new ConfigService(
+    process.env as Record<string, string | undefined>,
+  );
 
   const ds = new DataSource({
     type: 'postgres',
@@ -41,7 +45,7 @@ import * as bcrypt from 'bcryptjs';
   // 禁用外键 (PostgreSQL)
   await ds.query('SET session_replication_role = replica;');
   try {
-    const tables = await ds.query(
+    const tables: Array<{ tablename: string }> = await ds.query(
       "SELECT tablename FROM pg_tables WHERE schemaname='public'",
     );
 
@@ -52,7 +56,7 @@ import * as bcrypt from 'bcryptjs';
       }
     } else {
       console.log('[reset] Truncating tables ...');
-      const tableNames = tables.map((t: any) => `"${t.tablename}"`).join(', ');
+      const tableNames = tables.map((t) => `"${t.tablename}"`).join(', ');
       if (tableNames) {
         await ds.query(`TRUNCATE ${tableNames} RESTART IDENTITY CASCADE;`);
       }

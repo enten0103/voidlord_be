@@ -6,8 +6,6 @@ import { AuthService } from '../auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: UsersService;
-  let jwtService: JwtService;
 
   const mockUsersService = {
     findByUsername: jest.fn(),
@@ -16,6 +14,7 @@ describe('AuthService', () => {
 
   const mockJwtService = {
     sign: jest.fn(),
+    signAsync: jest.fn(),
   };
 
   const mockUser: User = {
@@ -43,8 +42,6 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    usersService = module.get<UsersService>(UsersService);
-    jwtService = module.get<JwtService>(JwtService);
   });
 
   afterEach(() => {
@@ -57,19 +54,23 @@ describe('AuthService', () => {
 
   describe('validateUser', () => {
     it('should return user data without password if validation succeeds', async () => {
-      const { password, ...userWithoutPassword } = mockUser;
+      const userSubset = {
+        id: mockUser.id,
+        username: mockUser.username,
+        email: mockUser.email,
+      };
 
       mockUsersService.findByUsername.mockResolvedValue(mockUser);
       mockUsersService.validatePassword.mockResolvedValue(true);
 
       const result = await service.validateUser('testuser', 'password123');
 
-      expect(usersService.findByUsername).toHaveBeenCalledWith('testuser');
-      expect(usersService.validatePassword).toHaveBeenCalledWith(
+      expect(mockUsersService.findByUsername).toHaveBeenCalledWith('testuser');
+      expect(mockUsersService.validatePassword).toHaveBeenCalledWith(
         'password123',
         mockUser.password,
       );
-      expect(result).toEqual(userWithoutPassword);
+      expect(result).toEqual(userSubset);
     });
 
     it('should return null if user not found', async () => {
@@ -77,7 +78,7 @@ describe('AuthService', () => {
 
       const result = await service.validateUser('testuser', 'password123');
 
-      expect(usersService.findByUsername).toHaveBeenCalledWith('testuser');
+      expect(mockUsersService.findByUsername).toHaveBeenCalledWith('testuser');
       expect(result).toBeNull();
     });
 
@@ -87,8 +88,8 @@ describe('AuthService', () => {
 
       const result = await service.validateUser('testuser', 'wrongpassword');
 
-      expect(usersService.findByUsername).toHaveBeenCalledWith('testuser');
-      expect(usersService.validatePassword).toHaveBeenCalledWith(
+      expect(mockUsersService.findByUsername).toHaveBeenCalledWith('testuser');
+      expect(mockUsersService.validatePassword).toHaveBeenCalledWith(
         'wrongpassword',
         mockUser.password,
       );
@@ -99,11 +100,11 @@ describe('AuthService', () => {
   describe('login', () => {
     it('should return access token and user data', async () => {
       const token = 'jwt-token';
-      mockJwtService.sign.mockReturnValue(token);
+      mockJwtService.signAsync.mockResolvedValue(token);
 
       const result = await service.login(mockUser);
 
-      expect(jwtService.sign).toHaveBeenCalledWith({
+      expect(mockJwtService.signAsync).toHaveBeenCalledWith({
         username: mockUser.username,
         sub: mockUser.id,
       });

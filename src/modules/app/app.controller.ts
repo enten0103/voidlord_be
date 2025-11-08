@@ -25,7 +25,11 @@ export class AppController {
   @ApiOperation({ summary: 'Health check endpoint' })
   @ApiResponse({ status: 200, description: 'Application is healthy' })
   @ApiResponse({ status: 503, description: 'Application is unhealthy' })
-  async healthCheck() {
+  async healthCheck(): Promise<{
+    status: string;
+    timestamp: string;
+    database: string;
+  }> {
     const dbHealth = await this.databaseInitService.healthCheck();
 
     return {

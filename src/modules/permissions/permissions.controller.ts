@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Logger,
   Param,
   Post,
   Req,
@@ -22,6 +21,7 @@ import { ApiPermission } from '../auth/permissions.decorator';
 import { GrantPermissionDto } from './dto/grant-permission.dto';
 import { RevokePermissionDto } from './dto/revoke-permission.dto';
 import { PermissionsService } from './permissions.service';
+import type { JwtRequestWithUser } from '../../types/request.interface';
 
 @ApiTags('permissions')
 @ApiBearerAuth('JWT-auth')
@@ -80,7 +80,7 @@ export class PermissionsController {
       example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
     },
   })
-  grant(@Req() req: any, @Body() dto: GrantPermissionDto) {
+  grant(@Req() req: JwtRequestWithUser, @Body() dto: GrantPermissionDto) {
     return this.permissionsService.grant(req.user.userId, dto);
   }
 
@@ -130,7 +130,7 @@ export class PermissionsController {
       example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
     },
   })
-  revoke(@Req() req: any, @Body() dto: RevokePermissionDto) {
+  revoke(@Req() req: JwtRequestWithUser, @Body() dto: RevokePermissionDto) {
     return this.permissionsService.revoke(req.user.userId, dto);
   }
 

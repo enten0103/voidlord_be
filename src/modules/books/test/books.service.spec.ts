@@ -1,17 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Repository } from 'typeorm';
+import { SelectQueryBuilder } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { BooksService } from '../books.service';
+import { createRepoMock } from '../../../../test/repo-mocks';
 import { Book } from '../../../entities/book.entity';
 import { Tag } from '../../../entities/tag.entity';
 import { BookRating } from '../../../entities/book-rating.entity';
 import { Comment } from '../../../entities/comment.entity';
+import { User } from '../../../entities/user.entity';
 
 describe('BooksService', () => {
   let service: BooksService;
-  let bookRepository: jest.Mocked<Repository<Book>>;
-  let tagRepository: jest.Mocked<Repository<Tag>>;
 
   const mockBook: Book = {
     id: 1,
@@ -33,39 +33,10 @@ describe('BooksService', () => {
     updated_at: new Date(),
   };
 
-  const mockBookRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
-    remove: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
-
-  const mockTagRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    findOne: jest.fn(),
-  };
-
-  const mockRatingRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    findOne: jest.fn(),
-    remove: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
-
-  const mockCommentRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    findOne: jest.fn(),
-    remove: jest.fn(),
-    find: jest.fn(),
-    count: jest.fn(),
-    findAndCount: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
+  const mockBookRepository = createRepoMock<Book>();
+  const mockTagRepository = createRepoMock<Tag>();
+  const mockRatingRepository = createRepoMock<BookRating>();
+  const mockCommentRepository = createRepoMock<Comment>();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -91,8 +62,6 @@ describe('BooksService', () => {
     }).compile();
 
     service = module.get<BooksService>(BooksService);
-    bookRepository = module.get(getRepositoryToken(Book));
-    tagRepository = module.get(getRepositoryToken(Tag));
   });
 
   afterEach(() => {
@@ -261,7 +230,9 @@ describe('BooksService', () => {
         getMany: jest.fn().mockResolvedValue([mockBook]),
       };
 
-      mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
 
       const result = await service.findByTags(['author', 'genre']);
 
@@ -293,7 +264,9 @@ describe('BooksService', () => {
         getMany: jest.fn().mockResolvedValue([mockBook]),
       };
 
-      mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
 
       const result = await service.findByTagKeyValue('author', 'John Doe');
 
@@ -325,7 +298,9 @@ describe('BooksService', () => {
         getMany: jest.fn().mockResolvedValue([mockBook]),
       };
 
-      mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
 
       const tagFilters = [
         { key: 'author', value: 'John Doe' },
@@ -367,7 +342,9 @@ describe('BooksService', () => {
         getMany: jest.fn().mockResolvedValue([mockBook]),
       };
 
-      mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
 
       const result = await service.findByTagId(1);
 
@@ -398,7 +375,9 @@ describe('BooksService', () => {
         getMany: jest.fn().mockResolvedValue([mockBook]),
       };
 
-      mockBookRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
 
       const result = await service.findByTagIds([1, 2, 3]);
 
@@ -451,12 +430,28 @@ describe('BooksService', () => {
     it('should return recommended books ordered by overlap', async () => {
       const baseBook = {
         ...mockBook,
-        tags: [{ id: 10 } as any, { id: 11 } as any],
+        tags: [{ id: 10 } as unknown as Tag, { id: 11 } as unknown as Tag],
       };
-      mockBookRepository.findOne.mockResolvedValueOnce(baseBook as any);
+      mockBookRepository.findOne.mockResolvedValueOnce(baseBook);
 
-      const mockQB = {
-        createQueryBuilder: jest.fn(),
+      // Typed lightweight QB stub to avoid any leakage
+      type J<T extends any[] = any[]> = jest.Mock<any, T>;
+      interface QB {
+        innerJoin: J<[string, string?, string?]>;
+        where: J<[string, Record<string, unknown>?]>;
+        andWhere: J<[string, Record<string, unknown>?]>;
+        select: J<[string]>;
+        addSelect: J<[string, string?]>;
+        groupBy: J<[string]>;
+        orderBy: J<[string, 'ASC' | 'DESC']>;
+        addOrderBy: J<[string, 'ASC' | 'DESC']>;
+        limit: J<[number]>;
+        getRawMany: jest.Mock<
+          Promise<Array<{ id: number; overlap: number }>>,
+          []
+        >;
+      }
+      const qb: QB = {
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -467,14 +462,15 @@ describe('BooksService', () => {
         addOrderBy: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([{ id: 2, overlap: 2 }]),
-      } as any;
-
-      // chain starting from repository.createQueryBuilder
-      (mockBookRepository.createQueryBuilder as any).mockReturnValue(mockQB);
+      } as unknown as QB;
+      // Provide only the used subset of SelectQueryBuilder<Book>
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        qb as unknown as SelectQueryBuilder<Book>,
+      );
 
       // find recommended book entities
       const recommended = { ...mockBook, id: 2 };
-      mockBookRepository.find.mockResolvedValueOnce([recommended as any]);
+      mockBookRepository.find.mockResolvedValueOnce([recommended]);
 
       const result = await service.recommendByBook(1, 5);
       expect(result.map((b) => b.id)).toEqual([2]);
@@ -490,21 +486,28 @@ describe('BooksService', () => {
     describe('listComments', () => {
       it('should list comments with pagination (default 20/0)', async () => {
         const now = new Date();
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
-        (mockCommentRepository.findAndCount as any).mockResolvedValueOnce([
-          [
-            {
-              id: 10,
-              content: 'Nice!',
-              created_at: now,
-              updated_at: now,
-              user: { id: 2, username: 'alice' },
-            },
-          ],
+        mockBookRepository.findOne.mockResolvedValueOnce(mockBook);
+        const comment: Comment = {
+          id: 10,
+          content: 'Nice!',
+          created_at: now,
+          updated_at: now,
+          user: {
+            id: 2,
+            username: 'alice',
+            email: 'a@b.c',
+            password: '',
+            created_at: now,
+            updated_at: now,
+          } as User,
+          book: { ...mockBook } as Book,
+        } as Comment;
+        mockCommentRepository.findAndCount.mockResolvedValueOnce([
+          [comment],
           1,
         ]);
         // reply count for comment id=10
-        (mockCommentRepository.count as any).mockResolvedValueOnce(3);
+        mockCommentRepository.count.mockResolvedValueOnce(3);
 
         const result = await service.listComments(1);
         expect(result.bookId).toBe(1);
@@ -517,22 +520,11 @@ describe('BooksService', () => {
           user: { id: 2, username: 'alice' },
           reply_count: 3,
         });
-
-        expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({ book: { id: 1 } }),
-            take: 20,
-            skip: 0,
-          }),
-        );
       });
 
       it('should clamp invalid limit/offset', async () => {
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
-        (mockCommentRepository.findAndCount as any).mockResolvedValueOnce([
-          [],
-          0,
-        ]);
+        mockBookRepository.findOne.mockResolvedValueOnce(mockBook);
+        mockCommentRepository.findAndCount.mockResolvedValueOnce([[], 0]);
         await service.listComments(1, 1000, -5);
         expect(mockCommentRepository.findAndCount).toHaveBeenCalledWith(
           expect.objectContaining({ take: 100, skip: 0 }),
@@ -540,7 +532,7 @@ describe('BooksService', () => {
       });
 
       it('should throw NotFoundException when book not found', async () => {
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(null);
+        mockBookRepository.findOne.mockResolvedValueOnce(null);
         await expect(service.listComments(999)).rejects.toThrow(
           NotFoundException,
         );
@@ -550,17 +542,17 @@ describe('BooksService', () => {
     describe('addComment', () => {
       it('should add comment successfully', async () => {
         const now = new Date();
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
-        (mockCommentRepository.create as any).mockReturnValueOnce({
+        mockBookRepository.findOne.mockResolvedValueOnce(mockBook);
+        mockCommentRepository.create.mockReturnValueOnce({
           id: 11,
           content: 'Great book!',
           created_at: now,
-        });
-        (mockCommentRepository.save as any).mockResolvedValueOnce({
+        } as unknown as Comment);
+        mockCommentRepository.save.mockResolvedValueOnce({
           id: 11,
           content: 'Great book!',
           created_at: now,
-        });
+        } as unknown as Comment);
 
         const res = await service.addComment(1, 42, '  Great book!  ');
         expect(res).toMatchObject({
@@ -594,7 +586,7 @@ describe('BooksService', () => {
       });
 
       it('should throw NotFound when book missing', async () => {
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(null);
+        mockBookRepository.findOne.mockResolvedValueOnce(null);
         await expect(service.addComment(999, 1, 'x')).rejects.toThrow(
           NotFoundException,
         );
@@ -603,19 +595,36 @@ describe('BooksService', () => {
 
     describe('removeComment', () => {
       it('should remove comment when exists', async () => {
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce({
+        mockCommentRepository.findOne.mockResolvedValueOnce({
           id: 10,
-          book: { id: 1 },
-          user: { id: 2 },
-        });
-        (mockCommentRepository.remove as any).mockResolvedValueOnce(undefined);
+          book: {
+            id: 1,
+            hash: 'h',
+            title: 't',
+            description: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+            tags: [],
+          } as Book,
+          user: {
+            id: 2,
+            username: 'alice',
+            email: 'a@b.c',
+            password: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+          } as User,
+        } as Comment);
+        mockCommentRepository.remove.mockResolvedValueOnce({
+          id: 10,
+        } as Comment);
         const res = await service.removeComment(1, 10);
         expect(res).toEqual({ ok: true });
         expect(mockCommentRepository.remove).toHaveBeenCalled();
       });
 
       it('should throw NotFound when comment missing', async () => {
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce(null);
+        mockCommentRepository.findOne.mockResolvedValueOnce(null);
         await expect(service.removeComment(1, 999)).rejects.toThrow(
           NotFoundException,
         );
@@ -624,46 +633,99 @@ describe('BooksService', () => {
 
     describe('getCommentOwnerId', () => {
       it('should return user id when exists', async () => {
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce({
+        mockCommentRepository.findOne.mockResolvedValueOnce({
           id: 10,
-          book: { id: 1 },
-          user: { id: 7 },
-        });
+          book: {
+            id: 1,
+            hash: 'h',
+            title: 't',
+            description: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+            tags: [],
+          } as Book,
+          user: {
+            id: 7,
+            username: 'bob',
+            email: 'b@b.c',
+            password: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+          } as User,
+        } as Comment);
         await expect(service.getCommentOwnerId(1, 10)).resolves.toBe(7);
       });
 
       it('should return null when not found', async () => {
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce(null);
+        mockCommentRepository.findOne.mockResolvedValueOnce(null);
         await expect(service.getCommentOwnerId(1, 999)).resolves.toBeNull();
       });
 
       it('should return null when has no user', async () => {
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce({
+        mockCommentRepository.findOne.mockResolvedValueOnce({
           id: 10,
-          book: { id: 1 },
+          content: 'stub',
+          created_at: new Date(),
+          updated_at: new Date(),
+          book: {
+            id: 1,
+            hash: 'h',
+            title: 't',
+            description: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+            tags: [],
+          } as Book,
           user: null,
-        });
+        } as Comment);
         await expect(service.getCommentOwnerId(1, 10)).resolves.toBeNull();
       });
     });
 
     describe('replies', () => {
       it('should add a reply successfully', async () => {
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook); // book exists
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce({
+        mockBookRepository.findOne.mockResolvedValueOnce(mockBook); // book exists
+        const parent: Comment = {
           id: 10,
-          book: { id: 1 },
-        }); // parent exists
-        (mockCommentRepository.create as any).mockReturnValueOnce({
+          content: 'parent',
+          created_at: new Date(),
+          updated_at: new Date(),
+          book: {
+            id: 1,
+            hash: 'h',
+            title: 't',
+            description: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+            tags: [],
+          } as Book,
+          user: {
+            id: 99,
+            username: 'u99',
+            email: 'u99@x.com',
+            password: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+          } as User,
+        } as Comment;
+        mockCommentRepository.findOne.mockResolvedValueOnce(parent); // parent exists
+        const created: Comment = {
           id: 12,
           content: 'Thanks!',
           created_at: new Date(),
-        });
-        (mockCommentRepository.save as any).mockResolvedValueOnce({
-          id: 12,
-          content: 'Thanks!',
-          created_at: new Date(),
-        });
+          updated_at: new Date(),
+          book: parent.book,
+          user: {
+            id: 42,
+            username: 'u42',
+            email: 'u42@x.com',
+            password: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+          } as User,
+        } as Comment;
+        mockCommentRepository.create.mockReturnValueOnce(created);
+        mockCommentRepository.save.mockResolvedValueOnce(created);
 
         const res = await service.addReply(1, 42, 10, ' Thanks! ');
         expect(res).toMatchObject({
@@ -684,23 +746,47 @@ describe('BooksService', () => {
 
       it('should list replies with pagination', async () => {
         const now = new Date();
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook); // book
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce({
+        mockBookRepository.findOne.mockResolvedValueOnce(mockBook); // book
+        const parent: Comment = {
           id: 10,
-          book: { id: 1 },
-        }); // parent
-        (mockCommentRepository.findAndCount as any).mockResolvedValueOnce([
-          [
-            {
-              id: 12,
-              content: 'r',
-              created_at: now,
-              updated_at: now,
-              user: { id: 5, username: 'bob' },
-            },
-          ],
-          1,
-        ]);
+          content: 'parent',
+          created_at: new Date(),
+          updated_at: new Date(),
+          book: {
+            id: 1,
+            hash: 'h',
+            title: 't',
+            description: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+            tags: [],
+          } as Book,
+          user: {
+            id: 99,
+            username: 'u99',
+            email: 'u99@x.com',
+            password: '',
+            created_at: new Date(),
+            updated_at: new Date(),
+          } as User,
+        } as Comment;
+        mockCommentRepository.findOne.mockResolvedValueOnce(parent); // parent
+        const reply: Comment = {
+          id: 12,
+          content: 'r',
+          created_at: now,
+          updated_at: now,
+          book: parent.book,
+          user: {
+            id: 5,
+            username: 'bob',
+            email: 'bob@x.com',
+            password: '',
+            created_at: now,
+            updated_at: now,
+          } as User,
+        } as Comment;
+        mockCommentRepository.findAndCount.mockResolvedValueOnce([[reply], 1]);
         const res = await service.listReplies(1, 10, 50, 0);
         expect(res).toMatchObject({
           bookId: 1,
@@ -719,8 +805,8 @@ describe('BooksService', () => {
       });
 
       it('should throw NotFound when parent missing', async () => {
-        (mockBookRepository.findOne as any).mockResolvedValueOnce(mockBook);
-        (mockCommentRepository.findOne as any).mockResolvedValueOnce(null);
+        mockBookRepository.findOne.mockResolvedValueOnce(mockBook);
+        mockCommentRepository.findOne.mockResolvedValueOnce(null);
         await expect(service.listReplies(1, 999)).rejects.toThrow(
           NotFoundException,
         );

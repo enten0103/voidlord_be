@@ -13,7 +13,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
+  // Passport will treat sync return as resolved promise; keep sync to avoid require-await lint
+  validate(payload: { sub: number; username: string }) {
     return { userId: payload.sub, username: payload.username };
   }
 }

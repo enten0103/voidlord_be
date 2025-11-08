@@ -17,6 +17,7 @@ import { S3_CLIENT } from './tokens';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FileObject } from '../../entities/file-object.entity';
+import { User } from '../../entities/user.entity';
 
 export interface PresignedUrlOptions {
   bucket?: string;
@@ -41,7 +42,7 @@ export class FilesService implements OnModuleInit {
     const bucket = this.getBucket();
     try {
       await this.s3.send(new HeadBucketCommand({ Bucket: bucket }));
-    } catch (e) {
+    } catch {
       try {
         await this.s3.send(new CreateBucketCommand({ Bucket: bucket }));
         this.logger.log(`Created bucket: ${bucket}`);
@@ -59,7 +60,7 @@ export class FilesService implements OnModuleInit {
     try {
       await this.s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -84,7 +85,7 @@ export class FilesService implements OnModuleInit {
       const fo = this.fileRepo.create({
         key,
         bucket: Bucket,
-        owner: { id: ownerId } as any,
+        owner: { id: ownerId } as unknown as User,
       });
       await this.fileRepo.save(fo);
     }

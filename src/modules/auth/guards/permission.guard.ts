@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSION_KEY } from '../permissions.decorator';
 import { DataSource } from 'typeorm';
 import { UserPermission } from '../../../entities/user-permission.entity';
+import type { JwtRequestWithUser } from '../../../types/request.interface';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -25,7 +26,7 @@ export class PermissionGuard implements CanActivate {
     }>(PERMISSION_KEY, [context.getHandler(), context.getClass()]);
     if (!meta) return true; // no permission required
     const { permission, minLevel } = meta;
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<JwtRequestWithUser>();
     const user = request.user; // set by JwtStrategy
     if (!user?.userId) throw new UnauthorizedException('Unauthorized');
 

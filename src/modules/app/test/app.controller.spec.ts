@@ -6,8 +6,9 @@ import { DatabaseInitService } from '../../../config/database-init.service';
 describe('AppController', () => {
   let appController: AppController;
 
-  const mockDatabaseInitService = {
-    healthCheck: jest.fn().mockResolvedValue(true),
+  type HealthCheckFn = jest.Mock<Promise<boolean>, []>;
+  const mockDatabaseInitService: { healthCheck: HealthCheckFn } = {
+    healthCheck: jest.fn<Promise<boolean>, []>().mockResolvedValue(true),
   };
 
   beforeEach(async () => {
@@ -33,26 +34,21 @@ describe('AppController', () => {
 
   describe('health check', () => {
     it('should return healthy status', async () => {
-      const result = await appController.healthCheck();
-
-      expect(result).toEqual({
-        status: 'healthy',
-        timestamp: expect.any(String),
-        database: 'connected',
-      });
+      const result: Awaited<ReturnType<AppController['healthCheck']>> =
+        await appController.healthCheck();
+      expect(result.status).toBe('healthy');
+      expect(typeof result.timestamp).toBe('string');
+      expect(result.database).toBe('connected');
       expect(mockDatabaseInitService.healthCheck).toHaveBeenCalled();
     });
 
     it('should return unhealthy status when database is down', async () => {
       mockDatabaseInitService.healthCheck.mockResolvedValueOnce(false);
-
-      const result = await appController.healthCheck();
-
-      expect(result).toEqual({
-        status: 'unhealthy',
-        timestamp: expect.any(String),
-        database: 'disconnected',
-      });
+      const result: Awaited<ReturnType<AppController['healthCheck']>> =
+        await appController.healthCheck();
+      expect(result.status).toBe('unhealthy');
+      expect(typeof result.timestamp).toBe('string');
+      expect(result.database).toBe('disconnected');
     });
   });
 });

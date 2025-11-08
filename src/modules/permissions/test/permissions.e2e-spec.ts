@@ -1,12 +1,13 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../../app/app.module';
-import request from 'supertest';
+import request, { Response } from 'supertest';
 import { DataSource } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../../../entities/user.entity';
 import { Permission } from '../../../entities/permission.entity';
 import { UserPermission } from '../../../entities/user-permission.entity';
+import { Server } from 'http';
+import { parseLoginResult } from '../../../../test/test-module.factory';
 
 /**
  * E2E 场景:
@@ -21,6 +22,7 @@ import { UserPermission } from '../../../entities/user-permission.entity';
 describe('Permissions (e2e)', () => {
   let app: INestApplication;
   let ds: DataSource;
+  let httpServer: Server;
 
   let adminToken: string;
   let userToken: string;
@@ -38,6 +40,7 @@ describe('Permissions (e2e)', () => {
     );
     await app.init();
     ds = app.get(DataSource);
+    httpServer = app.getHttpServer() as unknown as Server;
   });
 
   afterAll(async () => {
@@ -53,13 +56,14 @@ describe('Permissions (e2e)', () => {
   });
 
   async function register(username: string, email: string) {
-    const res = await request(app.getHttpServer())
+    const res: Response = await request(httpServer)
       .post('/auth/register')
       .send({ username, email, password: 'password123' })
       .expect(201);
+    const loginParsed = parseLoginResult(res.body);
     return {
-      token: res.body.access_token as string,
-      id: res.body.user.id as number,
+      token: loginParsed.access_token,
+      id: loginParsed.user.id,
     };
   }
 
@@ -115,7 +119,7 @@ describe('Permissions (e2e)', () => {
     await grantDirect(adminId, 'USER_READ', 3);
 
     // adminA 给 userB 授予 USER_READ level1
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post('/permissions/grant')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ userId: userId, permission: 'USER_READ', level: 1 })
@@ -129,7 +133,7 @@ describe('Permissions (e2e)', () => {
       });
 
     // userB 访问需要 USER_READ 的接口 (查询自己权限)
-    await request(app.getHttpServer())
+    await request(httpServer)
       .get(`/permissions/user/${userId}`)
       .set('Authorization', `Bearer ${userToken}`)
       .expect(200)
@@ -138,20 +142,20 @@ describe('Permissions (e2e)', () => {
       });
 
     // userB 尝试授予权限 (应403)
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post('/permissions/grant')
       .set('Authorization', `Bearer ${userToken}`)
       .send({ userId: userId, permission: 'USER_READ', level: 1 })
       .expect(403);
 
     // 未登录访问受保护接口，应返回 401
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post('/permissions/grant')
       .send({ userId: userId, permission: 'USER_READ', level: 1 })
       .expect(401);
 
     // adminA revoke userB USER_READ
-    await request(app.getHttpServer())
+    await request(httpServer)
       .post('/permissions/revoke')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ userId: userId, permission: 'USER_READ' })
@@ -161,14 +165,12 @@ describe('Permissions (e2e)', () => {
       });
 
     // userB 再次查询权限应为空 (403 因无 USER_READ)
-    await request(app.getHttpServer())
+    await request(httpServer)
       .get(`/permissions/user/${userId}`)
       .set('Authorization', `Bearer ${userToken}`)
       .expect(403);
 
     // 未登录查询，应为 401
-    await request(app.getHttpServer())
-      .get(`/permissions/user/${userId}`)
-      .expect(401);
+    await request(httpServer).get(`/permissions/user/${userId}`).expect(401);
   });
 });

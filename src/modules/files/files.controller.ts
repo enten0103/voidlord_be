@@ -28,6 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { ApiPermission } from '../auth/permissions.decorator';
 import { PermissionsService } from '../permissions/permissions.service';
+import type { JwtRequestWithUser } from '../../types/request.interface';
 
 @ApiTags('files')
 @Controller('files')
@@ -117,8 +118,8 @@ export class FilesController {
       },
     },
   })
-  async remove(@Query('key') key: string, @Req() req: any) {
-    const currentUserId = req?.user?.userId;
+  async remove(@Query('key') key: string, @Req() req: JwtRequestWithUser) {
+    const currentUserId = req.user.userId;
     const ownerId = await this.files.findOwnerIdByKey(key);
     if (ownerId == null) {
       // Unknown owner: only FILE_MANAGE may delete
@@ -323,14 +324,14 @@ export class FilesController {
   })
   async upload(
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: JwtRequestWithUser,
     @Body('key') key?: string,
     @Body('contentType') contentType?: string,
-    @Req() req?: any,
   ) {
     if (!file) {
       return { ok: false, message: 'file is required' };
     }
-    const safeName = (file.originalname || 'file').replace(/[^\w\.\-]+/g, '_');
+    const safeName = (file.originalname || 'file').replace(/[^\w.-]+/g, '_');
     const finalKey =
       key && key.trim().length > 0
         ? key
@@ -341,7 +342,7 @@ export class FilesController {
       file.buffer,
       contentType || file.mimetype,
       undefined,
-      req?.user?.userId,
+      req.user.userId,
     );
     const publicUrl = this.files.getPublicUrl(finalKey);
     return {

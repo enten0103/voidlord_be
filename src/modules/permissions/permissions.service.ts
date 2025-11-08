@@ -49,13 +49,14 @@ export class PermissionsService {
         user,
         permission: perm,
         level: dto.level,
-        grantedBy: { id: currentUserId } as any,
+        grantedBy: { id: currentUserId } as unknown as User,
       });
     } else {
       if (currentUserPerm <= up.level)
         throw new ForbiddenException('Cannot upgrade equal/higher assignment');
       up.level = dto.level;
-      if (up.grantedBy == null) up.grantedBy = { id: currentUserId } as any;
+      if (up.grantedBy == null)
+        up.grantedBy = { id: currentUserId } as unknown as User;
     }
     await this.userPermRepo().save(up);
     return { userId: user.id, permission: dto.permission, level: up.level };

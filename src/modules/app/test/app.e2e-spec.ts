@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import request from 'supertest';
-import { App } from 'supertest/types';
+import request, { Response } from 'supertest';
+import { Server } from 'http';
 import { AppModule } from '../app.module';
+import { parseBody } from '../../../../test/response-guards';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
+  let httpServer: Server;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -14,6 +16,7 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    httpServer = app.getHttpServer() as unknown as Server;
     await app.init();
   });
 
@@ -21,14 +24,16 @@ describe('AppController (e2e)', () => {
     try {
       const ds = app.get(DataSource);
       if (ds?.isInitialized) await ds.destroy();
-    } catch {}
+    } catch {
+      // ignore destroy error
+    }
     await app.close();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  it('/ (GET) returns greeting', async () => {
+    const res: Response = await request(httpServer).get('/').expect(200);
+    expect(parseBody(res.text, (t): t is string => typeof t === 'string')).toBe(
+      'Hello World!',
+    );
   });
 });

@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserConfigService } from './user-config.service';
 import { UpdateUserConfigDto } from './dto/update-user-config.dto';
 import { PublicUserProfileDto } from './dto/public-user-profile.dto';
+import type { JwtRequestWithUser } from '../../types/request.interface';
 
 @ApiTags('user-config')
 @Controller('user-config')
@@ -78,7 +79,7 @@ export class UserConfigController {
       },
     },
   })
-  my(@Req() req: any) {
+  my(@Req() req: JwtRequestWithUser) {
     return this.service.getOrCreateByUserId(req.user.userId);
   }
 
@@ -99,7 +100,7 @@ export class UserConfigController {
       },
     },
   })
-  update(@Req() req: any, @Body() dto: UpdateUserConfigDto) {
+  update(@Req() req: JwtRequestWithUser, @Body() dto: UpdateUserConfigDto) {
     return this.service.updateMy(req.user.userId, dto);
   }
 }

@@ -20,6 +20,44 @@ import { Comment } from '../src/entities/comment.entity';
 import { FavoriteList } from '../src/entities/favorite-list.entity';
 import { FavoriteListItem } from '../src/entities/favorite-list-item.entity';
 import { BookListsModule } from '../src/modules/book-lists/book-lists.module';
+import { ReadingRecord } from '../src/entities/reading-record.entity';
+import { ReadingRecordsModule } from '../src/modules/reading-records/reading-records.module';
+import request from 'supertest';
+
+export interface LoginResult {
+  access_token: string;
+  user: { id: number; username: string; email: string };
+}
+
+// 解析并校验登录/注册返回结构，避免直接使用 any 赋值。
+export function parseLoginResult(data: unknown): LoginResult {
+  if (typeof data === 'object' && data !== null) {
+    const obj = data as Record<string, unknown>;
+    const token = obj.access_token;
+    const user = obj.user;
+    if (
+      typeof token === 'string' &&
+      typeof user === 'object' &&
+      user !== null
+    ) {
+      const u = user as Record<string, unknown>;
+      const id = u.id;
+      const username = u.username;
+      const email = u.email;
+      if (
+        typeof id === 'number' &&
+        typeof username === 'string' &&
+        typeof email === 'string'
+      ) {
+        return {
+          access_token: token,
+          user: { id, username, email },
+        };
+      }
+    }
+  }
+  throw new Error('Unexpected login response shape');
+}
 
 export async function createTestModule(): Promise<TestingModule> {
   return Test.createTestingModule({
@@ -49,6 +87,7 @@ export async function createTestModule(): Promise<TestingModule> {
           Comment,
           FavoriteList,
           FavoriteListItem,
+          ReadingRecord,
         ],
         synchronize: true,
         dropSchema: true, // 每次测试都重新创建数据库结构
@@ -67,6 +106,7 @@ export async function createTestModule(): Promise<TestingModule> {
         Comment,
         FavoriteList,
         FavoriteListItem,
+        ReadingRecord,
       ]),
       UsersModule,
       AuthModule,
@@ -74,6 +114,31 @@ export async function createTestModule(): Promise<TestingModule> {
       RecommendationsModule,
       UserConfigModule,
       BookListsModule,
+      ReadingRecordsModule,
     ],
   }).compile();
+}
+
+/**
+ * 执行用户注册，并返回登录结果类型化结构。后续 e2e 测试可复用减少 any 使用。
+ */
+export async function registerAndLogin(
+  app: import('@nestjs/common').INestApplication,
+  creds: { username: string; email: string; password: string },
+): Promise<LoginResult> {
+  const { username, email, password } = creds;
+  // 注册
+  await request(app.getHttpServer() as unknown as import('http').Server)
+    .post('/auth/register')
+    .send({ username, email, password })
+    .expect(201);
+  // 登录
+  const res: import('supertest').Response = await request(
+    app.getHttpServer() as unknown as import('http').Server,
+  )
+    .post('/auth/login')
+    .send({ username, password })
+    .expect(201);
+  // 使用解析函数确保结构安全
+  return parseLoginResult(res.body);
 }

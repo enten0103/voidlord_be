@@ -35,25 +35,27 @@ describe('RecommendationsService', () => {
     tags: [],
   };
 
-  const mockSectionRepo = {
+  const mockSectionRepo: Partial<
+    jest.Mocked<Repository<RecommendationSection>>
+  > = {
     findOne: jest.fn(),
     find: jest.fn(),
     findBy: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
-  } as any;
-  const mockItemRepo = {
+  };
+  const mockItemRepo: Partial<jest.Mocked<Repository<RecommendationItem>>> = {
     findOne: jest.fn(),
     find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
-  } as any;
-  const mockBookRepo = {
+  };
+  const mockBookRepo: Partial<jest.Mocked<Repository<Book>>> = {
     findOne: jest.fn(),
     find: jest.fn(),
-  } as any;
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -81,8 +83,8 @@ describe('RecommendationsService', () => {
 
   it('createSection ok', async () => {
     sectionRepo.findOne.mockResolvedValue(null);
-    sectionRepo.create.mockReturnValue(mockSection as any);
-    sectionRepo.save.mockResolvedValue(mockSection as any);
+    sectionRepo.create.mockReturnValue(mockSection);
+    sectionRepo.save.mockResolvedValue(mockSection);
     const r = await service.createSection({
       key: 'today_hot',
       title: '今日最热',
@@ -91,45 +93,53 @@ describe('RecommendationsService', () => {
   });
 
   it('createSection duplicate', async () => {
-    sectionRepo.findOne.mockResolvedValue(mockSection as any);
+    sectionRepo.findOne.mockResolvedValue(mockSection);
     await expect(
       service.createSection({ key: 'today_hot', title: 'A' }),
     ).rejects.toThrow(ConflictException);
   });
 
   it('addItem flow', async () => {
-    sectionRepo.findOne.mockResolvedValue({ ...mockSection, items: [] } as any);
-    bookRepo.findOne.mockResolvedValue(mockBook as any);
+    sectionRepo.findOne.mockResolvedValue({
+      ...mockSection,
+      items: [],
+    } as RecommendationSection);
+    bookRepo.findOne.mockResolvedValue(mockBook);
     itemRepo.findOne.mockResolvedValue(null);
-    itemRepo.create.mockReturnValue({
+    const newItem: RecommendationItem = {
       id: 99,
       position: 0,
       section: mockSection,
       book: mockBook,
-    } as any);
-    itemRepo.save.mockResolvedValue({
-      id: 99,
-      position: 0,
-      section: mockSection,
-      book: mockBook,
-    } as any);
+      created_at: new Date(),
+      updated_at: new Date(),
+    } as RecommendationItem;
+    itemRepo.create.mockReturnValue(newItem);
+    itemRepo.save.mockResolvedValue(newItem);
     const item = await service.addItem(1, { bookId: 10 });
     expect(item.book.id).toBe(10);
   });
 
   it('addItem duplicate', async () => {
-    sectionRepo.findOne.mockResolvedValue({ ...mockSection, items: [] } as any);
-    bookRepo.findOne.mockResolvedValue(mockBook as any);
-    itemRepo.findOne.mockResolvedValue({ id: 1 } as any);
+    sectionRepo.findOne.mockResolvedValue({
+      ...mockSection,
+      items: [],
+    } as RecommendationSection);
+    bookRepo.findOne.mockResolvedValue(mockBook);
+    itemRepo.findOne.mockResolvedValue({ id: 1 } as RecommendationItem);
     await expect(service.addItem(1, { bookId: 10 })).rejects.toThrow(
       ConflictException,
     );
   });
 
   it('removeItem ok', async () => {
-    itemRepo.findOne.mockResolvedValue({ id: 5, section: { id: 1 } } as any);
-    itemRepo.remove.mockResolvedValue({} as any);
+    itemRepo.findOne.mockResolvedValue({
+      id: 5,
+      section: { id: 1 },
+    } as RecommendationItem);
+    itemRepo.remove.mockResolvedValue({} as RecommendationItem);
     await service.removeItem(1, 5);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(itemRepo.remove).toHaveBeenCalled();
   });
 

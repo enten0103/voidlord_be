@@ -33,6 +33,7 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { RateBookDto } from './dto/rate-book.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { PermissionsService } from '../permissions/permissions.service';
+import type { JwtRequestWithUser } from '../../types/request.interface';
 
 @ApiTags('books')
 @Controller('books')
@@ -75,12 +76,8 @@ export class BooksController {
       example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
     },
   })
-  create(@Body() createBookDto: CreateBookDto, @Req() req?: any) {
-    const userId = req?.user?.userId;
-    if (typeof userId === 'number') {
-      return this.booksService.create(createBookDto, userId);
-    }
-    return this.booksService.create(createBookDto as any);
+  create(@Body() createBookDto: CreateBookDto, @Req() req: JwtRequestWithUser) {
+    return this.booksService.create(createBookDto, req.user.userId);
   }
 
   @Get()
@@ -124,10 +121,10 @@ export class BooksController {
       },
     },
   })
-  my(@Req() req: any) {
+  my(@Req() req: JwtRequestWithUser) {
     const userId = req?.user?.userId;
     if (typeof userId !== 'number') {
-      throw new BadRequestException('Unauthorized');
+      throw new BadRequestException('Missing user');
     }
     return this.booksService.findMine(userId);
   }
@@ -485,8 +482,8 @@ export class BooksController {
     },
   })
   @ApiResponse({ status: 404, description: 'Book not found' })
-  getMyRating(@Param('id') id: string, @Req() req: any) {
-    return this.booksService.getMyRating(+id, req?.user?.userId);
+  getMyRating(@Param('id') id: string, @Req() req: JwtRequestWithUser) {
+    return this.booksService.getMyRating(+id, req.user.userId);
   }
 
   @Post(':id/rating')
@@ -521,8 +518,12 @@ export class BooksController {
     },
   })
   @ApiResponse({ status: 404, description: 'Book not found' })
-  rate(@Param('id') id: string, @Body() body: RateBookDto, @Req() req: any) {
-    return this.booksService.rateBook(+id, req?.user?.userId, body.score);
+  rate(
+    @Param('id') id: string,
+    @Body() body: RateBookDto,
+    @Req() req: JwtRequestWithUser,
+  ) {
+    return this.booksService.rateBook(+id, req.user.userId, body.score);
   }
 
   @Delete(':id/rating')
@@ -545,8 +546,8 @@ export class BooksController {
       },
     },
   })
-  removeMyRating(@Param('id') id: string, @Req() req: any) {
-    return this.booksService.removeMyRating(+id, req?.user?.userId);
+  removeMyRating(@Param('id') id: string, @Req() req: JwtRequestWithUser) {
+    return this.booksService.removeMyRating(+id, req.user.userId);
   }
 
   // Comments
@@ -675,9 +676,9 @@ export class BooksController {
   addComment(
     @Param('id') id: string,
     @Body() body: CreateCommentDto,
-    @Req() req: any,
+    @Req() req: JwtRequestWithUser,
   ) {
-    return this.booksService.addComment(+id, req?.user?.userId, body.content);
+    return this.booksService.addComment(+id, req.user.userId, body.content);
   }
 
   @Delete(':id/comments/:commentId')
@@ -715,9 +716,9 @@ export class BooksController {
   async deleteComment(
     @Param('id') id: string,
     @Param('commentId') commentId: string,
-    @Req() req: any,
+    @Req() req: JwtRequestWithUser,
   ) {
-    const currentUserId = req?.user?.userId as number;
+    const currentUserId = req.user.userId;
     const bookId = +id;
     const cid = +commentId;
     const ownerId = await this.booksService.getCommentOwnerId(bookId, cid);
@@ -901,11 +902,11 @@ export class BooksController {
     @Param('id') id: string,
     @Param('commentId') commentId: string,
     @Body() body: CreateCommentDto,
-    @Req() req: any,
+    @Req() req: JwtRequestWithUser,
   ) {
     return this.booksService.addReply(
       +id,
-      req?.user?.userId,
+      req.user.userId,
       +commentId,
       body.content,
     );

@@ -1,44 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PermissionsService } from '../permissions.service';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { Permission } from '../../../entities/permission.entity';
 import { User } from '../../../entities/user.entity';
 import { UserPermission } from '../../../entities/user-permission.entity';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { createRepoMock, RepoMock } from '../../../../test/repo-mocks';
 
-// Helper to create a mocked repository with only used methods
-function createRepoMock() {
-  const base: any = {
-    findOne: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    remove: jest.fn(),
-    find: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
-  return base;
-}
+// 使用共享 RepoMock 工具，得到强类型的仓库 mock
 
 describe('PermissionsService', () => {
   let service: PermissionsService;
-  let dataSource: any;
-  let permRepo: jest.Mocked<Repository<Permission>>;
-  let userRepo: jest.Mocked<Repository<User>>;
-  let userPermRepo: jest.Mocked<Repository<UserPermission>>;
+  let dataSource: DataSource;
+  let permRepo: RepoMock<Permission>;
+  let userRepo: RepoMock<User>;
+  let userPermRepo: RepoMock<UserPermission>;
 
   beforeEach(async () => {
-    permRepo = createRepoMock();
-    userRepo = createRepoMock();
-    userPermRepo = createRepoMock();
+    permRepo = createRepoMock<Permission>();
+    userRepo = createRepoMock<User>();
+    userPermRepo = createRepoMock<UserPermission>();
 
-    dataSource = {
-      getRepository: (entity: any) => {
+    const mockDataSource = {
+      getRepository: (entity: unknown) => {
         if (entity === Permission) return permRepo;
         if (entity === User) return userRepo;
         if (entity === UserPermission) return userPermRepo;
         throw new Error('Unknown repository request');
       },
     } as unknown as DataSource;
+    dataSource = mockDataSource;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,23 +45,45 @@ describe('PermissionsService', () => {
 
   describe('getUserPermissionLevel', () => {
     it('returns 0 when no record', async () => {
-      const qb: any = {
-        innerJoin: () => qb,
-        where: () => qb,
-        getOne: jest.fn().mockResolvedValue(null),
+      type QbMock = {
+        innerJoin: (...args: [string, string?]) => QbMock;
+        where: (...args: [string, Record<string, unknown>?]) => QbMock;
+        getOne: () => Promise<UserPermission | null>;
       };
-      userPermRepo.createQueryBuilder.mockReturnValue(qb);
+      const qb: QbMock = {
+        innerJoin: jest.fn(() => qb),
+        where: jest.fn(() => qb),
+        getOne: jest.fn(() => Promise.resolve(null)),
+      };
+
+      // 这里仅在测试中将轻量 qb 强转为 SelectQueryBuilder 以驱动 service 逻辑；加注释豁免 unsafe 分析
+
+      // 使用最小接口适配 createQueryBuilder，避免直接 any；改用工厂返回轻量对象再强转
+
+      const qbTyped =
+        qb as unknown as import('typeorm').SelectQueryBuilder<UserPermission>;
+      // 由于 SelectQueryBuilder 结构庞大，这里仅提供测试所需方法，强转是安全的（测试只调用这三个方法）
+
+      userPermRepo.createQueryBuilder.mockImplementation(() => qbTyped);
       const level = await service.getUserPermissionLevel(1, 'USER_READ');
       expect(level).toBe(0);
     });
 
     it('returns record level', async () => {
-      const qb: any = {
-        innerJoin: () => qb,
-        where: () => qb,
-        getOne: jest.fn().mockResolvedValue({ level: 2 }),
+      type QbMock = {
+        innerJoin: (...args: [string, string?]) => QbMock;
+        where: (...args: [string, Record<string, unknown>?]) => QbMock;
+        getOne: () => Promise<{ level: number } | null>;
       };
-      userPermRepo.createQueryBuilder.mockReturnValue(qb);
+      const qb: QbMock = {
+        innerJoin: jest.fn(() => qb),
+        where: jest.fn(() => qb),
+        getOne: jest.fn(() => Promise.resolve({ level: 2 })),
+      };
+
+      userPermRepo.createQueryBuilder.mockReturnValue(
+        qb as unknown as import('typeorm').SelectQueryBuilder<UserPermission>,
+      );
       const level = await service.getUserPermissionLevel(1, 'USER_READ');
       expect(level).toBe(2);
     });
@@ -85,7 +98,7 @@ describe('PermissionsService', () => {
           userId: 1,
           permission: 'USER_READ',
           level: 99,
-        } as any),
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -125,43 +138,66 @@ describe('PermissionsService', () => {
 
     it('creates new assignment', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(3);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
-      permRepo.findOne.mockResolvedValue({ id: 2, name: 'USER_READ' } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
+      permRepo.findOne.mockResolvedValue({
+        id: 2,
+        name: 'USER_READ',
+      } as Permission);
       userPermRepo.findOne.mockResolvedValue(null);
-      userPermRepo.create.mockReturnValue({ id: 5, level: 1 } as any);
-      userPermRepo.save.mockResolvedValue({ id: 5, level: 1 } as any);
-      const res = await service.grant(currentUserId, {
-        userId: 1,
-        permission: 'USER_READ',
+      userPermRepo.create.mockReturnValue({
+        id: 5,
         level: 1,
-      });
-      expect(res).toEqual({ userId: 1, permission: 'USER_READ', level: 1 });
+      } as unknown as UserPermission);
+      userPermRepo.save.mockResolvedValue({
+        id: 5,
+        level: 1,
+      } as unknown as UserPermission);
+      await expect(
+        service.grant(currentUserId, {
+          userId: 1,
+          permission: 'USER_READ',
+          level: 1,
+        }),
+      ).resolves.toEqual({ userId: 1, permission: 'USER_READ', level: 1 });
     });
 
     it('updates existing assignment with higher power', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(3);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
-      permRepo.findOne.mockResolvedValue({ id: 2, name: 'USER_READ' } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
+      permRepo.findOne.mockResolvedValue({
+        id: 2,
+        name: 'USER_READ',
+      } as Permission);
       userPermRepo.findOne.mockResolvedValue({
         id: 9,
         level: 1,
         grantedBy: null,
-      } as any);
-      userPermRepo.save.mockResolvedValue({ id: 9, level: 1 } as any);
-      const res = await service.grant(currentUserId, {
-        userId: 1,
-        permission: 'USER_READ',
+      } as unknown as UserPermission);
+      userPermRepo.save.mockResolvedValue({
+        id: 9,
         level: 1,
-      });
+      } as unknown as UserPermission);
+      await expect(
+        service.grant(currentUserId, {
+          userId: 1,
+          permission: 'USER_READ',
+          level: 1,
+        }),
+      ).resolves.toEqual({ userId: 1, permission: 'USER_READ', level: 1 });
       expect(userPermRepo.save).toHaveBeenCalled();
-      expect(res).toEqual({ userId: 1, permission: 'USER_READ', level: 1 });
     });
 
     it('cannot upgrade equal/higher assignment', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(2);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
-      permRepo.findOne.mockResolvedValue({ id: 2, name: 'USER_READ' } as any);
-      userPermRepo.findOne.mockResolvedValue({ id: 9, level: 2 } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
+      permRepo.findOne.mockResolvedValue({
+        id: 2,
+        name: 'USER_READ',
+      } as Permission);
+      userPermRepo.findOne.mockResolvedValue({
+        id: 9,
+        level: 2,
+      } as unknown as UserPermission);
       await expect(
         service.grant(currentUserId, {
           userId: 1,
@@ -192,7 +228,7 @@ describe('PermissionsService', () => {
 
     it('permission not found', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(3);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
       permRepo.findOne.mockResolvedValue(null);
       await expect(
         service.revoke(currentUserId, { userId: 1, permission: 'USER_READ' }),
@@ -201,25 +237,32 @@ describe('PermissionsService', () => {
 
     it('returns revoked:false if no assignment', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(3);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
-      permRepo.findOne.mockResolvedValue({ id: 2, name: 'USER_READ' } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
+      permRepo.findOne.mockResolvedValue({
+        id: 2,
+        name: 'USER_READ',
+      } as Permission);
       userPermRepo.findOne.mockResolvedValue(null);
-      const res = await service.revoke(currentUserId, {
-        userId: 1,
-        permission: 'USER_READ',
-      });
-      expect(res).toEqual({ revoked: false });
+      await expect(
+        service.revoke(currentUserId, {
+          userId: 1,
+          permission: 'USER_READ',
+        }),
+      ).resolves.toEqual({ revoked: false });
     });
 
     it('level2 cannot revoke others grant', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(2);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
-      permRepo.findOne.mockResolvedValue({ id: 2, name: 'USER_READ' } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
+      permRepo.findOne.mockResolvedValue({
+        id: 2,
+        name: 'USER_READ',
+      } as Permission);
       userPermRepo.findOne.mockResolvedValue({
         id: 9,
         level: 1,
-        grantedBy: { id: 999 } as any,
-      } as any);
+        grantedBy: { id: 999 } as User,
+      } as unknown as UserPermission);
       await expect(
         service.revoke(currentUserId, { userId: 1, permission: 'USER_READ' }),
       ).rejects.toThrow(ForbiddenException);
@@ -227,30 +270,39 @@ describe('PermissionsService', () => {
 
     it('revokes when allowed', async () => {
       jest.spyOn(service, 'getUserPermissionLevel').mockResolvedValue(3);
-      userRepo.findOne.mockResolvedValue({ id: 1 } as any);
-      permRepo.findOne.mockResolvedValue({ id: 2, name: 'USER_READ' } as any);
+      userRepo.findOne.mockResolvedValue({ id: 1 } as User);
+      permRepo.findOne.mockResolvedValue({
+        id: 2,
+        name: 'USER_READ',
+      } as Permission);
       userPermRepo.findOne.mockResolvedValue({
         id: 9,
         level: 1,
-        grantedBy: { id: 10 } as any,
-      } as any);
-      const res = await service.revoke(currentUserId, {
-        userId: 1,
-        permission: 'USER_READ',
-      });
+        grantedBy: { id: 10 } as User,
+      } as unknown as UserPermission);
+      await expect(
+        service.revoke(currentUserId, {
+          userId: 1,
+          permission: 'USER_READ',
+        }),
+      ).resolves.toEqual({ revoked: true });
       expect(userPermRepo.remove).toHaveBeenCalled();
-      expect(res).toEqual({ revoked: true });
     });
   });
 
   describe('listUserPermissions', () => {
     it('maps to array', async () => {
       userPermRepo.find.mockResolvedValue([
-        { permission: { name: 'USER_READ' }, level: 1 } as any,
-        { permission: { name: 'USER_UPDATE' }, level: 2 } as any,
+        {
+          permission: { name: 'USER_READ' },
+          level: 1,
+        } as unknown as UserPermission,
+        {
+          permission: { name: 'USER_UPDATE' },
+          level: 2,
+        } as unknown as UserPermission,
       ]);
-      const res = await service.listUserPermissions(1);
-      expect(res).toEqual([
+      await expect(service.listUserPermissions(1)).resolves.toEqual([
         { permission: 'USER_READ', level: 1 },
         { permission: 'USER_UPDATE', level: 2 },
       ]);

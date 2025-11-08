@@ -30,20 +30,47 @@ export const swaggerInit = (app: INestApplication) => {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  for (const path of Object.keys(document.paths)) {
-    const item: any = (document.paths as any)[path];
-    for (const method of Object.keys(item)) {
-      const op = item[method];
-      if (op && op['x-permission']) {
-        const { permission, minLevel } = op['x-permission'];
-        const line = `Requires permission: ${permission} (level >= ${minLevel})`;
-        if (op.description) {
-          if (!op.description.includes('Requires permission:')) {
-            op.description += `\n\n${line}`;
-          }
-        } else {
-          op.description = line;
+  const paths = document.paths ?? {};
+  const httpMethods = [
+    'get',
+    'put',
+    'post',
+    'delete',
+    'patch',
+    'options',
+    'head',
+    'trace',
+  ] as const;
+
+  for (const pathItem of Object.values(paths)) {
+    if (!pathItem) continue;
+    for (const method of httpMethods) {
+      const candidate = (pathItem as Record<string, unknown>)[method];
+      if (!candidate || typeof candidate !== 'object') continue;
+
+      const op = candidate as { description?: string } & Record<
+        string,
+        unknown
+      >;
+      const xPerm = op['x-permission'];
+      if (!xPerm || typeof xPerm !== 'object') continue;
+
+      const { permission, minLevel } = xPerm as {
+        permission?: string;
+        minLevel?: number;
+      };
+
+      if (typeof permission !== 'string' || typeof minLevel !== 'number') {
+        continue;
+      }
+
+      const line = `Requires permission: ${permission} (level >= ${minLevel})`;
+      if (typeof op.description === 'string') {
+        if (!op.description.includes('Requires permission:')) {
+          op.description += `\n\n${line}`;
         }
+      } else {
+        op.description = line;
       }
     }
   }

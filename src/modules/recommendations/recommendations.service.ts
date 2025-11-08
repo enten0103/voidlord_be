@@ -104,7 +104,7 @@ export class RecommendationsService {
     if (!book) throw new NotFoundException('Book not found');
 
     const dup = await this.itemRepo.findOne({
-      where: { section: { id: sectionId }, book: { id: dto.bookId } } as any,
+      where: { section: { id: sectionId }, book: { id: dto.bookId } },
     });
     if (dup) throw new ConflictException('Book already in section');
 
@@ -139,7 +139,7 @@ export class RecommendationsService {
 
   async reorderItems(sectionId: number, dto: ReorderItemsDto): Promise<void> {
     const items = await this.itemRepo.find({
-      where: { section: { id: sectionId } } as any,
+      where: { section: { id: sectionId } },
     });
     const map = new Map(items.map((i) => [i.id, i]));
     let pos = 0;

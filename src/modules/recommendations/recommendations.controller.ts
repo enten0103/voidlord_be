@@ -198,7 +198,7 @@ export class RecommendationsController {
     @Body() dto: UpdateSectionDto,
   ) {
     if (dto.sectionOrder) {
-      this.svc.batchReorder(dto.sectionOrder);
+      void this.svc.batchReorder(dto.sectionOrder);
     }
     return this.svc.updateSection(id, dto);
   }

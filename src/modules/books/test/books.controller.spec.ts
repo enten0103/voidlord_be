@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../auth/guards/permission.guard';
 import { BadRequestException } from '@nestjs/common';
 import { PermissionsService } from '../../permissions/permissions.service';
+import type { JwtRequestWithUser } from '../../../types/request.interface';
 
 describe('BooksController', () => {
   let controller: BooksController;
@@ -78,10 +79,14 @@ describe('BooksController', () => {
 
       mockBooksService.create.mockResolvedValue(mockBook);
 
-      const result = await controller.create(createBookDto);
+      const req = {
+        user: { userId: 1, username: 'tester' },
+      } as unknown as JwtRequestWithUser;
+      const result = await controller.create(createBookDto, req);
 
       expect(result).toEqual(mockBook);
-      expect(service.create).toHaveBeenCalledWith(createBookDto);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(service.create).toHaveBeenCalledWith(createBookDto, 1);
     });
   });
 
@@ -92,6 +97,7 @@ describe('BooksController', () => {
       const result = await controller.findAll();
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findAll).toHaveBeenCalled();
     });
 
@@ -101,22 +107,28 @@ describe('BooksController', () => {
       const result = await controller.findAll('author,genre');
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTags).toHaveBeenCalledWith(['author', 'genre']);
     });
   });
 
   describe('my', () => {
     it("should return current user's books", async () => {
-      const req: any = { user: { userId: 42 } };
+      const req = {
+        user: { userId: 42, username: 'u' },
+      } as unknown as JwtRequestWithUser;
       const books = [mockBook];
-      mockBooksService.findMine.mockResolvedValue(books as any);
+      mockBooksService.findMine.mockResolvedValue(books as never);
       const result = await controller.my(req);
       expect(result).toEqual(books);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findMine).toHaveBeenCalledWith(42);
     });
 
-    it('should throw BadRequest when user missing', async () => {
-      expect(() => controller.my({} as any)).toThrow(BadRequestException);
+    it('should throw BadRequest when user missing', () => {
+      expect(() => controller.my({} as unknown as JwtRequestWithUser)).toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -127,6 +139,7 @@ describe('BooksController', () => {
       const result = await controller.findOne('1');
 
       expect(result).toEqual(mockBook);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findOne).toHaveBeenCalledWith(1);
     });
   });
@@ -138,6 +151,7 @@ describe('BooksController', () => {
       const result = await controller.findByHash('abc123');
 
       expect(result).toEqual(mockBook);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByHash).toHaveBeenCalledWith('abc123');
     });
   });
@@ -150,6 +164,7 @@ describe('BooksController', () => {
       const result = await controller.searchByTags(searchDto);
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTags).toHaveBeenCalledWith(['author', 'genre']);
     });
 
@@ -160,6 +175,7 @@ describe('BooksController', () => {
       const result = await controller.searchByTags(searchDto);
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagKeyValue).toHaveBeenCalledWith(
         'author',
         'John Doe',
@@ -178,6 +194,7 @@ describe('BooksController', () => {
       const result = await controller.searchByTags(searchDto);
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByMultipleTagValues).toHaveBeenCalledWith(
         searchDto.tagFilters,
       );
@@ -190,6 +207,7 @@ describe('BooksController', () => {
       const result = await controller.searchByTags(searchDto);
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findAll).toHaveBeenCalled();
     });
 
@@ -200,6 +218,7 @@ describe('BooksController', () => {
       const result = await controller.searchByTags(searchDto);
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagId).toHaveBeenCalledWith(1);
     });
 
@@ -210,6 +229,7 @@ describe('BooksController', () => {
       const result = await controller.searchByTags(searchDto);
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagIds).toHaveBeenCalledWith([1, 2, 3]);
     });
   });
@@ -221,6 +241,7 @@ describe('BooksController', () => {
       const result = await controller.findByTagKeyValue('author', 'John Doe');
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagKeyValue).toHaveBeenCalledWith(
         'author',
         'John Doe',
@@ -235,27 +256,20 @@ describe('BooksController', () => {
       const result = await controller.findByTagId('1');
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagId).toHaveBeenCalledWith(1);
     });
 
-    it('should throw BadRequestException for invalid tag ID', async () => {
-      try {
-        await controller.findByTagId('invalid');
-        fail('Expected BadRequestException to be thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(BadRequestException);
-        expect(error.message).toBe('Invalid tag ID');
-      }
+    it('should throw BadRequestException for invalid tag ID', () => {
+      expect(() => controller.findByTagId('invalid')).toThrow(
+        BadRequestException,
+      );
+      expect(() => controller.findByTagId('invalid')).toThrow('Invalid tag ID');
     });
 
-    it('should throw BadRequestException for negative tag ID', async () => {
-      try {
-        await controller.findByTagId('-1');
-        fail('Expected BadRequestException to be thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(BadRequestException);
-        expect(error.message).toBe('Invalid tag ID');
-      }
+    it('should throw BadRequestException for negative tag ID', () => {
+      expect(() => controller.findByTagId('-1')).toThrow(BadRequestException);
+      expect(() => controller.findByTagId('-1')).toThrow('Invalid tag ID');
     });
   });
 
@@ -266,6 +280,7 @@ describe('BooksController', () => {
       const result = await controller.findByTagIds('1,2,3');
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagIds).toHaveBeenCalledWith([1, 2, 3]);
     });
 
@@ -275,17 +290,17 @@ describe('BooksController', () => {
       const result = await controller.findByTagIds('1,invalid,3,0');
 
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findByTagIds).toHaveBeenCalledWith([1, 3]);
     });
 
-    it('should throw BadRequestException when no valid tag IDs provided', async () => {
-      try {
-        await controller.findByTagIds('invalid,0,-1');
-        fail('Expected BadRequestException to be thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(BadRequestException);
-        expect(error.message).toBe('No valid tag IDs provided');
-      }
+    it('should throw BadRequestException when no valid tag IDs provided', () => {
+      expect(() => controller.findByTagIds('invalid,0,-1')).toThrow(
+        BadRequestException,
+      );
+      expect(() => controller.findByTagIds('invalid,0,-1')).toThrow(
+        'No valid tag IDs provided',
+      );
     });
   });
 
@@ -294,24 +309,24 @@ describe('BooksController', () => {
       mockBooksService.recommendByBook.mockResolvedValue([mockBook]);
       const result = await controller.recommend('1');
       expect(result).toEqual([mockBook]);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.recommendByBook).toHaveBeenCalledWith(1, 5);
     });
 
     it('should respect custom limit and clamp invalid', async () => {
       mockBooksService.recommendByBook.mockResolvedValue([mockBook]);
       await controller.recommend('1', '10');
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.recommendByBook).toHaveBeenCalledWith(1, 10);
       await controller.recommend('1', '-3');
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.recommendByBook).toHaveBeenCalledWith(1, 5);
     });
 
-    it('should throw BadRequestException for invalid book ID', async () => {
-      try {
-        await controller.recommend('invalid');
-        fail('Expected BadRequestException');
-      } catch (e) {
-        expect(e).toBeInstanceOf(BadRequestException);
-      }
+    it('should throw BadRequestException for invalid book ID', () => {
+      expect(() => controller.recommend('invalid')).toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -325,6 +340,7 @@ describe('BooksController', () => {
       const result = await controller.update('1', updateBookDto);
 
       expect(result).toEqual(updatedBook);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.update).toHaveBeenCalledWith(1, updateBookDto);
     });
   });
@@ -333,6 +349,7 @@ describe('BooksController', () => {
     it('should remove a book', async () => {
       mockBooksService.remove.mockResolvedValue(null);
       await controller.remove('1');
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.remove).toHaveBeenCalledWith(1);
     });
   });
