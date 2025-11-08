@@ -122,7 +122,7 @@ describe('AuthController (e2e)', () => {
           username: 'testuser',
           password: 'password123',
         })
-        .expect(201)
+        .expect(200)
         .expect((res) => {
           const parsed = parseLoginResult(res.body);
           expect(parsed.access_token).toEqual(expect.any(String));

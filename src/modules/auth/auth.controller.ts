@@ -5,9 +5,11 @@ import {
   Post,
   Request,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -16,6 +18,7 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import type {
@@ -46,9 +49,15 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Login user' })
+  @ApiBody({
+    description: 'Login credentials',
+    type: LoginDto,
+    required: true,
+  })
   @ApiResponse({
-    status: 201,
+    status: 200,
     description: 'Login successful',
     type: LoginResponseDto,
   })

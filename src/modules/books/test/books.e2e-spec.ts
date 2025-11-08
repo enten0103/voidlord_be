@@ -93,7 +93,7 @@ describe('Books (e2e)', () => {
         username: testUser.username,
         password: testUser.password,
       })
-      .expect(201);
+      .expect(200);
     authToken = parseBody(
       loginResponse.body,
       (d): d is { access_token: string } => {
@@ -299,7 +299,7 @@ describe('Books (e2e)', () => {
       const otherLogin = await request(httpServer)
         .post('/auth/login')
         .send({ username: `other_${suffix}`, password: 'p@ssw0rd!' })
-        .expect(201);
+        .expect(200);
       otherUserToken = parseBody(
         otherLogin.body,
         (d): d is { access_token: string } => {
@@ -1287,7 +1287,7 @@ describe('Books (e2e)', () => {
       const otherLogin = await request(httpServer)
         .post('/auth/login')
         .send({ username: `c_other_${suffix}`, password: 'p@ssw0rd!' })
-        .expect(201);
+        .expect(200);
       otherUserToken = parseBody(
         otherLogin.body,
         (d): d is { access_token: string } => {

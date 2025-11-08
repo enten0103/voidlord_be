@@ -88,7 +88,7 @@ describe('UserConfig (e2e)', () => {
     const login = await request(httpServer)
       .post('/auth/login')
       .send({ username: creds.username, password: creds.password })
-      .expect(201);
+      .expect(200);
     const loginParsed = parseLoginResult(login.body);
     userId = loginParsed.user.id;
     authToken = loginParsed.access_token;

@@ -45,7 +45,7 @@ describe('Reading Records (e2e)', () => {
     const login: Response = await request(httpServer)
       .post('/auth/login')
       .send({ username: 'reader1', password: 'p@ssw0rd!' })
-      .expect(201);
+      .expect(200);
     const loginParsed = parseLoginResult(login.body);
     userId = loginParsed.user.id;
     token = loginParsed.access_token;

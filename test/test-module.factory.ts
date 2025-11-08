@@ -138,7 +138,7 @@ export async function registerAndLogin(
   )
     .post('/auth/login')
     .send({ username, password })
-    .expect(201);
+    .expect(200);
   // 使用解析函数确保结构安全
   return parseLoginResult(res.body);
 }
