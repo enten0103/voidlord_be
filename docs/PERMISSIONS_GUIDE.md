@@ -114,31 +114,32 @@ POST /permissions/revoke
 
 ---
 ## 6. 业务端点权限矩阵
-| 领域 | 路径 (示例) | 方法 | 权限 | Min Level | 公开? |
-|------|-------------|------|------|-----------|-------|
-| 用户 | /users (list) | GET | USER_READ | 1 | 否 |
-| 用户 | /users/:id | GET | USER_READ | 1 | 否 |
-| 用户 | /users/:id | PATCH | USER_UPDATE | 1 | 否 |
-| 用户 | /users/:id | DELETE | USER_DELETE | 1 | 否 |
-| 用户 | /users (create) | POST | USER_CREATE | 1 | 否 |
-| 图书 | /books | POST | BOOK_CREATE | 1 | 否 |
-| 图书 | /books/:id | PATCH | BOOK_UPDATE | 1 | 否 |
-| 图书 | /books/:id | DELETE | BOOK_DELETE | 1 | 否 |
-| 图书 | /books/* (读取/搜索/推荐) | GET | BOOK_READ (当前放宽) | 0 | 是 |
-| 图书 | /books/my | GET | (需要登录) | 0 | 否 |
-| 推荐 | /recommendations/sections* (CRUD) | POST/PATCH/DELETE | RECOMMENDATION_MANAGE | 1 | 否 |
-| 推荐 | /recommendations/public | GET | (公开) | 0 | 是 |
-| 权限 | /permissions/grant | POST | USER_UPDATE | 2 | 否 |
-| 权限 | /permissions/revoke | POST | USER_UPDATE | 2 | 否 |
-| 权限 | /permissions/user/:id | GET | USER_READ | 1 | 否 |
-| 文件 | /files/policy/public | POST | SYS_MANAGE | 3 | 否 |
-| 文件 | /files/policy/private | POST | SYS_MANAGE | 3 | 否 |
-| 文件 | /files/upload-url | GET | (需要登录) | 0 | 否 |
-| 文件 | /files/download-url | GET | (需要登录) | 0 | 否 |
-| 文件 | /files/upload | POST | (需要登录) | 0 | 否 |
-| 文件 | /files/object | DELETE | FILE_MANAGE（非本人/未知） | 1 | 否 |
-| 评论 | /books/:id/comments | POST | (需要登录) | 0 | 否 |
-| 评论 | /books/:id/comments/:commentId | DELETE | COMMENT_MANAGE（非本人） | 1 | 否 |
+| 领域 | 路径 (示例) | 方法 | 权限 | Min Level | 公开? | 说明 |
+|------|-------------|------|------|-----------|-------|------|
+| 用户 | /users (list) | GET | USER_READ | 1 | 否 | 列出所有用户 |
+| 用户 | /users/:id | GET | USER_READ | 1 | 否 | 查看单个用户 |
+| 用户 | /users/:id | PATCH | USER_UPDATE | 1 | 否 | 更新用户资料 |
+| 用户 | /users/:id | DELETE | USER_DELETE | 1 | 否 | 删除用户 |
+| 用户 | /users (create) | POST | USER_CREATE | 1 | 否 | 创建用户 |
+| 用户配置 | /user-config/me | GET | (登录) | 0 | 否 | 自动创建与返回配置 |
+| 图书 | /books | POST | BOOK_CREATE | 1 | 否 | 创建图书 |
+| 图书 | /books/:id | PATCH | BOOK_UPDATE | 1 | 否 | 更新图书 |
+| 图书 | /books/:id | DELETE | BOOK_DELETE | 1 | 否 | 删除图书 |
+| 图书 | /books/* (读取/搜索/推荐) | GET | BOOK_READ (当前放宽) | 0 | 是 | 基本读取与搜索开放 |
+| 图书 | /books/my | GET | (需要登录) | 0 | 否 | 当前用户创建的图书 |
+| 推荐 | /recommendations/sections* | CRUD | RECOMMENDATION_MANAGE | 1 | 否 | 分区与条目管理 |
+| 推荐 | /recommendations/public | GET | (公开) | 0 | 是 | 启用分区聚合 |
+| 权限 | /permissions/grant | POST | USER_UPDATE | 2 | 否 | 授予权限记录 |
+| 权限 | /permissions/revoke | POST | USER_UPDATE | 2 | 否 | 撤销权限记录 |
+| 权限 | /permissions/user/:id | GET | USER_READ | 1 | 否 | 查看用户权限 |
+| 文件 | /files/policy/public | POST | SYS_MANAGE | 3 | 否 | 设置桶公开 |
+| 文件 | /files/policy/private | POST | SYS_MANAGE | 3 | 否 | 恢复私有 |
+| 文件 | /files/upload-url | GET | (需要登录) | 0 | 否 | 预签名上传 URL |
+| 文件 | /files/download-url | GET | (需要登录) | 0 | 否 | 预签名下载 URL |
+| 文件 | /files/upload | POST | (需要登录) | 0 | 否 | 后端代理上传 |
+| 文件 | /files/object | DELETE | FILE_MANAGE（非本人/未知） | 1 | 否 | 非本人需权限 |
+| 评论 | /books/:id/comments | POST | (需要登录) | 0 | 否 | 新增顶层评论 |
+| 评论 | /books/:id/comments/:commentId | DELETE | COMMENT_MANAGE（非本人） | 1 | 否 | 非作者需权限 |
 
 > 评论删除规则：评论作者本人可直接删除；非作者需要 `COMMENT_MANAGE (>=1)`；否则返回 403。
 

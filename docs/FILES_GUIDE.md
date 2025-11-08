@@ -2,6 +2,17 @@
 
 本指南详细介绍了 `files` 模块的功能，该模块负责与兼容 S3 的对象存储服务（如 MinIO）进行交互。
 
+## 端点速览
+
+| 方法 | 路径 | 描述 | 认证 | 权限 |
+|------|------|------|------|------|
+| GET | /files/upload-url | 生成预签名上传 URL（PUT） | JWT | - |
+| POST | /files/upload | 后端代理上传（multipart） | JWT | - |
+| GET | /files/download-url | 生成预签名下载 URL | JWT | - |
+| DELETE | /files/object | 删除对象（本人或 FILE_MANAGE） | JWT | FILE_MANAGE(>=1) when not owner |
+| POST | /files/policy/public | 将桶设置为 public-read | JWT | SYS_MANAGE(>=3) |
+| POST | /files/policy/private | 将桶恢复为 private | JWT | SYS_MANAGE(>=3) |
+
 ## 功能概述
 
 - **S3/MinIO 集成**: 封装了 AWS S3 SDK v3，用于连接和操作对象存储。
@@ -167,3 +178,21 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:9000
 
 - 权限模型与 401/403 语义详见：`docs/PERMISSIONS_GUIDE.md`
 - 顶层概览与端点列表参见：`README.md`
+
+---
+## 错误码汇总
+| 状态码 | 场景 | 示例 |
+|--------|------|------|
+| 401 | 未登录调用任意端点 | `{ "statusCode":401,"message":"Unauthorized","error":"Unauthorized" }` |
+| 403 | 删除对象非本人且无 FILE_MANAGE | `{ "statusCode":403,"message":"Only owner or FILE_MANAGE can delete","error":"Forbidden" }` |
+| 403 | 未具备 SYS_MANAGE(>=3) 操作桶策略 | `{ "statusCode":403,"message":"Forbidden","error":"Forbidden" }` |
+| 400 | 参数缺失或无效（如缺 key） | `{ "statusCode":400,"message":"Bad Request","error":"Bad Request" }` |
+| 404 | 对象不存在（可选实现） | `{ "statusCode":404,"message":"Not Found","error":"Not Found" }` |
+
+---
+## 快速排错
+- 预签名 URL 403：检查桶策略是否为私有、对象前缀是否受限、URL 是否过期；
+- 上传失败：确认请求方法 PUT、Content-Type 与签名参数匹配；
+- 下载失败：`expiresIn` 是否过小、系统时钟偏差；
+- 删除失败：确认对象 owner 与当前用户是否一致，或当前用户是否具备 FILE_MANAGE；
+- 桶策略：尽量短时公开，完毕后立即恢复私有；必要时审计操作者与 IP。
