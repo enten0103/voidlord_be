@@ -37,10 +37,13 @@ export class RecommendationsController {
   constructor(private readonly svc: RecommendationsService) {}
 
   @Get('public')
-  @ApiOperation({ summary: 'Get active recommendation sections with items' })
+  @ApiOperation({
+    summary: 'Get active recommendation sections (booklists) with items',
+  })
   @ApiResponse({
     status: 200,
-    description: 'List of active sections with items',
+    description:
+      'List of active sections with items (each item links a BookList)',
     schema: {
       example: [
         {
@@ -52,7 +55,7 @@ export class RecommendationsController {
           items: [
             {
               id: 10,
-              book: { id: 42, tags: [] },
+              list: { id: 7, name: '编辑精选' },
               position: 0,
               note: '编辑推荐',
             },
@@ -134,7 +137,7 @@ export class RecommendationsController {
   }
 
   @Get('sections/:id')
-  @ApiOperation({ summary: 'Get section detail' })
+  @ApiOperation({ summary: 'Get section detail (with booklists)' })
   @ApiParam({ name: 'id', description: 'Section ID' })
   @ApiResponse({
     status: 200,
@@ -144,7 +147,7 @@ export class RecommendationsController {
         id: 1,
         key: 'today_hot',
         title: '今日最热',
-        items: [{ id: 10, book: { id: 42 }, position: 0 }],
+        items: [{ id: 10, list: { id: 7 }, position: 0 }],
       },
     },
   })
@@ -233,7 +236,7 @@ export class RecommendationsController {
   }
 
   @Post('sections/:id/items')
-  @ApiOperation({ summary: 'Add book to section' })
+  @ApiOperation({ summary: 'Add booklist to section' })
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @ApiPermission('RECOMMENDATION_MANAGE', 1)
   @ApiBearerAuth('JWT-auth')
@@ -241,21 +244,21 @@ export class RecommendationsController {
   @ApiBody({
     schema: {
       properties: {
-        bookId: { type: 'number', example: 42 },
+        bookListId: { type: 'number', example: 7 },
         position: { type: 'number', example: 0 },
         note: { type: 'string', example: '编辑推荐' },
       },
-      required: ['bookId'],
+      required: ['bookListId'],
     },
   })
   @ApiResponse({
     status: 200,
-    description: 'Item added',
+    description: 'Item added (booklist linked)',
     schema: {
       example: {
         id: 10,
         section: { id: 1 },
-        book: { id: 42 },
+        list: { id: 7 },
         position: 0,
         note: '编辑推荐',
       },

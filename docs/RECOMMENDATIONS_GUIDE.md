@@ -16,7 +16,7 @@
 ---
 ## 1. 概述与定位
 - Section：推荐分区（主题容器）
-- Item：分区内的推荐图书条目（有序）
+- Item：分区内的推荐书单条目（有序）
 - Public 聚合：仅返回 `active=true` 的分区及条目，供未登录用户浏览。
 
 ---
@@ -32,7 +32,7 @@
 |  | items | RecommendationItem[] | 分区内条目集合 |
 | RecommendationItem | id | number | 主键 |
 |  | section | RecommendationSection | 所属分区 (ManyToOne) |
-|  | book | Book | 关联图书 |
+|  | list | BookList | 关联书单 |
 |  | position | number | 分区内排序序号（升序） |
 |  | note | string? | 推荐备注（原因/标签） |
 
@@ -55,7 +55,7 @@
 | POST | /recommendations/sections | 创建分区 | { key,title,description?,sort_order?,active? } | Section |
 | PATCH | /recommendations/sections/:id | 更新分区 | 任意可更新字段或批量重排指令 | Section |
 | DELETE | /recommendations/sections/:id | 删除分区 | - | { ok:true } |
-| POST | /recommendations/sections/:id/items | 添加条目 | { bookId, position?, note? } | Item |
+| POST | /recommendations/sections/:id/items | 添加条目 | { bookListId, position?, note? } | Item |
 | DELETE | /recommendations/sections/:sectionId/items/:itemId | 删除条目 | - | { ok:true } |
 | PATCH | /recommendations/sections/:id/items/reorder | 重排条目 | { itemIds:[number] } | { ok:true } |
 
@@ -80,11 +80,11 @@ POST /recommendations/sections/1/items
 Authorization: Bearer <jwt>
 Content-Type: application/json
 
-{ "bookId": 42, "position": 0, "note": "编辑推荐" }
+{ "bookListId": 42, "position": 0, "note": "编辑推荐" }
 ```
 响应：
 ```json
-{ "id":10,"section":{"id":1},"book":{"id":42},"position":0,"note":"编辑推荐" }
+{ "id":10,"section":{"id":1},"list":{"id":42},"position":0,"note":"编辑推荐" }
 ```
 
 ### 公开聚合
@@ -100,7 +100,7 @@ GET /recommendations/public
     "title":"今日最热",
     "active":true,
     "sort_order":0,
-    "items":[{"id":10,"book":{"id":42},"position":0,"note":"编辑推荐"}]
+  "items":[{"id":10,"list":{"id":42},"position":0,"note":"编辑推荐"}]
   }
 ]
 ```

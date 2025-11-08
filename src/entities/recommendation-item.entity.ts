@@ -11,10 +11,10 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { RecommendationSection } from './recommendation-section.entity';
-import { Book } from './book.entity';
+import { FavoriteList } from './favorite-list.entity';
 
 @Entity('recommendation_items')
-@Unique('uk_section_book', ['section', 'book'])
+@Unique('uk_section_list', ['section', 'list'])
 @Index(['section', 'position'])
 export class RecommendationItem {
   @ApiProperty({ description: 'Item ID' })
@@ -46,7 +46,7 @@ export class RecommendationItem {
   @JoinColumn({ name: 'section_id' })
   section: RecommendationSection;
 
-  @ManyToOne(() => Book, { eager: true, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'book_id' })
-  book: Book;
+  @ManyToOne(() => FavoriteList, { eager: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'list_id' })
+  list: FavoriteList;
 }

@@ -2,9 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString } from 'class-validator';
 
 export class AddItemDto {
-  @ApiProperty({ description: 'Book ID to add' })
+  @ApiProperty({
+    description: 'BookList (FavoriteList) ID to add',
+    example: 42,
+  })
   @IsInt()
-  bookId: number;
+  bookListId: number;
 
   @ApiProperty({
     description: 'Desired position (if omitted append to end)',
@@ -15,7 +18,7 @@ export class AddItemDto {
   position?: number;
 
   @ApiProperty({
-    description: 'Optional note shown with the book',
+    description: 'Optional note shown with the recommended list',
     required: false,
   })
   @IsOptional()

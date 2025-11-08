@@ -6,7 +6,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../../app/app.module';
 import { User } from '../../../entities/user.entity';
-import { Book } from '../../../entities/book.entity';
+import { FavoriteList } from '../../../entities/favorite-list.entity';
 import { RecommendationSection } from '../../../entities/recommendation-section.entity';
 import { RecommendationItem } from '../../../entities/recommendation-item.entity';
 import { grantPermissions } from '../../permissions/test/permissions.seed';
@@ -31,7 +31,7 @@ function isAuthRegister(val: unknown): val is {
 
 interface RecommendationItemLite {
   id?: number;
-  book?: { id?: number };
+  list?: { id?: number };
 }
 interface RecommendationSectionLite {
   id?: number;
@@ -45,11 +45,11 @@ function isRecommendationItemLite(o: unknown): o is RecommendationItemLite {
   if (!isRecord(o)) return false;
   const id = o.id;
   if (id !== undefined && typeof id !== 'number') return false;
-  const book = o.book;
-  if (book !== undefined) {
-    if (!isRecord(book)) return false;
-    const bid = book.id;
-    if (bid !== undefined && typeof bid !== 'number') return false;
+  const list = (o as { list?: unknown }).list;
+  if (list !== undefined) {
+    if (!isRecord(list)) return false;
+    const lid = (list as { id?: unknown }).id;
+    if (lid !== undefined && typeof lid !== 'number') return false;
   }
   return true;
 }
@@ -75,7 +75,7 @@ describe('Recommendations (e2e)', () => {
   let app: INestApplication;
   let httpServer: Server;
   let userRepo: Repository<User>;
-  let bookRepo: Repository<Book>;
+  let listRepo: Repository<FavoriteList>;
   let sectionRepo: Repository<RecommendationSection>;
   let itemRepo: Repository<RecommendationItem>;
   let adminToken: string;
@@ -94,7 +94,7 @@ describe('Recommendations (e2e)', () => {
     httpServer = app.getHttpServer() as unknown as Server;
 
     userRepo = moduleFixture.get(getRepositoryToken(User));
-    bookRepo = moduleFixture.get(getRepositoryToken(Book));
+    listRepo = moduleFixture.get(getRepositoryToken(FavoriteList));
     sectionRepo = moduleFixture.get(getRepositoryToken(RecommendationSection));
     itemRepo = moduleFixture.get(getRepositoryToken(RecommendationItem));
   });
@@ -103,7 +103,8 @@ describe('Recommendations (e2e)', () => {
     try {
       await itemRepo.query('DELETE FROM recommendation_items');
       await sectionRepo.query('DELETE FROM recommendation_sections');
-      await bookRepo.query('DELETE FROM book');
+      await listRepo.query('DELETE FROM favorite_list_item');
+      await listRepo.query('DELETE FROM favorite_list');
       await userRepo.query('DELETE FROM "user"');
     } catch {
       // ignore cleanup errors
@@ -130,8 +131,14 @@ describe('Recommendations (e2e)', () => {
     } catch {
       // ignore
     }
+    // 清理书单
     try {
-      await ds.query('DELETE FROM book');
+      await ds.query('DELETE FROM favorite_list_item');
+    } catch {
+      // ignore
+    }
+    try {
+      await ds.query('DELETE FROM favorite_list');
     } catch {
       // ignore
     }
@@ -163,23 +170,21 @@ describe('Recommendations (e2e)', () => {
     });
     userToken = parseBody(userRes.body, isAuthRegister).access_token;
 
-    // 授予 admin 推荐与书籍相关权限
+    // 授予 admin 推荐管理权限（书单接口仅需登录）
     await grantPermissions(ds, adminId, {
       RECOMMENDATION_MANAGE: 1,
-      BOOK_CREATE: 1,
     });
-
-    // 创建两本书
-    const b1 = await request(httpServer)
-      .post('/books')
+    // 创建两份书单
+    const l1 = await request(httpServer)
+      .post('/book-lists')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ hash: 'hash1', title: 'Book1' });
-    expect(b1.status).toBe(201);
-    const b2 = await request(httpServer)
-      .post('/books')
+      .send({ name: 'List1', description: 'd1', is_public: true });
+    expect([200, 201]).toContain(l1.status);
+    const l2 = await request(httpServer)
+      .post('/book-lists')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ hash: 'hash2', title: 'Book2' });
-    expect(b2.status).toBe(201);
+      .send({ name: 'List2', description: 'd2', is_public: true });
+    expect([200, 201]).toContain(l2.status);
   });
 
   it('admin can create section & add item & list public', async () => {
@@ -193,13 +198,13 @@ describe('Recommendations (e2e)', () => {
       isRecommendationSectionLite,
     ).id!;
 
-    // 使用创建书籍返回的真实 ID
-    const books = await bookRepo.find();
-    const firstBookId = books[0].id;
+    // 使用创建书单返回的真实 ID
+    const lists = await listRepo.find();
+    const firstListId = lists[0].id;
     const addItem = await request(httpServer)
       .post(`/recommendations/sections/${sectionId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ bookId: firstBookId });
+      .send({ bookListId: firstListId });
     expect(addItem.status).toBe(201);
 
     const pub = await request(httpServer).get('/recommendations/public');
@@ -221,7 +226,7 @@ describe('Recommendations (e2e)', () => {
 
   // 旧的 seedPermissions 函数已被统一的 grantPermissions helper 取代
 
-  it('cannot add duplicate book in section', async () => {
+  it('cannot add duplicate booklist in section', async () => {
     const createSec = await request(httpServer)
       .post('/recommendations/sections')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -230,18 +235,18 @@ describe('Recommendations (e2e)', () => {
       createSec.body,
       isRecommendationSectionLite,
     ).id!;
-    const books = await bookRepo.find();
-    const firstBookId = books[0].id;
+    const lists = await listRepo.find();
+    const firstListId = lists[0].id;
     await request(httpServer)
       .post(`/recommendations/sections/${sectionId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ bookId: firstBookId })
+      .send({ bookListId: firstListId })
       .expect(201);
 
     await request(httpServer)
       .post(`/recommendations/sections/${sectionId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ bookId: firstBookId })
+      .send({ bookListId: firstListId })
       .expect(409);
   });
 
@@ -252,16 +257,16 @@ describe('Recommendations (e2e)', () => {
       .send({ key: 'sec1', title: 'Sec1' });
     const secId = parseBody(sec.body, isRecommendationSectionLite).id!;
 
-    const books = await bookRepo.find({ order: { id: 'ASC' } });
+    const lists = await listRepo.find({ order: { id: 'ASC' } });
     await request(httpServer)
       .post(`/recommendations/sections/${secId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ bookId: books[0].id });
+      .send({ bookListId: lists[0].id });
 
     await request(httpServer)
       .post(`/recommendations/sections/${secId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ bookId: books[1].id });
+      .send({ bookListId: lists[1].id });
 
     // 拉取 section 详情获取真实 item id 顺序
     const detail = await request(httpServer)
@@ -304,11 +309,11 @@ describe('Recommendations (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ key: 'del_sec', title: 'DelSec' });
     const secId = parseBody(createSec.body, isRecommendationSectionLite).id!;
-    const books = await bookRepo.find({ order: { id: 'ASC' } });
+    const lists = await listRepo.find({ order: { id: 'ASC' } });
     await request(httpServer)
       .post(`/recommendations/sections/${secId}/items`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ bookId: books[0].id });
+      .send({ bookListId: lists[0].id });
     const detail = await request(httpServer)
       .get(`/recommendations/sections/${secId}`)
       .set('Authorization', `Bearer ${adminToken}`);
