@@ -44,7 +44,7 @@
 |------|------|------|----------|
 | 用户管理 | 用户基础资料与配置（含 user_config） | (集成在模块文档中) | User, UserConfig |
 | 权限授予/撤销 | 等级化权限 (0/1/2/3) 精细控制访问与授权能力 | `PERMISSIONS_GUIDE.md` | Permission, UserPermission |
-| 认证 | JWT 登录与请求上下文 `JwtRequestWithUser` | 代码内 `request.interface.ts` | - |
+| Auth | 注册 / 登录 / Profile / 受保护示例 | `AUTH_README.md` | LoginResponseDto |
 
 ### 2.1 权限等级摘要
 Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完全管理 (授予与升级至 3)。
@@ -105,6 +105,10 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 阅读记录 | 汇总统计 | /reading-records/stats/summary | GET | 登录 | 完成率计算 |
 | 推荐 | 分区管理 | /recommendations/sections | POST/PATCH/DELETE | RECOMMENDATION_MANAGE(1) | - |
 | 推荐 | 公共推荐 | /recommendations/public | GET | 开放 | 聚合显示（条目含 list） |
+| 认证 | 注册 | /auth/register | POST | 开放 | 返回登录态 |
+| 认证 | 登录 | /auth/login | POST | 开放 | 返回登录态 |
+| 认证 | Profile | /auth/profile | GET | 登录 | 基本资料 |
+| 认证 | Protected 示例 | /auth/protected | GET | 登录 | 演示 JWT 注入 |
 | 书单 | CRUD | /book-lists* | 多种 | (视实现) | 排序与关联 |
 | 权限 | 授予 | /permissions/grant | POST | USER_UPDATE(2) | level2 仅授予 level1 |
 | 权限 | 撤销 | /permissions/revoke | POST | USER_UPDATE(2) | level2 仅撤销自己授予 |
@@ -162,6 +166,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | `BOOKS_TAG_SEARCH.md` | 六种标签搜索模式与推荐细节 |
 | `PERMISSIONS_GUIDE.md` | 等级化权限与授权流程 |
 | `RECOMMENDATIONS_GUIDE.md` | 推荐分区/条目管理与公开接口 |
+| `AUTH_README.md` | 用户注册、登录与 JWT 保护端点 |
 | `READING_RECORDS_README.md` | 阅读记录 Upsert + 汇总统计 |
 | `BOOK_LISTS_README.md` | 书单 CRUD 与条目管理 |
 | `FILES_GUIDE.md` | 文件策略、上传与删除权限判定 |
