@@ -19,7 +19,7 @@
 | 模块 | 职责概述 | 关键能力 | 文档 | 主要实体 |
 |------|----------|----------|------|----------|
 | Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
-| Book-Lists | 用户自定义/系统维护的书单集合 | 书单 CRUD、书籍关联、排序 | `BOOK_LISTS_README.md` | BookList |
+| Book-Lists | 用户自定义/系统维护的书单集合（带标签和嵌套支持） | 书单 CRUD、书籍关联、标签管理、书单嵌套、排序复制 | `BOOK_LISTS_README.md` | BookList, BookListItem, Tag |
 | Recommendations | 首页/公共推荐分区与书单条目 | 推荐分区与条目 CRUD、公开聚合（推荐目标为 BookList） | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection, RecommendationItem |
 | Reading Records | 用户阅读进度与统计 | Upsert 进度、状态流转、分钟统计、汇总 | `READING_RECORDS_README.md` | ReadingRecord |
 
@@ -109,7 +109,15 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 认证 | 登录 | /auth/login | POST | 开放 | 返回登录态 |
 | 认证 | Profile | /auth/profile | GET | 登录 | 基本资料 |
 | 认证 | Protected 示例 | /auth/protected | GET | 登录 | 演示 JWT 注入 |
-| 书单 | CRUD | /book-lists* | 多种 | (视实现) | 排序与关联 |
+| 书单 | CRUD | /book-lists* | 多种 | (视实现) | 排序与关联、标签支持、嵌套结构 |
+| 书单 | 创建书单（带标签） | /book-lists | POST | 登录 | 支持 tags 数组，自动去重 |
+| 书单 | 列表书单 | /book-lists/my | GET | 登录 | 返回含 items_count 和 tags |
+| 书单 | 获取详情 | /book-lists/:id | GET | 登录/公开 | 包含书单的所有标签 |
+| 书单 | 更新书单 | /book-lists/:id | PATCH | 登录(owner) | 支持更新 tags |
+| 书单 | 删除书单 | /book-lists/:id | DELETE | 登录(owner) | - |
+| 书单 | 添加书籍 | /book-lists/:id/books | POST | 登录(owner) | - |
+| 书单 | 移除书籍 | /book-lists/:id/books/:bookId | DELETE | 登录(owner) | - |
+| 书单 | 复制书单 | /book-lists/:id/copy | POST | 登录 | 继承源书单的标签 |
 | 权限 | 授予 | /permissions/grant | POST | USER_UPDATE(2) | level2 仅授予 level1 |
 | 权限 | 撤销 | /permissions/revoke | POST | USER_UPDATE(2) | level2 仅撤销自己授予 |
 | 权限 | 用户权限查看 | /permissions/user/:id | GET | USER_READ(1) | 列表 |

@@ -2,6 +2,26 @@
 
 全部显著变更会记录在此文件中。格式参考 Conventional Commits。
 
+## [unreleased]
+### ✨ Feat
+- feat(book-lists): 为 FavoriteList 添加标签支持 (ManyToMany with Tag) 与嵌套结构 (FavoriteListItem.parent_list)
+- feat(book-lists): 标签去重与自动创建逻辑，复制书单时继承标签
+- feat(book-lists): 增强 Swagger 文档示例，明确标签与嵌套支持
+
+### 🧪 Test
+- test(book-lists): 添加标签管理单元测试 (create/update/copy with tags)
+- test(book-lists): 增加 E2E 场景测试标签持久化、更新、复制继承
+
+### 📄 Docs
+- docs(book-lists): 详细说明标签数据结构、去重策略、生命周期
+- docs(book-lists): 新增"书单嵌套"章节说明层级结构用法
+- docs: 全局 README 更新功能矩阵，细化书单相关端点描述
+
+### 🧹 Chore
+- chore: 同步 Controller Swagger 示例包含 tags 字段
+
+---
+
 ## [released]
 ### 💥 Breaking
 - remove(auth): 移除未使用的基于 role 的授权体系 (User.role 字段 / JWT role 声明 / RolesGuard / @Roles 装饰器) 统一仅保留细粒度 permissions；需要前端不再依赖 token 中的 role。

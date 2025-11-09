@@ -33,7 +33,7 @@ export class BookListsController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a new book list' })
+  @ApiOperation({ summary: 'Create a new book list with optional tags' })
   @ApiResponse({
     status: 201,
     description: 'Created',
@@ -41,12 +41,18 @@ export class BookListsController {
       example: {
         id: 1,
         name: 'Favorites',
+        description: 'My favorite books',
         is_public: false,
+        tags: [
+          { key: 'genre', value: 'science_fiction' },
+          { key: 'mood', value: 'philosophical' },
+        ],
         created_at: '2025-01-01T00:00:00.000Z',
       },
     },
   })
   @ApiResponse({ status: 409, description: 'List name already exists' })
+  @ApiResponse({ status: 400, description: 'Invalid tag format' })
   create(@Body() dto: CreateListDto, @Req() req: JwtRequestWithUser) {
     return this.service.create(req.user.userId, dto);
   }
@@ -54,7 +60,9 @@ export class BookListsController {
   @Get('my')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'List my book lists' })
+  @ApiOperation({
+    summary: 'List my book lists (includes tags and item count)',
+  })
   @ApiResponse({
     status: 200,
     description: 'OK',
@@ -63,9 +71,15 @@ export class BookListsController {
         {
           id: 1,
           name: 'Favorites',
+          description: 'My favorite books',
           items_count: 3,
           is_public: false,
+          tags: [
+            { key: 'genre', value: 'science_fiction' },
+            { key: 'status', value: 'reading' },
+          ],
           created_at: '2025-01-01T00:00:00.000Z',
+          updated_at: '2025-01-02T00:00:00.000Z',
         },
       ],
     },
@@ -75,7 +89,9 @@ export class BookListsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a book list by ID (owner or public)' })
+  @ApiOperation({
+    summary: 'Get a book list by ID (owner or public, includes tags)',
+  })
   @ApiQuery({
     name: 'limit',
     required: false,
@@ -90,9 +106,14 @@ export class BookListsController {
       example: {
         id: 1,
         name: 'Favorites',
+        description: 'My favorite books',
         is_public: true,
+        owner_id: 5,
         items_count: 2,
-        items: [{ id: 10, book: { id: 1, title: 'Three-Body', hash: '...' } }],
+        tags: [{ key: 'genre', value: 'science_fiction' }],
+        items: [{ id: 10, book: { id: 1 } }],
+        created_at: '2025-01-01T00:00:00.000Z',
+        updated_at: '2025-01-02T00:00:00.000Z',
       },
     },
   })
@@ -109,7 +130,9 @@ export class BookListsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Update a book list' })
+  @ApiOperation({
+    summary: 'Update a book list (name, description, is_public, tags)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Updated',
@@ -117,7 +140,12 @@ export class BookListsController {
       example: {
         id: 1,
         name: 'New Name',
+        description: 'Updated description',
         is_public: true,
+        tags: [
+          { key: 'genre', value: 'fantasy' },
+          { key: 'status', value: 'reading' },
+        ],
         updated_at: '2025-01-02T00:00:00.000Z',
       },
     },
@@ -125,6 +153,7 @@ export class BookListsController {
   @ApiResponse({ status: 403, description: 'Not owner' })
   @ApiResponse({ status: 404, description: 'List not found' })
   @ApiResponse({ status: 409, description: 'List name already exists' })
+  @ApiResponse({ status: 400, description: 'Invalid tag format' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateListDto,
@@ -200,7 +229,7 @@ export class BookListsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary:
-      'Copy a public list (or own private) into my lists (new list becomes private)',
+      'Copy a public list (or own private) into my lists (inherits tags, becomes private)',
   })
   @ApiResponse({
     status: 201,
@@ -209,6 +238,7 @@ export class BookListsController {
       example: {
         id: 99,
         name: 'Favorites (copy)',
+        tags: [{ key: 'genre', value: 'science_fiction' }],
         items_count: 5,
         is_public: false,
         copied_from: 12,

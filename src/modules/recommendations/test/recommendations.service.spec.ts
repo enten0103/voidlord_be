@@ -35,6 +35,7 @@ describe('RecommendationsService', () => {
     created_at: new Date(),
     updated_at: new Date(),
     items: [],
+    tags: [],
   };
 
   const mockSectionRepo: Partial<

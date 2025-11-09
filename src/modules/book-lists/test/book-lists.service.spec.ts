@@ -5,6 +5,7 @@ import { BookListsService } from '../book-lists.service';
 import { FavoriteList } from '../../../entities/favorite-list.entity';
 import { FavoriteListItem } from '../../../entities/favorite-list-item.entity';
 import { Book } from '../../../entities/book.entity';
+import { Tag } from '../../../entities/tag.entity';
 import {
   ConflictException,
   ForbiddenException,
@@ -20,6 +21,7 @@ describe('BookListsService', () => {
   const mockListRepo = createRepoMock<FavoriteList>();
   const mockItemRepo = createRepoMock<FavoriteListItem>();
   const mockBookRepo = createRepoMock<Book>();
+  const mockTagRepo = createRepoMock<Tag>();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -31,6 +33,7 @@ describe('BookListsService', () => {
           useValue: mockItemRepo,
         },
         { provide: getRepositoryToken(Book), useValue: mockBookRepo },
+        { provide: getRepositoryToken(Tag), useValue: mockTagRepo },
       ],
     }).compile();
 
@@ -80,6 +83,7 @@ describe('BookListsService', () => {
           id: 1,
           name: 'A',
           is_public: false,
+          tags: [],
           created_at: new Date(),
           updated_at: new Date(),
           owner: {
@@ -99,6 +103,7 @@ describe('BookListsService', () => {
         id: 1,
         name: 'A',
         is_public: false,
+        tags: [],
         owner: { id: 5 },
         created_at: new Date(),
         updated_at: new Date(),
@@ -119,6 +124,7 @@ describe('BookListsService', () => {
       listRepo.findOne.mockResolvedValueOnce({
         id: 1,
         is_public: true,
+        tags: [],
         owner: { id: 5 },
         created_at: new Date(),
         updated_at: new Date(),
@@ -223,6 +229,7 @@ describe('BookListsService', () => {
           name: 'A',
           description: 'd',
           is_public: true,
+          tags: [],
           owner: { id: 2 },
         } as unknown as FavoriteList);
         listRepo.findOne.mockResolvedValueOnce(null); // name not exists
@@ -265,6 +272,7 @@ describe('BookListsService', () => {
           id: 1,
           name: 'A',
           is_public: true,
+          tags: [],
           owner: { id: 2 },
         } as unknown as FavoriteList);
         // first check returns exists, second returns exists, third returns null

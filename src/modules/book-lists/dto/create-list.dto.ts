@@ -5,7 +5,20 @@ import {
   IsString,
   MaxLength,
   MinLength,
+  IsArray,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class TagDto {
+  @ApiProperty({ description: 'Tag key', example: 'genre' })
+  @IsString()
+  key: string;
+
+  @ApiProperty({ description: 'Tag value', example: 'Fiction' })
+  @IsString()
+  value: string;
+}
 
 export class CreateListDto {
   @ApiProperty({ description: 'List name', minLength: 1, maxLength: 200 })
@@ -32,4 +45,16 @@ export class CreateListDto {
   @IsOptional()
   @IsBoolean()
   is_public?: boolean;
+
+  @ApiProperty({
+    description: 'Tags for the list (key-value pairs)',
+    required: false,
+    type: () => [TagDto],
+    example: [{ key: 'genre', value: 'Fiction' }],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TagDto)
+  tags?: TagDto[];
 }

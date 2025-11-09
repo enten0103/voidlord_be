@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { FavoriteList } from '../../entities/favorite-list.entity';
 import { FavoriteListItem } from '../../entities/favorite-list-item.entity';
 import { Book } from '../../entities/book.entity';
+import { Tag } from '../../entities/tag.entity';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
 
@@ -19,6 +20,7 @@ export class BookListsService {
     @InjectRepository(FavoriteListItem)
     private itemRepo: Repository<FavoriteListItem>,
     @InjectRepository(Book) private bookRepo: Repository<Book>,
+    @InjectRepository(Tag) private tagRepository: Repository<Tag>,
   ) {}
 
   async create(userId: number, dto: CreateListDto) {
@@ -26,10 +28,17 @@ export class BookListsService {
       where: { owner: { id: userId }, name: dto.name },
     });
     if (exists) throw new ConflictException('List name already exists');
+
+    let tags: Tag[] = [];
+    if (dto.tags && dto.tags.length > 0) {
+      tags = await this.processTags(dto.tags);
+    }
+
     const entity = this.listRepo.create({
       name: dto.name.trim(),
       description: dto.description?.trim(),
       is_public: dto.is_public ?? false,
+      tags,
       owner: {
         id: userId,
       } as unknown as import('../../entities/user.entity').User,
@@ -40,6 +49,7 @@ export class BookListsService {
       name: saved.name,
       description: saved.description,
       is_public: saved.is_public,
+      tags: tags.map((t) => ({ key: t.key, value: t.value })),
       created_at: saved.created_at,
     };
   }
@@ -47,6 +57,7 @@ export class BookListsService {
   async listMine(userId: number) {
     const lists = await this.listRepo.find({
       where: { owner: { id: userId } },
+      relations: ['tags'],
       order: { created_at: 'DESC' },
     });
     // count items for each list
@@ -58,6 +69,7 @@ export class BookListsService {
       name: l.name,
       description: l.description,
       is_public: l.is_public,
+      tags: (l.tags || []).map((t) => ({ key: t.key, value: t.value })),
       created_at: l.created_at,
       updated_at: l.updated_at,
       items_count: counts[idx] ?? 0,
@@ -67,7 +79,7 @@ export class BookListsService {
   async getOne(listId: number, userId?: number) {
     const list = await this.listRepo.findOne({
       where: { id: listId },
-      relations: ['owner'],
+      relations: ['owner', 'tags'],
     });
     if (!list) throw new NotFoundException('List not found');
     const isOwner = userId && list.owner?.id === userId;
@@ -82,6 +94,7 @@ export class BookListsService {
       name: list.name,
       description: list.description,
       is_public: list.is_public,
+      tags: (list.tags || []).map((t) => ({ key: t.key, value: t.value })),
       owner_id: list.owner?.id ?? null,
       created_at: list.created_at,
       updated_at: list.updated_at,
@@ -110,12 +123,18 @@ export class BookListsService {
     if (dto.description !== undefined)
       list.description = dto.description?.trim() || null;
     if (dto.is_public !== undefined) list.is_public = dto.is_public;
+    if (dto.tags) {
+      list.tags = await this.processTags(dto.tags);
+    }
     const saved = await this.listRepo.save(list);
     return {
       id: saved.id,
       name: saved.name,
       description: saved.description,
       is_public: saved.is_public,
+      tags: saved.tags
+        ? saved.tags.map((t) => ({ key: t.key, value: t.value }))
+        : undefined,
       updated_at: saved.updated_at,
     };
   }
@@ -170,7 +189,7 @@ export class BookListsService {
   async copy(listId: number, userId: number) {
     const src = await this.listRepo.findOne({
       where: { id: listId },
-      relations: ['owner'],
+      relations: ['owner', 'tags'],
     });
     if (!src) throw new NotFoundException('List not found');
     if (!src.is_public && src.owner?.id !== userId)
@@ -193,6 +212,7 @@ export class BookListsService {
       name: newName,
       description: src.description,
       is_public: false, // copies default to private
+      tags: src.tags, // copy tags from source
       owner: {
         id: userId,
       } as unknown as import('../../entities/user.entity').User,
@@ -220,9 +240,38 @@ export class BookListsService {
     return {
       id: saved.id,
       name: saved.name,
+      tags: (src.tags || []).map((t) => ({ key: t.key, value: t.value })),
       items_count: count,
       is_public: saved.is_public,
       copied_from: listId,
     };
+  }
+
+  private async processTags(
+    tagDtos: { key: string; value: string; shown?: boolean }[],
+  ): Promise<Tag[]> {
+    const tags: Tag[] = [];
+
+    for (const tagDto of tagDtos) {
+      let tag = await this.tagRepository.findOne({
+        where: {
+          key: tagDto.key,
+          value: tagDto.value,
+        },
+      });
+
+      if (!tag) {
+        tag = this.tagRepository.create({
+          key: tagDto.key,
+          value: tagDto.value,
+          shown: tagDto.shown !== undefined ? tagDto.shown : true,
+        });
+        tag = await this.tagRepository.save(tag);
+      }
+
+      tags.push(tag);
+    }
+
+    return tags;
   }
 }

@@ -4,6 +4,8 @@ import {
   Column,
   ManyToOne,
   OneToMany,
+  ManyToMany,
+  JoinTable,
   CreateDateColumn,
   UpdateDateColumn,
   Unique,
@@ -11,6 +13,7 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { FavoriteListItem } from './favorite-list-item.entity';
+import { Tag } from './tag.entity';
 
 @Entity()
 @Unique(['owner', 'name'])
@@ -41,6 +44,15 @@ export class FavoriteList {
 
   @OneToMany(() => FavoriteListItem, (i) => i.list)
   items?: FavoriteListItem[];
+
+  @ApiProperty({ description: 'Associated tags', type: () => [Tag] })
+  @ManyToMany(() => Tag, { cascade: true })
+  @JoinTable({
+    name: 'favorite_list_tags',
+    joinColumn: { name: 'list_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
+  })
+  tags: Tag[];
 
   @ApiProperty({ description: 'Creation timestamp' })
   @CreateDateColumn()

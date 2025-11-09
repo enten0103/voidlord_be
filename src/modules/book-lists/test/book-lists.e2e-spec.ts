@@ -238,4 +238,148 @@ describe('Book Lists (e2e)', () => {
     expect(cpBody.name).toMatch(/Collision \(copy( \d+)?\)$/);
     expect(cpBody.items_count).toBe(1);
   });
+
+  it('create list with tags and verify tags persisted', async () => {
+    const cl = await request(httpServer)
+      .post('/book-lists')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        name: 'TaggedList',
+        is_public: true,
+        tags: [
+          { key: 'genre', value: 'fiction' },
+          { key: 'mood', value: 'relaxing' },
+        ],
+      })
+      .expect(201);
+    const listId: number = (cl.body as { id: number }).id;
+    const createBody = cl.body as {
+      tags?: Array<{ key: string; value: string }>;
+    };
+    expect(Array.isArray(createBody.tags)).toBe(true);
+    expect(createBody.tags).toHaveLength(2);
+    expect(createBody.tags).toContainEqual({
+      key: 'genre',
+      value: 'fiction',
+    });
+
+    // verify tags in GET detail
+    const detail = await request(httpServer)
+      .get(`/book-lists/${listId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    const detailBody = detail.body as {
+      tags?: Array<{ key: string; value: string }>;
+    };
+    expect(Array.isArray(detailBody.tags)).toBe(true);
+    expect(detailBody.tags).toHaveLength(2);
+    expect(detailBody.tags).toContainEqual({
+      key: 'genre',
+      value: 'fiction',
+    });
+  });
+
+  it('update list tags', async () => {
+    // create list with initial tags
+    const cl = await request(httpServer)
+      .post('/book-lists')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        name: 'UpdateTagsTest',
+        is_public: true,
+        tags: [{ key: 'old', value: 'tag' }],
+      })
+      .expect(201);
+    const listId: number = (cl.body as { id: number }).id;
+
+    // update tags
+    const upd = await request(httpServer)
+      .patch(`/book-lists/${listId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        tags: [
+          { key: 'new', value: 'tag1' },
+          { key: 'new', value: 'tag2' },
+        ],
+      })
+      .expect(200);
+    const updBody = upd.body as {
+      tags?: Array<{ key: string; value: string }>;
+    };
+    expect(Array.isArray(updBody.tags)).toBe(true);
+    expect(updBody.tags).toHaveLength(2);
+    expect(updBody.tags).toContainEqual({ key: 'new', value: 'tag1' });
+
+    // verify in GET
+    const detail = await request(httpServer)
+      .get(`/book-lists/${listId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    const detailBody = detail.body as {
+      tags?: Array<{ key: string; value: string }>;
+    };
+    expect(detailBody.tags).toHaveLength(2);
+    expect(detailBody.tags).toContainEqual({ key: 'new', value: 'tag2' });
+  });
+
+  it('copy list copies tags', async () => {
+    // owner creates a public list with tags
+    const cl = await request(httpServer)
+      .post('/book-lists')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        name: 'TagsCopySource',
+        is_public: true,
+        tags: [
+          { key: 'genre', value: 'drama' },
+          { key: 'region', value: 'europe' },
+        ],
+      })
+      .expect(201);
+    const srcId: number = (cl.body as { id: number }).id;
+
+    // other user copies it
+    const cp = await request(httpServer)
+      .post(`/book-lists/${srcId}/copy`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(201);
+    const cpBody = cp.body as {
+      tags?: Array<{ key: string; value: string }>;
+    };
+    expect(Array.isArray(cpBody.tags)).toBe(true);
+    expect(cpBody.tags).toHaveLength(2);
+    expect(cpBody.tags).toContainEqual({ key: 'genre', value: 'drama' });
+  });
+
+  it('listMine returns lists with tags', async () => {
+    // create a list with tags using unique name
+    const name = `ListMineTagsTest-${Date.now()}-${Math.random()}`;
+    const cl = await request(httpServer)
+      .post('/book-lists')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        name,
+        is_public: false,
+        tags: [{ key: 'priority', value: 'high' }],
+      })
+      .expect(201);
+    expect((cl.body as { id?: number }).id).toBeGreaterThan(0);
+
+    // list my lists
+    const mine = await request(httpServer)
+      .get('/book-lists/my')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    const mineBody = mine.body as Array<{
+      name: string;
+      tags?: Array<{ key: string; value: string }>;
+    }>;
+    expect(Array.isArray(mineBody)).toBe(true);
+    const tagged = mineBody.find((l) => l.name === name);
+    expect(tagged).toBeDefined();
+    if (tagged) {
+      expect(Array.isArray(tagged.tags)).toBe(true);
+      expect(tagged.tags).toContainEqual({ key: 'priority', value: 'high' });
+    }
+  });
 });

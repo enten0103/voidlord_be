@@ -24,6 +24,13 @@ export class FavoriteListItem {
   @ManyToOne(() => Book, { onDelete: 'CASCADE' })
   book: Book;
 
+  @ApiProperty({
+    description: 'Parent list for nesting (optional)',
+    required: false,
+  })
+  @ManyToOne(() => FavoriteList, { onDelete: 'CASCADE', nullable: true })
+  parent_list?: FavoriteList | null;
+
   @ApiProperty({ description: 'Added timestamp' })
   @CreateDateColumn()
   added_at: Date;
