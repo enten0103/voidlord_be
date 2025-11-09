@@ -55,10 +55,6 @@ export class BooksController {
     type: BookResponseDto,
   })
   @ApiResponse({
-    status: 409,
-    description: 'Book with this hash already exists',
-  })
-  @ApiResponse({
     status: 401,
     description: 'Unauthorized',
     schema: {
@@ -141,17 +137,7 @@ export class BooksController {
     return this.booksService.findOne(+id);
   }
 
-  @Get('hash/:hash')
-  @ApiOperation({ summary: 'Get book by hash' })
-  @ApiResponse({
-    status: 200,
-    description: 'Book retrieved successfully',
-    type: BookResponseDto,
-  })
-  @ApiResponse({ status: 404, description: 'Book not found' })
-  findByHash(@Param('hash') hash: string) {
-    return this.booksService.findByHash(hash);
-  }
+  // findByHash removed (no hash field)
 
   @Post('search')
   @ApiOperation({ summary: 'Search books by tags' })
@@ -345,9 +331,6 @@ export class BooksController {
       example: [
         {
           id: 101,
-          hash: 'rec-b3',
-          title: 'Deep AI Systems',
-          description: 'Advanced concepts',
           tags: [
             { id: 5, key: 'topic', value: 'AI', shown: true },
             { id: 7, key: 'lang', value: 'TS', shown: true },
@@ -358,9 +341,6 @@ export class BooksController {
         },
         {
           id: 99,
-          hash: 'rec-b1',
-          title: 'AI Patterns',
-          description: 'Overlap 2 tags',
           tags: [
             { id: 5, key: 'topic', value: 'AI', shown: true },
             { id: 7, key: 'lang', value: 'TS', shown: true },
@@ -393,10 +373,6 @@ export class BooksController {
     type: BookResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Book not found' })
-  @ApiResponse({
-    status: 409,
-    description: 'Book with this hash already exists',
-  })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized',

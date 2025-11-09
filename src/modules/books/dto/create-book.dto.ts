@@ -29,25 +29,6 @@ export class CreateTagDto {
 }
 
 export class CreateBookDto {
-  @ApiProperty({ description: 'Book hash', example: 'abc123def456' })
-  @IsNotEmpty()
-  @IsString()
-  hash: string;
-
-  @ApiProperty({ description: 'Book title', example: 'The Great Gatsby' })
-  @IsNotEmpty()
-  @IsString()
-  title: string;
-
-  @ApiProperty({
-    description: 'Book description',
-    required: false,
-    example: 'A classic novel',
-  })
-  @IsOptional()
-  @IsString()
-  description?: string;
-
   @ApiProperty({
     description: 'Tags associated with the book',
     type: [CreateTagDto],

@@ -18,13 +18,13 @@
 
 | 模块 | 职责概述 | 关键能力 | 文档 | 主要实体 |
 |------|----------|----------|------|----------|
-| Books | 图书基本信息与标签管理 | CRUD、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
+| Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
 | Book-Lists | 用户自定义/系统维护的书单集合 | 书单 CRUD、书籍关联、排序 | `BOOK_LISTS_README.md` | BookList |
 | Recommendations | 首页/公共推荐分区与书单条目 | 推荐分区与条目 CRUD、公开聚合（推荐目标为 BookList） | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection, RecommendationItem |
 | Reading Records | 用户阅读进度与统计 | Upsert 进度、状态流转、分钟统计、汇总 | `READING_RECORDS_README.md` | ReadingRecord |
 
 ### 1.1 Books 模块功能切片
-- 创建 / 更新 / 删除 图书
+- 创建 / 更新 / 删除 图书（模型仅含 id / create_by / timestamps / tags）
 - 标签去重与级联创建
 - 多模式标签搜索（6 种优先级匹配）
 - 推荐（共享标签数 + 创建时间降序）
@@ -91,14 +91,14 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 
 | 分类 | 功能点 | 端点 (示例) | 方法 | 权限要求 | 备注 |
 |------|--------|-------------|------|----------|------|
-| 图书 | 创建图书 | /books | POST | BOOK_CREATE(1) | 自动写 create_by |
+| 图书 | 创建图书 | /books | POST | BOOK_CREATE(1) | 自动写 create_by；无标题/描述字段 |
 | 图书 | 我的图书 | /books/my | GET | 登录 | 按创建时间倒序 |
-| 图书 | 标签搜索统一入口 | /books/search | POST | (当前开放) | 6 模式优先匹配 |
-| 图书 | 推荐 | /books/recommend/:id | GET | (开放) | limit 默认5 |
-| 图书 | 评论列表 | /books/:id/comments | GET | 开放 | 分页 limit<=100 |
+| 图书 | 标签搜索统一入口 | /books/search | POST | (当前开放) | 6 模式优先匹配（仅标签基础） |
+| 图书 | 推荐 | /books/recommend/:id | GET | (开放) | limit 默认5（基于标签相似度） |
+| 图书 | 评论列表 | /books/:id/comments | GET | 开放 | 分页 limit<=100；与精简 Book 模型无耦合 |
 | 图书 | 新增评论 | /books/:id/comments | POST | 登录 | 内容长度 1-2000 |
 | 图书 | 删除评论 | /books/:id/comments/:commentId | DELETE | 登录/COMMENT_MANAGE | 作者或权限 |
-| 图书 | 评分 | /books/:id/rating | POST | 登录 | 响应含平均值 |
+| 图书 | 评分 | /books/:id/rating | POST | 登录 | 响应含平均值；评分不依赖标题 |
 | 阅读记录 | Upsert | /reading-records | POST | 登录 | minutes 增量累加 |
 | 阅读记录 | 单本记录 | /reading-records/book/:bookId | GET | 登录 | 404 不存在 |
 | 阅读记录 | 我的记录列表 | /reading-records/my | GET | 登录 | 更新时间降序 |
@@ -122,7 +122,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 
 | 模块 | 单元覆盖 | E2E 场景 | 关键断言 | 备注 |
 |------|----------|----------|----------|------|
-| Books | Service + Controller（含搜索/推荐/评论） | CRUD / 搜索六模式 / 推荐排序 / 评论权限 | 数据结构与错误码 | 评分与评论分页边界 |
+| Books | Service + Controller（含搜索/推荐/评论） | CRUD / 搜索六模式 / 推荐排序 / 评论权限 | 精简模型字段（无 hash/title/description）正确返回 | 评分与评论分页边界 |
 | Recommendations | 分区与条目 CRUD | 公共聚合输出 | 排序与过滤 | - |
 | Reading Records | Upsert / 汇总 / 状态计算 | 进度更新 / 删除 / 统计 | finished_ratio / 时间字段 | - |
 | Permissions | 授予 / 撤销逻辑 | 授权失败 / 升级规则 | 等级限制与403/401 | - |
@@ -162,7 +162,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 ## 速览导航
 | 文档 | 描述 |
 |------|------|
-| `BOOKS_README.md` | 图书与标签 + 评论/评分完整指南 |
+| `BOOKS_README.md` | 精简图书模型 + 标签 + 评论/评分完整指南（已移除 hash/title/description） |
 | `BOOKS_TAG_SEARCH.md` | 六种标签搜索模式与推荐细节 |
 | `PERMISSIONS_GUIDE.md` | 等级化权限与授权流程 |
 | `RECOMMENDATIONS_GUIDE.md` | 推荐分区/条目管理与公开接口 |

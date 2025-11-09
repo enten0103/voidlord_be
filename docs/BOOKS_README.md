@@ -6,12 +6,9 @@ Book 模块是一个完整的图书管理系统，支持图书的 CRUD 操作以
 
 ## 🏗️ 数据库设计
 
-### Book 实体
+### Book 实体（精简后）
 - `id` (number): 主键，自增
-- `hash` (string): 图书唯一标识符，唯一索引
-- `title` (string): 图书标题
-- `description` (string, 可选): 图书描述
-- `create_by` (number, 可选): 创建者用户 ID，创建时从登录的 JWT 中写入
+- `create_by` (number, 可选): 创建者用户 ID（从 JWT 中写入）
 - `created_at` (Date): 创建时间
 - `updated_at` (Date): 更新时间
 - `tags` (Tag[]): 关联的标签列表（多对多关系）
@@ -32,25 +29,16 @@ Book 模块是一个完整的图书管理系统，支持图书的 CRUD 操作以
 
 ## 🚀 API 端点
 
-### 1. 创建图书
+### 1. 创建图书（仅支持标签，已移除 hash/title/description）
 ```http
 POST /books
 Authorization: Bearer <jwt_token>
 Content-Type: application/json
 
 {
-  "hash": "unique-book-hash",
-  "title": "图书标题",
-  "description": "图书描述（可选）",
   "tags": [
-    {
-      "key": "author",
-      "value": "作者名"
-    },
-    {
-      "key": "genre", 
-      "value": "科幻"
-    }
+    { "key": "author", "value": "作者名" },
+    { "key": "genre", "value": "科幻" }
   ]
 }
 ```
@@ -59,9 +47,6 @@ Content-Type: application/json
 ```json
 {
   "id": 101,
-  "hash": "unique-book-hash",
-  "title": "图书标题",
-  "description": "图书描述（可选）",
   "create_by": 12,
   "tags": [
     {"id": 5, "key": "author", "value": "作者名", "shown": true, "created_at": "...", "updated_at": "..."}
@@ -85,10 +70,7 @@ GET /books?tags=author,genre
 GET /books/:id
 ```
 
-### 4. 根据 hash 获取图书
-```http
-GET /books/hash/:hash
-```
+（已移除：根据 hash 获取图书 `/books/hash/:hash` 接口不再存在）
 
 ### 4.1 获取本人上传的图书
 ```http
@@ -105,8 +87,6 @@ Authorization: Bearer <jwt_token>
 [
   {
     "id": 12,
-    "hash": "mine-001",
-    "title": "我的第一本书",
     "create_by": 5,
     "tags": [],
     "created_at": "...",
@@ -122,12 +102,8 @@ Authorization: Bearer <jwt_token>
 Content-Type: application/json
 
 {
-  "title": "新标题",
   "tags": [
-    {
-      "key": "year",
-      "value": "2024"
-    }
+    { "key": "year", "value": "2024" }
   ]
 }
 ```
@@ -161,7 +137,7 @@ Authorization: Bearer <jwt_token>
 - 共享标签数降序 + 创建时间降序
 
 ### 数据验证
-- hash 唯一性检查
+-- 已移除 hash/title/description，避免冗余存储；标题等展示型信息可通过标签体系或扩展表后续补充
 - 输入数据验证（使用 class-validator）
 - 错误处理（404, 409, 401 等）
 
@@ -185,9 +161,7 @@ Authorization: Bearer <jwt_token>
 -- Book 表
 CREATE TABLE book (
     id SERIAL PRIMARY KEY,
-    hash VARCHAR UNIQUE NOT NULL,
-    title VARCHAR NOT NULL,
-    description TEXT,
+  -- 已移除 hash/title/description 字段
   create_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -224,23 +198,20 @@ pnpm run start:dev
 
 ### 2. 创建图书示例
 ```javascript
-// 创建一本带标签的图书
+// 创建一本带标签的图书（仅 tags）
 const response = await fetch('/books', {
     method: 'POST',
     headers: {
         'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-        hash: 'sci-fi-001',
-        title: '三体',
-        description: '刘慈欣的科幻小说',
-        tags: [
-            { key: 'author', value: '刘慈欣' },
-            { key: 'genre', value: '科幻' },
-            { key: 'language', value: '中文' }
-        ]
-    })
+  body: JSON.stringify({
+    tags: [
+      { key: 'author', value: '刘慈欣' },
+      { key: 'genre', value: '科幻' },
+      { key: 'language', value: '中文' }
+    ]
+  })
 });
 ```
 
@@ -249,8 +220,6 @@ const response = await fetch('/books', {
 // 获取所有科幻类图书
 const books = await fetch('/books?tags=genre').then(r => r.json());
 
-// 根据 hash 查找图书
-const book = await fetch('/books/hash/sci-fi-001').then(r => r.json());
 ```
 
 ## 🏃‍♂️ 快速开始
@@ -264,7 +233,7 @@ const book = await fetch('/books/hash/sci-fi-001').then(r => r.json());
 
 ## 📝 注意事项
 
-- hash 字段必须全局唯一
+-- 不再包含 hash/title/description 字段
 - 删除图书会自动清理关联关系
 - 标签不会因为没有关联图书而被自动删除
 - 所有写操作都需要认证

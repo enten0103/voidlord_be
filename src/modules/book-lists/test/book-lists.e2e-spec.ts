@@ -62,7 +62,7 @@ describe('Book Lists (e2e)', () => {
     const bRes = await request(httpServer)
       .post('/books')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ hash: 'fav-h1', title: 'Fav One' })
+      .send({})
       .expect(201);
     const b = bRes.body as { id: number };
 
@@ -108,7 +108,12 @@ describe('Book Lists (e2e)', () => {
       throw new Error('Expected items in list detail');
     }
     const first = viewBody.items[0];
-    expect(first && first.book && first.book.title).toBe('Fav One');
+    if (!first || !first.book) {
+      throw new Error('Expected first item to contain book');
+    }
+    expect(typeof first.book.id).toBe('number');
+    // 书籍模型已简化为仅包含 id/时间戳/作者与标签，不再有 title 字段
+    expect(first.book.id).toBe(b.id);
 
     // duplicate add -> 409
     await request(httpServer)
@@ -129,7 +134,7 @@ describe('Book Lists (e2e)', () => {
     const bRes = await request(httpServer)
       .post('/books')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ hash: 'copy-h1', title: 'Copy One' })
+      .send({})
       .expect(201);
     const b = bRes.body as { id: number };
 
@@ -167,7 +172,7 @@ describe('Book Lists (e2e)', () => {
     const bRes = await request(httpServer)
       .post('/books')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ hash: 'copy-h2', title: 'Private Copy Book' })
+      .send({})
       .expect(201);
     const b = bRes.body as { id: number };
 
@@ -197,7 +202,7 @@ describe('Book Lists (e2e)', () => {
     const bRes = await request(httpServer)
       .post('/books')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ hash: 'copy-h3', title: 'Same Name Book' })
+      .send({})
       .expect(201);
     const b = bRes.body as { id: number };
 

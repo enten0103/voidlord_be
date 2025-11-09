@@ -16,18 +16,6 @@ export class Book {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ description: 'Book hash' })
-  @Column({ unique: true })
-  hash: string;
-
-  @ApiProperty({ description: 'Book title' })
-  @Column()
-  title: string;
-
-  @ApiProperty({ description: 'Book description', required: false })
-  @Column({ nullable: true })
-  description?: string;
-
   @ApiProperty({ description: 'Book creation date' })
   @CreateDateColumn()
   created_at: Date;

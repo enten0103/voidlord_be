@@ -23,9 +23,6 @@ describe('Books (e2e)', () => {
 
   interface CreatedBookLite {
     id: number;
-    hash: string;
-    title: string;
-    description?: string;
     tags?: Array<{ key: string; value: string }>;
   }
 
@@ -37,11 +34,7 @@ describe('Books (e2e)', () => {
   const isBookLite = (o: unknown): o is CreatedBookLite => {
     if (typeof o !== 'object' || o === null) return false;
     const r = o as Record<string, unknown>;
-    return (
-      typeof r.id === 'number' &&
-      typeof r.hash === 'string' &&
-      typeof r.title === 'string'
-    );
+    return typeof r.id === 'number';
   };
 
   const isBookLiteArray = (o: unknown): o is CreatedBookLite[] => {
@@ -151,9 +144,6 @@ describe('Books (e2e)', () => {
   describe('/books (POST)', () => {
     it('should create a new book with tags', () => {
       const createBookDto = {
-        hash: 'test-hash-123',
-        title: 'Test Book',
-        description: 'A test book description',
         tags: [
           { key: 'author', value: 'John Doe' },
           { key: 'genre', value: 'Fiction' },
@@ -167,79 +157,38 @@ describe('Books (e2e)', () => {
         .expect(201)
         .expect((res) => {
           const body = parseBody(res.body, isBookLite);
-          expect(body.hash).toBe(createBookDto.hash);
-          expect(body.title).toBe(createBookDto.title);
-          expect(body.description).toBe(createBookDto.description);
           expect(body.tags).toHaveLength(2);
         });
     });
 
     it('should create a book without tags', () => {
-      const createBookDto = {
-        hash: 'simple-book-hash',
-        title: 'Simple Book',
-      };
-
       return request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(createBookDto)
+        .send({})
         .expect(201)
         .expect((res) => {
           const body = parseBody(res.body, isBookLite);
-          expect(body.hash).toBe(createBookDto.hash);
-          expect(body.title).toBe(createBookDto.title);
-          expect(body.tags).toHaveLength(0);
+          expect(Array.isArray(body.tags) ? body.tags.length : 0).toBe(0);
         });
     });
 
-    it('should return 409 if book hash already exists', async () => {
-      const createBookDto = {
-        hash: 'duplicate-hash',
-        title: 'First Book',
-      };
-
-      // 创建第一本书
-      await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(createBookDto)
-        .expect(201);
-
-      // 尝试创建相同hash的书
-      return request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ ...createBookDto, title: 'Second Book' })
-        .expect(409);
-    });
+    // hash 唯一性校验已移除
 
     it('should return 401 without authentication', () => {
-      const createBookDto = {
-        hash: 'unauthorized-book',
-        title: 'Unauthorized Book',
-      };
-
-      return request(httpServer).post('/books').send(createBookDto).expect(401);
+      return request(httpServer).post('/books').send({}).expect(401);
     });
   });
 
   describe('/books (GET)', () => {
     beforeEach(async () => {
       // 创建测试数据
-      const book1: Book = await bookRepository.save({
-        hash: 'book1-hash',
-        title: 'Book One',
-        description: 'First book',
-        tags: [],
-      });
-
-      const book2: Book = await bookRepository.save({
-        hash: 'book2-hash',
-        title: 'Book Two',
-        description: 'Second book',
-        tags: [],
-      });
+      const book1 = await bookRepository.save(
+        bookRepository.create({ tags: [] }),
+      );
+      const book2 = await bookRepository.save(
+        bookRepository.create({ tags: [] }),
+      );
 
       const tag1: Tag = await tagRepository.save({
         key: 'author',
@@ -264,7 +213,8 @@ describe('Books (e2e)', () => {
       const res: Response = await request(httpServer).get('/books').expect(200);
       const body = parseBody(res.body, isBookLiteArray);
       expect(body).toHaveLength(2);
-      expect(body[0].title).toBeDefined();
+      // ensure id exists
+      expect(typeof body[0].id).toBe('number');
       expect(body[0].tags).toBeDefined();
     });
 
@@ -328,12 +278,12 @@ describe('Books (e2e)', () => {
       const b1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ hash: 'mine-1', title: 'Mine 1' })
+        .send({})
         .expect(201);
       const b2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ hash: 'mine-2', title: 'Mine 2' })
+        .send({})
         .expect(201);
       myIds = [
         parseBody(b1.body, isBookLite).id,
@@ -344,12 +294,12 @@ describe('Books (e2e)', () => {
       const o1 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${otherUserToken}`)
-        .send({ hash: 'other-1', title: 'Other 1' })
+        .send({})
         .expect(201);
       const o2 = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${otherUserToken}`)
-        .send({ hash: 'other-2', title: 'Other 2' })
+        .send({})
         .expect(201);
       otherIds = [
         parseBody(o1.body, isBookLite).id,
@@ -377,12 +327,9 @@ describe('Books (e2e)', () => {
     let bookId: number;
 
     beforeEach(async () => {
-      const book = await bookRepository.save({
-        hash: 'single-book-hash',
-        title: 'Single Book',
-        description: 'A single book for testing',
-        tags: [],
-      });
+      const book = await bookRepository.save(
+        bookRepository.create({ tags: [] }),
+      );
       bookId = book.id;
     });
 
@@ -392,8 +339,6 @@ describe('Books (e2e)', () => {
         .expect(200);
       const body = parseBody(res.body, isBookLite);
       expect(body.id).toBe(bookId);
-      expect(body.hash).toBe('single-book-hash');
-      expect(body.title).toBe('Single Book');
     });
 
     it('should return 404 for non-existent book', () => {
@@ -401,59 +346,16 @@ describe('Books (e2e)', () => {
     });
   });
 
-  describe('/books/hash/:hash (GET)', () => {
-    beforeEach(async () => {
-      await bookRepository.save({
-        hash: 'findable-hash',
-        title: 'Findable Book',
-        description: 'A book to find by hash',
-        tags: [],
-      });
-    });
-
-    it('should return a book by hash', async () => {
-      const res: Response = await request(httpServer)
-        .get('/books/hash/findable-hash')
-        .expect(200);
-      const body = parseBody(res.body, isBookLite);
-      expect(body.hash).toBe('findable-hash');
-      expect(body.title).toBe('Findable Book');
-    });
-
-    it('should return 404 for non-existent hash', () => {
-      return request(httpServer)
-        .get('/books/hash/non-existent-hash')
-        .expect(404);
-    });
-  });
+  // hash route removed
 
   describe('/books/:id (PATCH)', () => {
     let bookId: number;
 
     beforeEach(async () => {
-      const book = await bookRepository.save({
-        hash: 'updatable-hash',
-        title: 'Original Title',
-        description: 'Original description',
-        tags: [],
-      });
+      const book = await bookRepository.save(
+        bookRepository.create({ tags: [] }),
+      );
       bookId = book.id;
-    });
-
-    it('should update a book', async () => {
-      const updateDto = {
-        title: 'Updated Title',
-        description: 'Updated description',
-      };
-
-      const res = await request(httpServer)
-        .patch(`/books/${bookId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(updateDto)
-        .expect(200);
-      const body = parseBody(res.body, isBookLite);
-      expect(body.title).toBe('Updated Title');
-      expect(body.description).toBe('Updated description');
     });
 
     it('should update book tags', async () => {
@@ -478,10 +380,12 @@ describe('Books (e2e)', () => {
       ).toBe(true);
     });
 
+    // title/description 更新已不再支持
+
     it('should return 401 without authentication', () => {
       return request(httpServer)
         .patch(`/books/${bookId}`)
-        .send({ title: 'Unauthorized Update' })
+        .send({ tags: [{ key: 'x', value: 'y' }] })
         .expect(401);
     });
   });
@@ -508,9 +412,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'search-book-1',
-          title: 'Science Fiction Book',
-          description: 'A sci-fi book',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -523,9 +424,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'search-book-2',
-          title: 'Fantasy Novel',
-          description: 'A fantasy book',
           tags: [
             { key: 'author', value: 'J.R.R. Tolkien' },
             { key: 'genre', value: 'Fantasy' },
@@ -538,9 +436,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'search-book-3',
-          title: 'Another Sci-Fi',
-          description: 'Another sci-fi book',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -637,8 +532,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tag-search-1',
-          title: 'Book by Asimov',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -650,8 +543,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tag-search-2',
-          title: 'Another Asimov Book',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -697,11 +588,9 @@ describe('Books (e2e)', () => {
     let bookId: number;
 
     beforeEach(async () => {
-      const book = await bookRepository.save({
-        hash: 'deletable-hash',
-        title: 'Deletable Book',
-        tags: [],
-      });
+      const book = await bookRepository.save(
+        bookRepository.create({ tags: [] }),
+      );
       bookId = book.id;
     });
 
@@ -752,8 +641,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tagid-search-1',
-          title: 'Book with Author Tag',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -765,8 +652,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tagid-search-2',
-          title: 'Another Book with Author Tag',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Fantasy' },
@@ -834,8 +719,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tagids-search-1',
-          title: 'Sci-Fi Book',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -847,8 +730,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tagids-search-2',
-          title: 'Fantasy Book',
           tags: [
             { key: 'author', value: 'J.R.R. Tolkien' },
             { key: 'genre', value: 'Science Fiction' },
@@ -860,8 +741,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'tagids-search-3',
-          title: 'Another Asimov Book',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Fantasy' },
@@ -936,8 +815,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'search-tagids-1',
-          title: 'Tagged Book 1',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Science Fiction' },
@@ -949,8 +826,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'search-tagids-2',
-          title: 'Tagged Book 2',
           tags: [
             { key: 'author', value: 'Isaac Asimov' },
             { key: 'genre', value: 'Fantasy' },
@@ -1025,8 +900,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'rec-base',
-          title: 'Base',
           tags: [
             { key: 'topic', value: 'AI' },
             { key: 'lang', value: 'TS' },
@@ -1040,8 +913,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'rec-b1',
-          title: 'Rel 1',
           tags: [
             { key: 'topic', value: 'AI' },
             { key: 'lang', value: 'TS' },
@@ -1052,8 +923,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'rec-b2',
-          title: 'Rel 2',
           tags: [
             { key: 'topic', value: 'AI' },
             { key: 'lang', value: 'Go' },
@@ -1064,8 +933,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'rec-b3',
-          title: 'Rel 3',
           tags: [
             { key: 'topic', value: 'AI' },
             { key: 'lang', value: 'TS' },
@@ -1077,8 +944,6 @@ describe('Books (e2e)', () => {
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          hash: 'rec-u1',
-          title: 'Unrelated',
           tags: [{ key: 'topic', value: 'Math' }],
         });
       relatedIds = [
@@ -1127,7 +992,7 @@ describe('Books (e2e)', () => {
       const empty = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ hash: 'rec-empty', title: 'Empty' });
+        .send({});
       const emptyBody = parseBody(empty.body, isBookLite);
       const res = await request(httpServer)
         .get(`/books/recommend/${emptyBody.id}`)
@@ -1143,7 +1008,7 @@ describe('Books (e2e)', () => {
       const res = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ hash: 'rate-1', title: 'Rate Target' })
+        .send({})
         .expect(201);
       createdId = parseBody(res.body, isBookLite).id;
     });
@@ -1259,7 +1124,7 @@ describe('Books (e2e)', () => {
       const res = await request(httpServer)
         .post('/books')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ hash: 'cmt-1', title: 'Comment Target' })
+        .send({})
         .expect(201);
       createdId = parseBody(res.body, isBookLite).id;
 

@@ -15,13 +15,10 @@ describe('BooksService', () => {
 
   const mockBook: Book = {
     id: 1,
-    hash: 'abc123',
-    title: 'Test Book',
-    description: 'A test book',
     tags: [],
     created_at: new Date(),
     updated_at: new Date(),
-  };
+  } as unknown as Book;
 
   const mockTag: Tag = {
     id: 1,
@@ -71,13 +68,9 @@ describe('BooksService', () => {
   describe('create', () => {
     it('should create a book successfully', async () => {
       const createBookDto = {
-        hash: 'abc123',
-        title: 'Test Book',
-        description: 'A test book',
         tags: [{ key: 'author', value: 'John Doe' }],
-      };
+      } as { tags: Array<{ key: string; value: string }> };
 
-      mockBookRepository.findOne.mockResolvedValue(null);
       mockTagRepository.findOne.mockResolvedValue(null);
       mockTagRepository.create.mockReturnValue(mockTag);
       mockTagRepository.save.mockResolvedValue(mockTag);
@@ -87,23 +80,7 @@ describe('BooksService', () => {
       const result = await service.create(createBookDto);
 
       expect(result).toEqual(mockBook);
-      expect(mockBookRepository.findOne).toHaveBeenCalledWith({
-        where: { hash: 'abc123' },
-      });
       expect(mockBookRepository.save).toHaveBeenCalled();
-    });
-
-    it('should throw ConflictException if book hash already exists', async () => {
-      const createBookDto = {
-        hash: 'abc123',
-        title: 'Test Book',
-      };
-
-      mockBookRepository.findOne.mockResolvedValue(mockBook);
-
-      await expect(service.create(createBookDto)).rejects.toThrow(
-        ConflictException,
-      );
     });
   });
 
@@ -154,53 +131,24 @@ describe('BooksService', () => {
     });
   });
 
-  describe('findByHash', () => {
-    it('should return a book by hash', async () => {
-      mockBookRepository.findOne.mockResolvedValue(mockBook);
-
-      const result = await service.findByHash('abc123');
-
-      expect(result).toEqual(mockBook);
-      expect(mockBookRepository.findOne).toHaveBeenCalledWith({
-        where: { hash: 'abc123' },
-        relations: ['tags'],
-      });
-    });
-
-    it('should throw NotFoundException if book not found', async () => {
-      mockBookRepository.findOne.mockResolvedValue(null);
-
-      await expect(service.findByHash('nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
+  // findByHash removed
 
   describe('update', () => {
-    it('should update a book successfully', async () => {
-      const updateBookDto = { title: 'Updated Title' };
-      const updatedBook = { ...mockBook, title: 'Updated Title' };
+    it('should update book tags successfully', async () => {
+      const updateBookDto = { tags: [{ key: 'author', value: 'New' }] } as {
+        tags: Array<{ key: string; value: string }>;
+      };
+      const updatedBook = { ...mockBook, tags: [mockTag] } as Book;
 
       mockBookRepository.findOne.mockResolvedValue(mockBook);
+      mockTagRepository.findOne.mockResolvedValue(null);
+      mockTagRepository.create.mockReturnValue(mockTag);
+      mockTagRepository.save.mockResolvedValue(mockTag);
       mockBookRepository.save.mockResolvedValue(updatedBook);
 
-      const result = await service.update(1, updateBookDto);
-
+      const result = await service.update(1, updateBookDto as never);
       expect(result).toEqual(updatedBook);
       expect(mockBookRepository.save).toHaveBeenCalled();
-    });
-
-    it('should throw ConflictException if updating to existing hash', async () => {
-      const updateBookDto = { hash: 'existing-hash' };
-      const existingBook = { ...mockBook, id: 2, hash: 'existing-hash' };
-
-      mockBookRepository.findOne
-        .mockResolvedValueOnce(mockBook) // findOne call
-        .mockResolvedValueOnce(existingBook); // hash conflict check
-
-      await expect(service.update(1, updateBookDto)).rejects.toThrow(
-        ConflictException,
-      );
     });
   });
 
@@ -597,15 +545,7 @@ describe('BooksService', () => {
       it('should remove comment when exists', async () => {
         mockCommentRepository.findOne.mockResolvedValueOnce({
           id: 10,
-          book: {
-            id: 1,
-            hash: 'h',
-            title: 't',
-            description: '',
-            created_at: new Date(),
-            updated_at: new Date(),
-            tags: [],
-          } as Book,
+          book: { id: 1 } as Book,
           user: {
             id: 2,
             username: 'alice',
@@ -635,15 +575,7 @@ describe('BooksService', () => {
       it('should return user id when exists', async () => {
         mockCommentRepository.findOne.mockResolvedValueOnce({
           id: 10,
-          book: {
-            id: 1,
-            hash: 'h',
-            title: 't',
-            description: '',
-            created_at: new Date(),
-            updated_at: new Date(),
-            tags: [],
-          } as Book,
+          book: { id: 1 } as Book,
           user: {
             id: 7,
             username: 'bob',
@@ -667,15 +599,7 @@ describe('BooksService', () => {
           content: 'stub',
           created_at: new Date(),
           updated_at: new Date(),
-          book: {
-            id: 1,
-            hash: 'h',
-            title: 't',
-            description: '',
-            created_at: new Date(),
-            updated_at: new Date(),
-            tags: [],
-          } as Book,
+          book: { id: 1 } as Book,
           user: null,
         } as Comment);
         await expect(service.getCommentOwnerId(1, 10)).resolves.toBeNull();
@@ -690,15 +614,7 @@ describe('BooksService', () => {
           content: 'parent',
           created_at: new Date(),
           updated_at: new Date(),
-          book: {
-            id: 1,
-            hash: 'h',
-            title: 't',
-            description: '',
-            created_at: new Date(),
-            updated_at: new Date(),
-            tags: [],
-          } as Book,
+          book: { id: 1 } as Book,
           user: {
             id: 99,
             username: 'u99',
@@ -752,15 +668,7 @@ describe('BooksService', () => {
           content: 'parent',
           created_at: new Date(),
           updated_at: new Date(),
-          book: {
-            id: 1,
-            hash: 'h',
-            title: 't',
-            description: '',
-            created_at: new Date(),
-            updated_at: new Date(),
-            tags: [],
-          } as Book,
+          book: { id: 1 } as Book,
           user: {
             id: 99,
             username: 'u99',

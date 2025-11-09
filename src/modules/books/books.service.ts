@@ -27,30 +27,15 @@ export class BooksService {
   ) {}
 
   async create(createBookDto: CreateBookDto, userId?: number): Promise<Book> {
-    // 检查hash是否已存在
-    const existingBook = await this.bookRepository.findOne({
-      where: { hash: createBookDto.hash },
-    });
-
-    if (existingBook) {
-      throw new ConflictException('Book with this hash already exists');
-    }
-
-    // 处理标签
+    // 处理标签（现仅支持标签）
     let tags: Tag[] = [];
     if (createBookDto.tags && createBookDto.tags.length > 0) {
       tags = await this.processTags(createBookDto.tags);
     }
-
-    // 创建书籍
     const book = this.bookRepository.create({
-      hash: createBookDto.hash,
-      title: createBookDto.title,
-      description: createBookDto.description,
       create_by: userId,
       tags,
     });
-
     return this.bookRepository.save(book);
   }
 
@@ -82,45 +67,13 @@ export class BooksService {
     return book;
   }
 
-  async findByHash(hash: string): Promise<Book> {
-    const book = await this.bookRepository.findOne({
-      where: { hash },
-      relations: ['tags'],
-    });
-
-    if (!book) {
-      throw new NotFoundException(`Book with hash ${hash} not found`);
-    }
-
-    return book;
-  }
+  // findByHash 已移除（不再存在 hash 字段）
 
   async update(id: number, updateBookDto: UpdateBookDto): Promise<Book> {
     const book = await this.findOne(id);
-
-    // 如果更新hash，检查是否冲突
-    if (updateBookDto.hash && updateBookDto.hash !== book.hash) {
-      const existingBook = await this.bookRepository.findOne({
-        where: { hash: updateBookDto.hash },
-      });
-
-      if (existingBook) {
-        throw new ConflictException('Book with this hash already exists');
-      }
-    }
-
-    // 处理标签更新
     if (updateBookDto.tags) {
-      const tags = await this.processTags(updateBookDto.tags);
-      book.tags = tags;
+      book.tags = await this.processTags(updateBookDto.tags);
     }
-
-    // 更新其他字段
-    if (updateBookDto.title) book.title = updateBookDto.title;
-    if (updateBookDto.hash) book.hash = updateBookDto.hash;
-    if (updateBookDto.description !== undefined)
-      book.description = updateBookDto.description;
-
     return this.bookRepository.save(book);
   }
 

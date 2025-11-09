@@ -24,15 +24,6 @@ export class BookResponseDto {
   @ApiProperty({ description: 'Book ID' })
   id: number;
 
-  @ApiProperty({ description: 'Book hash' })
-  hash: string;
-
-  @ApiProperty({ description: 'Book title' })
-  title: string;
-
-  @ApiProperty({ description: 'Book description', required: false })
-  description?: string;
-
   @ApiProperty({ description: 'Book creation date' })
   created_at: Date;
 
