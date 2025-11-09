@@ -141,6 +141,15 @@ describe('Permissions (e2e)', () => {
         expect(res.body).toEqual([{ permission: 'USER_READ', level: 1 }]);
       });
 
+    // userB 访问 /permissions/user/me（仅需登录）
+    await request(httpServer)
+      .get(`/permissions/user/me`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toEqual([{ permission: 'USER_READ', level: 1 }]);
+      });
+
     // userB 尝试授予权限 (应403)
     await request(httpServer)
       .post('/permissions/grant')
@@ -170,7 +179,18 @@ describe('Permissions (e2e)', () => {
       .set('Authorization', `Bearer ${userToken}`)
       .expect(403);
 
+    // 但 /permissions/user/me 仍可访问，返回空数组
+    await request(httpServer)
+      .get(`/permissions/user/me`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toEqual([]);
+      });
+
     // 未登录查询，应为 401
     await request(httpServer).get(`/permissions/user/${userId}`).expect(401);
+    // 未登录访问 /me 也为 401
+    await request(httpServer).get(`/permissions/user/me`).expect(401);
   });
 });

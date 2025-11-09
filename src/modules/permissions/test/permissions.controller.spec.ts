@@ -101,4 +101,16 @@ describe('PermissionsController', () => {
     expect(res).toEqual([{ permission: 'USER_READ', level: 1 }]);
     expect(mockPermissionsService.listUserPermissions).toHaveBeenCalledWith(1);
   });
+
+  it('should list current user permissions via me', async () => {
+    mockPermissionsService.listUserPermissions.mockResolvedValue([
+      { permission: 'USER_READ', level: 1 },
+    ]);
+    const req = {
+      user: { userId: 42, username: 'me' },
+    } as unknown as import('../../../types/request.interface').JwtRequestWithUser;
+    const res = await controller.me(req);
+    expect(res).toEqual([{ permission: 'USER_READ', level: 1 }]);
+    expect(mockPermissionsService.listUserPermissions).toHaveBeenCalledWith(42);
+  });
 });

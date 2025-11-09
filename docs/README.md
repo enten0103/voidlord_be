@@ -113,6 +113,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 权限 | 授予 | /permissions/grant | POST | USER_UPDATE(2) | level2 仅授予 level1 |
 | 权限 | 撤销 | /permissions/revoke | POST | USER_UPDATE(2) | level2 仅撤销自己授予 |
 | 权限 | 用户权限查看 | /permissions/user/:id | GET | USER_READ(1) | 列表 |
+| 权限 | 我的权限 | /permissions/user/me | GET | 登录 | 返回当前用户权限列表 |
 | 文件 | 公共策略 | /files/policy/public | POST | SYS_MANAGE(3) | - |
 | 文件 | 上传 URL | /files/upload-url | GET | 登录 | 预签名模式 |
 | 文件 | 删除对象 | /files/object | DELETE | 登录/FILE_MANAGE(1) | 非本人需权限 |

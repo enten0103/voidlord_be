@@ -18,7 +18,7 @@ export interface ReadingRecordResponse {
   last_read_at: Date;
   total_minutes: number;
   updated_at: Date;
-  book?: { id: number; title: string };
+  book?: { id: number };
 }
 
 @Injectable()
@@ -143,7 +143,7 @@ export class ReadingRecordsService {
       updated_at: r.updated_at,
     };
     if (includeBook && r.book) {
-      base.book = { id: r.book.id, title: r.book.title };
+      base.book = { id: r.book.id };
     }
     return base;
   }

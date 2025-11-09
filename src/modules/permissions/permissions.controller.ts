@@ -30,6 +30,34 @@ import type { JwtRequestWithUser } from '../../types/request.interface';
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
+  @Get('user/me')
+  @UseGuards(JwtAuthGuard) // 仅需登录，无需额外权限
+  @ApiOperation({ summary: "Get current user's permissions" })
+  @ApiResponse({
+    status: 200,
+    description: 'Current user permissions',
+    schema: {
+      example: [
+        { permission: 'USER_READ', level: 1 },
+        { permission: 'BOOK_UPDATE', level: 2 },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  me(@Req() req: JwtRequestWithUser) {
+    return this.permissionsService.listUserPermissions(req.user.userId);
+  }
+
   @Post('grant')
   @ApiOperation({ summary: 'Grant a permission to a user' })
   @ApiPermission('USER_UPDATE', 2)

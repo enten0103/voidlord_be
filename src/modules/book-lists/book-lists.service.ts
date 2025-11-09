@@ -87,7 +87,7 @@ export class BookListsService {
       updated_at: list.updated_at,
       items: items.map((i) => ({
         id: i.id,
-        book: { id: i.book.id, title: i.book.title, hash: i.book.hash },
+        book: { id: i.book.id },
       })),
       items_count: items.length,
     };

@@ -28,6 +28,14 @@ COMMENT_MANAGE
 SYS_MANAGE
 ```
 
+**权限用途说明**：
+- `USER_*`：用户资料与权限管理相关
+- `BOOK_*`：图书 CRUD 操作
+- `RECOMMENDATION_MANAGE`：推荐分区/条目管理
+- `FILE_MANAGE`：文件/对象上传、删除权限
+- `COMMENT_MANAGE`：**删除他人评论** 的权限（任何 level >= 1 的用户都可用；用户本人可直接删除自己的评论，无需此权限）
+- `SYS_MANAGE`：系统级操作（如文件桶公开/私有策略设置）
+
 ### 1.2 等级含义
 | 等级 | 含义 | 可做操作 | 授权限制 |
 |------|------|----------|----------|
@@ -81,6 +89,7 @@ SYS_MANAGE
 | 授予权限 | POST `/permissions/grant` | `{ userId, permission, level }` | `USER_UPDATE` | 2 | level2 只能授予 level1；level3 可授予/升级到 3 |
 | 撤销权限 | POST `/permissions/revoke` | `{ userId, permission }` | `USER_UPDATE` | 2 | level2 仅可撤销自己授予的；level3 无限制 |
 | 查看用户权限 | GET `/permissions/user/:id` | - | `USER_READ` | 1 | 返回 `{ permission, level }[]` |
+| 查看当前用户权限 | GET `/permissions/user/me` | - | (登录) | 0 | 返回当前用户的 `{ permission, level }[]` |
 
 ### 5.1 请求/响应示例
 授予：
@@ -141,7 +150,10 @@ POST /permissions/revoke
 | 评论 | /books/:id/comments | POST | (需要登录) | 0 | 否 | 新增顶层评论 |
 | 评论 | /books/:id/comments/:commentId | DELETE | COMMENT_MANAGE（非本人） | 1 | 否 | 非作者需权限 |
 
-> 评论删除规则：评论作者本人可直接删除；非作者需要 `COMMENT_MANAGE (>=1)`；否则返回 403。
+> **评论删除规则**：
+>  - 评论作者本人可直接删除自己的评论，**无需任何权限**。
+>  - 非作者需要 `COMMENT_MANAGE` 权限且 `level >= 1`，才能删除他人评论。
+>  - 违反条件则返回 403 Forbidden，响应体：`{ "statusCode": 403, "message": "Only owner or COMMENT_MANAGE can delete", "error": "Forbidden" }`。
 
 > 评论内容限制：content 去除首尾空格后长度需在 [1, 2000]，否则返回 409 Conflict；书籍或评论不存在返回 404。
 
@@ -149,7 +161,12 @@ POST /permissions/revoke
 
 > 读取类接口目前允许匿名 / 基础访问；如需收紧，给读取接口添加 `@ApiPermission('BOOK_READ',1)` 并在用户初始赋权时授予。
 
-### 6.1 文件策略端点安全建议
+### 6.1 评论管理权限应用建议
+- `COMMENT_MANAGE` 权限适用于内容审核人员或社区管理员，可快速删除不当评论。
+- 避免过度授权；建议仅授予信任的版主或管理员。
+- 结合用户举报功能，建立审核工作流（举报 → 审核 → 删除）。
+
+### 6.2 文件策略端点安全建议
 - 强烈建议仅授予极少数管理员 `SYS_MANAGE` level 3。
 - 操作前后做好审计记录（时间、操作者、IP）。
 - 更推荐使用预签名 URL 分享临时访问，避免长期公开桶。
