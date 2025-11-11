@@ -189,7 +189,18 @@ describe('MediaLibrariesService', () => {
       updated_at: new Date(),
       items: [],
     } as MediaLibrary);
-    await expect(service.addBook(10, 5, 7)).rejects.toThrow(ForbiddenException);
+    bookRepo.findOne.mockResolvedValueOnce({ id: 7 } as Book);
+    itemRepo.findOne.mockResolvedValueOnce(null);
+    itemRepo.create.mockReturnValue({ id: 33 } as MediaLibraryItem);
+    itemRepo.save.mockResolvedValueOnce({
+      id: 33,
+      library: { id: 10 } as MediaLibrary,
+      book: { id: 7 } as Book,
+      child_library: null,
+      added_at: new Date(),
+    } as MediaLibraryItem);
+    const res = await service.addBook(10, 5, 7);
+    expect(res.bookId).toBe(7);
   });
 
   it('addLibrary self conflict', async () => {

@@ -152,7 +152,7 @@ export class MediaLibrariesService {
     });
     if (!lib) throw new NotFoundException('Library not found');
     if (lib.owner?.id !== userId) throw new ForbiddenException('Not owner');
-    if (lib.is_system) throw new ForbiddenException('System library locked');
+    // 系统库现在允许添加书籍（用于记录历史），仍需拥有者校验
     const book = await this.bookRepo.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     const existing = await this.itemRepo.findOne({
@@ -176,7 +176,7 @@ export class MediaLibrariesService {
     });
     if (!parent) throw new NotFoundException('Library not found');
     if (parent.owner?.id !== userId) throw new ForbiddenException('Not owner');
-    if (parent.is_system) throw new ForbiddenException('System library locked');
+    // 系统库现在允许嵌套其他库（若业务不需要可再次禁止）
     const child = await this.libraryRepo.findOne({
       where: { id: childLibraryId },
     });
@@ -208,7 +208,7 @@ export class MediaLibrariesService {
     });
     if (!lib) throw new NotFoundException('Library not found');
     if (lib.owner?.id !== userId) throw new ForbiddenException('Not owner');
-    if (lib.is_system) throw new ForbiddenException('System library locked');
+    // 系统库现在允许移除条目
     const item = await this.itemRepo.findOne({
       where: { id: itemId },
       relations: ['library'],

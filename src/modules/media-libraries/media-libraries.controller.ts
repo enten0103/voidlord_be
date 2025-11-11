@@ -124,7 +124,7 @@ export class MediaLibrariesController {
   @ApiOperation({
     summary: 'Add book to media library',
     description:
-      '向媒体库添加书籍。系统库不可添加。重复添加返回 409。仅库拥有者可操作。',
+      '向媒体库添加书籍。系统库亦可添加（用于阅读记录或后续统计）。重复添加返回 409。仅库拥有者可操作。',
   })
   @ApiResponse({ status: 201, description: 'Added 成功' })
   @ApiResponse({ status: 403, description: '非拥有者或系统库锁定' })
@@ -148,7 +148,8 @@ export class MediaLibrariesController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Nest a child media library',
-    description: '父库嵌套子库。不能自嵌套。系统库不可嵌套。重复嵌套返回 409。',
+    description:
+      '父库嵌套子库。不能自嵌套。系统库现在也允许嵌套（若不需要可后续收紧）。重复嵌套返回 409。',
   })
   @ApiResponse({ status: 201, description: 'Nested 成功' })
   @ApiResponse({ status: 403, description: '非拥有者或系统库锁定' })
@@ -173,7 +174,7 @@ export class MediaLibrariesController {
   @ApiOperation({
     summary: 'Remove an item (book or child library)',
     description:
-      '根据 itemId 删除书籍或子库条目。系统库锁定不可操作。仅拥有者可删除。',
+      '根据 itemId 删除书籍或子库条目。系统库也允许移除条目。仅拥有者可删除。',
   })
   @ApiResponse({ status: 200, description: 'Removed 成功' })
   @ApiResponse({ status: 403, description: '非拥有者或系统库锁定' })
