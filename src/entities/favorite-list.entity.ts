@@ -14,6 +14,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { FavoriteListItem } from './favorite-list-item.entity';
 import { Tag } from './tag.entity';
+import { MediaLibrary } from './media-library.entity';
 
 @Entity()
 @Unique(['owner', 'name'])
@@ -37,6 +38,11 @@ export class FavoriteList {
   @ApiProperty({ description: 'Whether the list is public', default: false })
   @Column({ type: 'boolean', default: false })
   is_public: boolean;
+
+  // New alignment relation: each FavoriteList now corresponds 1:1 to a MediaLibrary
+  // This enables gradual deprecation of FavoriteList while keeping legacy endpoints.
+  @ManyToOne(() => MediaLibrary, { onDelete: 'CASCADE', nullable: true })
+  library?: MediaLibrary | null;
 
   @ApiProperty({ description: 'Owner user' })
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

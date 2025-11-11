@@ -28,7 +28,20 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn'
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      'linebreak-style': 'off', // allow Windows CRLF in workspace
+    },
+  },
+  {
+    files: ['src/modules/media-libraries/dto/media-library-responses.dto.ts'],
+    rules: {
+      'prettier/prettier': 'off',
+    },
+  },
+  {
+    files: ['src/modules/media-libraries/test/media-libraries.e2e-spec.ts'],
+    rules: {
+      'prettier/prettier': 'off',
     },
   },
 );

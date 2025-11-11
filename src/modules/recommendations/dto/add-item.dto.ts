@@ -3,11 +3,11 @@ import { IsInt, IsOptional, IsString } from 'class-validator';
 
 export class AddItemDto {
   @ApiProperty({
-    description: 'BookList (FavoriteList) ID to add',
+    description: 'MediaLibrary ID to add (replacing previous FavoriteList)',
     example: 42,
   })
   @IsInt()
-  bookListId: number;
+  mediaLibraryId: number;
 
   @ApiProperty({
     description: 'Desired position (if omitted append to end)',
@@ -18,7 +18,7 @@ export class AddItemDto {
   position?: number;
 
   @ApiProperty({
-    description: 'Optional note shown with the recommended list',
+    description: 'Optional note shown with the recommended library',
     required: false,
   })
   @IsOptional()

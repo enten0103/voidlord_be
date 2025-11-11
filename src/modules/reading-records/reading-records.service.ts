@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ReadingRecord } from '../../entities/reading-record.entity';
 import { Book } from '../../entities/book.entity';
+import { MediaLibrary } from '../../entities/media-library.entity';
+import { MediaLibraryItem } from '../../entities/media-library-item.entity';
 import { User } from '../../entities/user.entity';
 import { UpsertReadingRecordDto } from './dto/upsert-reading-record.dto';
 
@@ -28,7 +30,29 @@ export class ReadingRecordsService {
     private readonly recordRepo: Repository<ReadingRecord>,
     @InjectRepository(Book)
     private readonly bookRepo: Repository<Book>,
+    @InjectRepository(MediaLibrary)
+    private readonly libraryRepo: Repository<MediaLibrary>,
+    @InjectRepository(MediaLibraryItem)
+    private readonly itemRepo: Repository<MediaLibraryItem>,
   ) {}
+
+  private async ensureSystemLibrary(userId: number) {
+    let lib = await this.libraryRepo.findOne({
+      where: { owner: { id: userId }, is_system: true },
+    });
+    if (!lib) {
+      lib = this.libraryRepo.create({
+        name: '系统阅读记录',
+        description: '系统自动创建的阅读记录媒体库',
+        is_public: false,
+        is_system: true,
+        owner: { id: userId } as User,
+        tags: [],
+      });
+      lib = await this.libraryRepo.save(lib);
+    }
+    return lib;
+  }
 
   async upsert(userId: number, dto: UpsertReadingRecordDto) {
     const book = await this.bookRepo.findOne({ where: { id: dto.bookId } });
@@ -72,6 +96,20 @@ export class ReadingRecordsService {
       if (dto.minutes_increment) record.total_minutes += dto.minutes_increment;
     }
     const saved = await this.recordRepo.save(record);
+    // Ensure system media library has this book
+    const sysLib = await this.ensureSystemLibrary(userId);
+    if (book.id) {
+      const existingItem = await this.itemRepo.findOne({
+        where: { library: { id: sysLib.id }, book: { id: book.id } },
+      });
+      if (!existingItem) {
+        const item = this.itemRepo.create({
+          library: { id: sysLib.id } as MediaLibrary,
+          book: { id: book.id } as Book,
+        });
+        await this.itemRepo.save(item);
+      }
+    }
     return this.toResponse(saved);
   }
 

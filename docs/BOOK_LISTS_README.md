@@ -1,8 +1,24 @@
-# 书单（Book-Lists）API 指南
+# (Deprecated) 书单（Book-Lists）API 指南
+
+> ⚠️ 本文档已废弃：书单功能已被统一、扩展的 “媒体库 (Media Libraries)” 模块取代。旧 `/book-lists` 端点已移除或将在下一个版本中被完全下线。
+>
+> 请迁移至：`MEDIA_LIBRARIES_README.md`
+>
+> 迁移对照速览：
+> - 创建书单 -> `POST /media-libraries`
+> - 我的书单 -> `GET /media-libraries/my`
+> - 书单详情 -> `GET /media-libraries/:id`
+> - 添加书籍 -> `POST /media-libraries/:id/books/:bookId`
+> - 嵌套书单 -> `POST /media-libraries/:id/libraries/:childId`
+> - 删除条目 -> `DELETE /media-libraries/:id/items/:itemId`
+> - 更新 -> `PATCH /media-libraries/:id`
+> - 复制 -> `POST /media-libraries/:id/copy`
+>
+> 媒体库改进：统一条目类型（书或子库）、显式系统库 `is_system`、更清晰的嵌套与移除语义、复制逻辑复用。
 
 支持用户创建并维护多本书的收藏书单，可设置公开/私有；书单名称在同一用户下唯一，支持从公开书单一键复制。
 
-> 命名说明：文档中使用 BookList / BookListItem（等价于旧称 FavoriteList / FavoriteListItem）。
+> 历史命名说明（仅供参考）：文档中使用 BookList / BookListItem（等价于旧称 FavoriteList / FavoriteListItem）。
 
 ## 目录
 1. 概述与定位  

@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { RecommendationSection } from '../../entities/recommendation-section.entity';
 import { RecommendationItem } from '../../entities/recommendation-item.entity';
-import { FavoriteList } from '../../entities/favorite-list.entity';
+import { MediaLibrary } from '../../entities/media-library.entity';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { AddItemDto } from './dto/add-item.dto';
@@ -21,8 +21,8 @@ export class RecommendationsService {
     private sectionRepo: Repository<RecommendationSection>,
     @InjectRepository(RecommendationItem)
     private itemRepo: Repository<RecommendationItem>,
-    @InjectRepository(FavoriteList)
-    private listRepo: Repository<FavoriteList>,
+    @InjectRepository(MediaLibrary)
+    private libraryRepo: Repository<MediaLibrary>,
   ) {}
 
   async createSection(dto: CreateSectionDto): Promise<RecommendationSection> {
@@ -38,14 +38,14 @@ export class RecommendationsService {
     return this.sectionRepo.find({
       where: includeInactive ? {} : { active: true },
       order: { sort_order: 'ASC', id: 'ASC' },
-      relations: ['items', 'items.list'],
+      relations: ['items', 'items.library'],
     });
   }
 
   async getSection(id: number): Promise<RecommendationSection> {
     const section = await this.sectionRepo.findOne({
       where: { id },
-      relations: ['items', 'items.list'],
+      relations: ['items', 'items.library'],
     });
     if (!section) throw new NotFoundException('Section not found');
     section.items.sort((a, b) => a.position - b.position || a.id - b.id);
@@ -97,13 +97,18 @@ export class RecommendationsService {
       relations: ['items'],
     });
     if (!section) throw new NotFoundException('Section not found');
-    const list = await this.listRepo.findOne({ where: { id: dto.bookListId } });
-    if (!list) throw new NotFoundException('List not found');
+    const library = await this.libraryRepo.findOne({
+      where: { id: dto.mediaLibraryId },
+    });
+    if (!library) throw new NotFoundException('Library not found');
 
     const dup = await this.itemRepo.findOne({
-      where: { section: { id: sectionId }, list: { id: dto.bookListId } },
+      where: {
+        section: { id: sectionId },
+        library: { id: dto.mediaLibraryId },
+      },
     });
-    if (dup) throw new ConflictException('List already in section');
+    if (dup) throw new ConflictException('Library already in section');
 
     let position: number;
     if (dto.position !== undefined) {
@@ -117,7 +122,7 @@ export class RecommendationsService {
 
     const item = this.itemRepo.create({
       section,
-      list,
+      library,
       position,
       note: dto.note,
     });
@@ -152,7 +157,7 @@ export class RecommendationsService {
     const sections = await this.sectionRepo.find({
       where: { active: true },
       order: { sort_order: 'ASC', id: 'ASC' },
-      relations: ['items', 'items.list'],
+      relations: ['items', 'items.library'],
     });
     for (const s of sections) {
       s.items.sort((a, b) => a.position - b.position || a.id - b.id);

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { RecommendationsService } from '../recommendations.service';
 import { RecommendationSection } from '../../../entities/recommendation-section.entity';
 import { RecommendationItem } from '../../../entities/recommendation-item.entity';
-import { FavoriteList } from '../../../entities/favorite-list.entity';
+import { MediaLibrary } from '../../../entities/media-library.entity';
 import { User } from '../../../entities/user.entity';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
@@ -12,7 +12,7 @@ describe('RecommendationsService', () => {
   let service: RecommendationsService;
   let sectionRepo: jest.Mocked<Repository<RecommendationSection>>;
   let itemRepo: jest.Mocked<Repository<RecommendationItem>>;
-  let listRepo: jest.Mocked<Repository<FavoriteList>>;
+  let libraryRepo: jest.Mocked<Repository<MediaLibrary>>;
 
   const mockSection: RecommendationSection = {
     id: 1,
@@ -26,17 +26,18 @@ describe('RecommendationsService', () => {
     items: [],
   };
 
-  const mockList: FavoriteList = {
+  const mockLibrary: MediaLibrary = {
     id: 10,
-    name: '精选书单',
+    name: '精选媒体库',
     description: 'desc',
     is_public: true,
+    is_system: false,
     owner: { id: 1 } as User,
     created_at: new Date(),
     updated_at: new Date(),
     items: [],
     tags: [],
-  };
+  } as MediaLibrary;
 
   const mockSectionRepo: Partial<
     jest.Mocked<Repository<RecommendationSection>>
@@ -55,7 +56,7 @@ describe('RecommendationsService', () => {
     save: jest.fn(),
     remove: jest.fn(),
   };
-  const mockListRepo: Partial<jest.Mocked<Repository<FavoriteList>>> = {
+  const mockLibraryRepo: Partial<jest.Mocked<Repository<MediaLibrary>>> = {
     findOne: jest.fn(),
     find: jest.fn(),
   };
@@ -72,14 +73,17 @@ describe('RecommendationsService', () => {
           provide: getRepositoryToken(RecommendationItem),
           useValue: mockItemRepo,
         },
-        { provide: getRepositoryToken(FavoriteList), useValue: mockListRepo },
+        {
+          provide: getRepositoryToken(MediaLibrary),
+          useValue: mockLibraryRepo,
+        },
       ],
     }).compile();
 
     service = module.get(RecommendationsService);
     sectionRepo = module.get(getRepositoryToken(RecommendationSection));
     itemRepo = module.get(getRepositoryToken(RecommendationItem));
-    listRepo = module.get(getRepositoryToken(FavoriteList));
+    libraryRepo = module.get(getRepositoryToken(MediaLibrary));
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -107,20 +111,20 @@ describe('RecommendationsService', () => {
       ...mockSection,
       items: [],
     } as RecommendationSection);
-    listRepo.findOne.mockResolvedValue(mockList);
+    libraryRepo.findOne.mockResolvedValue(mockLibrary);
     itemRepo.findOne.mockResolvedValue(null);
     const newItem: RecommendationItem = {
       id: 99,
       position: 0,
       section: mockSection,
-      list: mockList,
+      library: mockLibrary,
       created_at: new Date(),
       updated_at: new Date(),
     } as RecommendationItem;
     itemRepo.create.mockReturnValue(newItem);
     itemRepo.save.mockResolvedValue(newItem);
-    const item = await service.addItem(1, { bookListId: 10 });
-    expect(item.list.id).toBe(10);
+    const item = await service.addItem(1, { mediaLibraryId: 10 });
+    expect(item.library.id).toBe(10);
   });
 
   it('addItem duplicate', async () => {
@@ -128,9 +132,9 @@ describe('RecommendationsService', () => {
       ...mockSection,
       items: [],
     } as RecommendationSection);
-    listRepo.findOne.mockResolvedValue(mockList);
+    libraryRepo.findOne.mockResolvedValue(mockLibrary);
     itemRepo.findOne.mockResolvedValue({ id: 1 } as RecommendationItem);
-    await expect(service.addItem(1, { bookListId: 10 })).rejects.toThrow(
+    await expect(service.addItem(1, { mediaLibraryId: 10 })).rejects.toThrow(
       ConflictException,
     );
   });

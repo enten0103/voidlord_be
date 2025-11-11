@@ -10,7 +10,9 @@ import { FavoriteList } from './favorite-list.entity';
 import { Book } from './book.entity';
 
 @Entity()
+// Unique constraints: prevent duplicate book entries and duplicate child list entries in same parent list
 @Unique(['list', 'book'])
+@Unique(['list', 'child_list'])
 export class FavoriteListItem {
   @ApiProperty({ description: 'Item ID' })
   @PrimaryGeneratedColumn()
@@ -20,16 +22,13 @@ export class FavoriteListItem {
   @ManyToOne(() => FavoriteList, (l) => l.items, { onDelete: 'CASCADE' })
   list: FavoriteList;
 
-  @ApiProperty({ description: 'Book in the list' })
-  @ManyToOne(() => Book, { onDelete: 'CASCADE' })
-  book: Book;
+  @ApiProperty({ description: 'Book in the list', required: false })
+  @ManyToOne(() => Book, { onDelete: 'CASCADE', nullable: true })
+  book?: Book | null;
 
-  @ApiProperty({
-    description: 'Parent list for nesting (optional)',
-    required: false,
-  })
+  @ApiProperty({ description: 'Nested child list', required: false })
   @ManyToOne(() => FavoriteList, { onDelete: 'CASCADE', nullable: true })
-  parent_list?: FavoriteList | null;
+  child_list?: FavoriteList | null;
 
   @ApiProperty({ description: 'Added timestamp' })
   @CreateDateColumn()

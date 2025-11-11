@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RecommendationSection } from '../../entities/recommendation-section.entity';
 import { RecommendationItem } from '../../entities/recommendation-item.entity';
-import { FavoriteList } from '../../entities/favorite-list.entity';
+import { MediaLibrary } from '../../entities/media-library.entity';
 import { RecommendationsService } from './recommendations.service';
 import { RecommendationsController } from './recommendations.controller';
 
@@ -11,7 +11,7 @@ import { RecommendationsController } from './recommendations.controller';
     TypeOrmModule.forFeature([
       RecommendationSection,
       RecommendationItem,
-      FavoriteList,
+      MediaLibrary,
     ]),
   ],
   providers: [RecommendationsService],

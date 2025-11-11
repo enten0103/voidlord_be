@@ -12,8 +12,8 @@ import { RecommendationsModule } from '../recommendations/recommendations.module
 import { PermissionsModule } from '../permissions/permissions.module';
 import { FilesModule } from '../files/files.module';
 import { UserConfigModule } from '../user-config/user-config.module';
-import { BookListsModule } from '../book-lists/book-lists.module';
 import { ReadingRecordsModule } from '../reading-records/reading-records.module';
+import { MediaLibrariesModule } from '../media-libraries/media-libraries.module';
 
 @Module({
   imports: [
@@ -30,7 +30,7 @@ import { ReadingRecordsModule } from '../reading-records/reading-records.module'
     PermissionsModule,
     FilesModule,
     UserConfigModule,
-    BookListsModule,
+    MediaLibrariesModule,
     ReadingRecordsModule,
   ],
   controllers: [AppController],

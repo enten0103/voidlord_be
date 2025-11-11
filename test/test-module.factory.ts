@@ -17,9 +17,9 @@ import { FileObject } from '../src/entities/file-object.entity';
 import { UserConfigModule } from '../src/modules/user-config/user-config.module';
 import { BookRating } from '../src/entities/book-rating.entity';
 import { Comment } from '../src/entities/comment.entity';
-import { FavoriteList } from '../src/entities/favorite-list.entity';
-import { FavoriteListItem } from '../src/entities/favorite-list-item.entity';
-import { BookListsModule } from '../src/modules/book-lists/book-lists.module';
+import { MediaLibrary } from '../src/entities/media-library.entity';
+import { MediaLibraryItem } from '../src/entities/media-library-item.entity';
+import { MediaLibrariesModule } from '../src/modules/media-libraries/media-libraries.module';
 import { ReadingRecord } from '../src/entities/reading-record.entity';
 import { ReadingRecordsModule } from '../src/modules/reading-records/reading-records.module';
 import request from 'supertest';
@@ -85,8 +85,8 @@ export async function createTestModule(): Promise<TestingModule> {
           FileObject,
           BookRating,
           Comment,
-          FavoriteList,
-          FavoriteListItem,
+          MediaLibrary,
+          MediaLibraryItem,
           ReadingRecord,
         ],
         synchronize: true,
@@ -104,8 +104,8 @@ export async function createTestModule(): Promise<TestingModule> {
         FileObject,
         BookRating,
         Comment,
-        FavoriteList,
-        FavoriteListItem,
+        MediaLibrary,
+        MediaLibraryItem,
         ReadingRecord,
       ]),
       UsersModule,
@@ -113,7 +113,7 @@ export async function createTestModule(): Promise<TestingModule> {
       BooksModule,
       RecommendationsModule,
       UserConfigModule,
-      BookListsModule,
+      MediaLibrariesModule,
       ReadingRecordsModule,
     ],
   }).compile();

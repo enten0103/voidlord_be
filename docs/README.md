@@ -16,11 +16,13 @@
 ---
 ## 1. 核心领域模块
 
+> 🚨 迁移公告：原 Book-Lists (书单) 模块已被全新的媒体库 Media Libraries 替换。请使用 `MEDIA_LIBRARIES_README.md` 文档与 `/media-libraries` 端点。旧 `BOOK_LISTS_README.md` 已标记 Deprecated，仅保留一版过渡。
+
 | 模块 | 职责概述 | 关键能力 | 文档 | 主要实体 |
 |------|----------|----------|------|----------|
 | Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
-| Book-Lists | 用户自定义/系统维护的书单集合（带标签和嵌套支持） | 书单 CRUD、书籍关联、标签管理、书单嵌套、排序复制 | `BOOK_LISTS_README.md` | BookList, BookListItem, Tag |
-| Recommendations | 首页/公共推荐分区与书单条目 | 推荐分区与条目 CRUD、公开聚合（推荐目标为 BookList） | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection, RecommendationItem |
+| Media Libraries | 统一的用户/系统集合（支持书籍与子库嵌套、复制、标签、系统库保护） | 创建/列表/详情/添加书/嵌套库/删除条目/更新/复制 | `MEDIA_LIBRARIES_README.md` | MediaLibrary, MediaLibraryItem, Tag |
+| Recommendations | 首页/公共推荐分区与媒体库条目 | 推荐分区与条目 CRUD、公开聚合（推荐目标为 MediaLibrary） | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection, RecommendationItem |
 | Reading Records | 用户阅读进度与统计 | Upsert 进度、状态流转、分钟统计、汇总 | `READING_RECORDS_README.md` | ReadingRecord |
 
 ### 1.1 Books 模块功能切片
@@ -109,15 +111,15 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 认证 | 登录 | /auth/login | POST | 开放 | 返回登录态 |
 | 认证 | Profile | /auth/profile | GET | 登录 | 基本资料 |
 | 认证 | Protected 示例 | /auth/protected | GET | 登录 | 演示 JWT 注入 |
-| 书单 | CRUD | /book-lists* | 多种 | (视实现) | 排序与关联、标签支持、嵌套结构 |
-| 书单 | 创建书单（带标签） | /book-lists | POST | 登录 | 支持 tags 数组，自动去重 |
-| 书单 | 列表书单 | /book-lists/my | GET | 登录 | 返回含 items_count 和 tags |
-| 书单 | 获取详情 | /book-lists/:id | GET | 登录/公开 | 包含书单的所有标签 |
-| 书单 | 更新书单 | /book-lists/:id | PATCH | 登录(owner) | 支持更新 tags |
-| 书单 | 删除书单 | /book-lists/:id | DELETE | 登录(owner) | - |
-| 书单 | 添加书籍 | /book-lists/:id/books | POST | 登录(owner) | - |
-| 书单 | 移除书籍 | /book-lists/:id/books/:bookId | DELETE | 登录(owner) | - |
-| 书单 | 复制书单 | /book-lists/:id/copy | POST | 登录 | 继承源书单的标签 |
+| 媒体库 | 创建库 | /media-libraries | POST | 登录 | name 唯一，可附 tags |
+| 媒体库 | 我的库列表 | /media-libraries/my | GET | 登录 | 含 items_count, tags |
+| 媒体库 | 库详情 | /media-libraries/:id | GET | 登录/公开 | items 中含 book 或 child_library |
+| 媒体库 | 添加书籍 | /media-libraries/:id/books/:bookId | POST | 登录(owner) | 系统库禁止 |
+| 媒体库 | 嵌套子库 | /media-libraries/:id/libraries/:childId | POST | 登录(owner) | 禁止 self/重复 |
+| 媒体库 | 删除条目 | /media-libraries/:id/items/:itemId | DELETE | 登录(owner) | 统一删除书或子库条目 |
+| 媒体库 | 更新库 | /media-libraries/:id | PATCH | 登录(owner) | name 去重 / tags 覆盖 / 系统库锁定 |
+| 媒体库 | 复制库 | /media-libraries/:id/copy | POST | 登录 | 仅复制书籍条目，名称自动去重 |
+| 媒体库 | 删除库 | /media-libraries/:id | DELETE | 登录(owner) | 系统库禁止 |
 | 权限 | 授予 | /permissions/grant | POST | USER_UPDATE(2) | level2 仅授予 level1 |
 | 权限 | 撤销 | /permissions/revoke | POST | USER_UPDATE(2) | level2 仅撤销自己授予 |
 | 权限 | 用户权限查看 | /permissions/user/:id | GET | USER_READ(1) | 列表 |
@@ -136,7 +138,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | Reading Records | Upsert / 汇总 / 状态计算 | 进度更新 / 删除 / 统计 | finished_ratio / 时间字段 | - |
 | Permissions | 授予 / 撤销逻辑 | 授权失败 / 升级规则 | 等级限制与403/401 | - |
 | Files | 策略生成 / 所有权删除判断 | 上传/删除路径 | 权限分支 | 需更多负载测试 |
-| Book-Lists | 列表 CRUD / 排序 | 关联书籍 / 权限控制 | 排序与响应结构 | - |
+| Media Libraries | 库 CRUD / 条目添加 / 嵌套 / 复制 | 添加书籍 / 嵌套库 / 复制名称去重 | 系统库锁定、重复冲突、私有访问控制 | - |
 
 质量门槛：当前 Lint 0 错误；所有单元与 E2E 用例通过。新增功能需：
 1. 提供最小单元测试（正常 + 至少1边界）
@@ -177,7 +179,8 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | `RECOMMENDATIONS_GUIDE.md` | 推荐分区/条目管理与公开接口 |
 | `AUTH_README.md` | 用户注册、登录与 JWT 保护端点 |
 | `READING_RECORDS_README.md` | 阅读记录 Upsert + 汇总统计 |
-| `BOOK_LISTS_README.md` | 书单 CRUD 与条目管理 |
+| `MEDIA_LIBRARIES_README.md` | 媒体库（替代书单） CRUD / 嵌套 / 复制 / 系统库 |
+| `BOOK_LISTS_README.md` | (Deprecated) 旧书单文档，迁移参考 |
 | `FILES_GUIDE.md` | 文件策略、上传与删除权限判定 |
 | `DATABASE_GUIDE.md` | 双数据库启动、环境和故障排查 |
 | `TAG_SEARCH_API_SUMMARY.md` | (Deprecated) 已迁移至 `BOOKS_TAG_SEARCH.md` |

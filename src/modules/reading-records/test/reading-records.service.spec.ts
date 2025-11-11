@@ -5,11 +5,15 @@ import { ReadingRecordsService } from '../reading-records.service';
 import { ReadingRecord } from '../../../entities/reading-record.entity';
 import { Book } from '../../../entities/book.entity';
 import { NotFoundException } from '@nestjs/common';
+import { MediaLibrary } from '../../../entities/media-library.entity';
+import { MediaLibraryItem } from '../../../entities/media-library-item.entity';
 
 describe('ReadingRecordsService', () => {
   let service: ReadingRecordsService;
   let recordRepo: jest.Mocked<Repository<ReadingRecord>>;
   let bookRepo: jest.Mocked<Repository<Book>>;
+  let libraryRepo: jest.Mocked<Repository<MediaLibrary>>;
+  let itemRepo: jest.Mocked<Repository<MediaLibraryItem>>;
 
   const mockRecordRepo: Partial<jest.Mocked<Repository<ReadingRecord>>> = {
     findOne: jest.fn(),
@@ -21,6 +25,16 @@ describe('ReadingRecordsService', () => {
   const mockBookRepo: Partial<jest.Mocked<Repository<Book>>> = {
     findOne: jest.fn(),
   };
+  const mockLibraryRepo: Partial<jest.Mocked<Repository<MediaLibrary>>> = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+  const mockItemRepo: Partial<jest.Mocked<Repository<MediaLibraryItem>>> = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -31,11 +45,21 @@ describe('ReadingRecordsService', () => {
           useValue: mockRecordRepo,
         },
         { provide: getRepositoryToken(Book), useValue: mockBookRepo },
+        {
+          provide: getRepositoryToken(MediaLibrary),
+          useValue: mockLibraryRepo,
+        },
+        {
+          provide: getRepositoryToken(MediaLibraryItem),
+          useValue: mockItemRepo,
+        },
       ],
     }).compile();
     service = moduleRef.get(ReadingRecordsService);
     recordRepo = moduleRef.get(getRepositoryToken(ReadingRecord));
     bookRepo = moduleRef.get(getRepositoryToken(Book));
+    libraryRepo = moduleRef.get(getRepositoryToken(MediaLibrary));
+    itemRepo = moduleRef.get(getRepositoryToken(MediaLibraryItem));
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -53,8 +77,19 @@ describe('ReadingRecordsService', () => {
       total_minutes: 0,
       updated_at: new Date(),
     } as unknown as ReadingRecord);
+    // system library ensure + item insertion
+    libraryRepo.findOne.mockResolvedValueOnce(null);
+    libraryRepo.create.mockReturnValueOnce({ id: 50 } as MediaLibrary);
+    libraryRepo.save.mockResolvedValueOnce({ id: 50 } as MediaLibrary);
+    itemRepo.findOne.mockResolvedValueOnce(null);
+    itemRepo.create.mockReturnValueOnce({ id: 77 } as MediaLibraryItem);
+    itemRepo.save.mockResolvedValueOnce({ id: 77 } as MediaLibraryItem);
     const res = await service.upsert(5, { bookId: 1 });
     expect(res.id).toBe(9);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(libraryRepo.create).toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(itemRepo.create).toHaveBeenCalled();
   });
 
   it('updates existing record and increments minutes', async () => {
@@ -72,12 +107,16 @@ describe('ReadingRecordsService', () => {
       total_minutes: 25,
       updated_at: new Date(),
     } as unknown as ReadingRecord);
+    libraryRepo.findOne.mockResolvedValueOnce({ id: 50 } as MediaLibrary); // existing system library
+    itemRepo.findOne.mockResolvedValueOnce({ id: 77 } as MediaLibraryItem); // item already exists
     const res = await service.upsert(5, {
       bookId: 1,
       progress: 60,
       minutes_increment: 15,
     });
     expect(res.total_minutes).toBe(25);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(libraryRepo.create).not.toHaveBeenCalled();
   });
 
   it('getOne returns record', async () => {

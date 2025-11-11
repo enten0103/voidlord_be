@@ -12,8 +12,8 @@ import { UserConfig } from '../entities/user-config.entity';
 import { FileObject } from '../entities/file-object.entity';
 import { BookRating } from '../entities/book-rating.entity';
 import { Comment } from '../entities/comment.entity';
-import { FavoriteList } from '../entities/favorite-list.entity';
-import { FavoriteListItem } from '../entities/favorite-list-item.entity';
+import { MediaLibrary } from '../entities/media-library.entity';
+import { MediaLibraryItem } from '../entities/media-library-item.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -38,8 +38,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         FileObject,
         BookRating,
         Comment,
-        FavoriteList,
-        FavoriteListItem,
+        MediaLibrary,
+        MediaLibraryItem,
       ],
       synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE', true), // 仅在开发环境使用
       logging: this.configService.get<boolean>('DB_LOGGING', false),
