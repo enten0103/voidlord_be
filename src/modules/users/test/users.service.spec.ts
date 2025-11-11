@@ -5,18 +5,24 @@ import { UsersService } from '../users.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../../entities/user.entity';
+import { MediaLibrary } from '../../../entities/media-library.entity';
 
 jest.mock('bcryptjs');
 
 describe('UsersService', () => {
   let service: UsersService;
 
-  const mockRepository = {
+  const mockUserRepo = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
     remove: jest.fn(),
+  };
+  const mockLibraryRepo = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,7 +31,11 @@ describe('UsersService', () => {
         UsersService,
         {
           provide: getRepositoryToken(User),
-          useValue: mockRepository,
+          useValue: mockUserRepo,
+        },
+        {
+          provide: getRepositoryToken(MediaLibrary),
+          useValue: mockLibraryRepo,
         },
       ],
     }).compile();
@@ -58,26 +68,33 @@ describe('UsersService', () => {
         updated_at: new Date(),
       };
 
-      mockRepository.findOne.mockResolvedValue(null);
+      mockUserRepo.findOne.mockResolvedValue(null);
       (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
-      mockRepository.create.mockReturnValue(savedUser);
-      mockRepository.save.mockResolvedValue(savedUser);
+      mockUserRepo.create.mockReturnValue(savedUser);
+      mockUserRepo.save.mockResolvedValue(savedUser);
+      mockLibraryRepo.findOne.mockResolvedValue(null);
+      mockLibraryRepo.create.mockReturnValue({ id: 99, name: '系统阅读记录' });
+      mockLibraryRepo.save.mockResolvedValue({ id: 99, name: '系统阅读记录' });
 
       const result = await service.create(createUserDto);
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({
+      expect(mockUserRepo.findOne).toHaveBeenCalledWith({
         where: [
           { username: createUserDto.username },
           { email: createUserDto.email },
         ],
       });
       expect(bcrypt.hash).toHaveBeenCalledWith(createUserDto.password, 10);
-      expect(mockRepository.create).toHaveBeenCalledWith({
+      expect(mockUserRepo.create).toHaveBeenCalledWith({
         username: createUserDto.username,
         email: createUserDto.email,
         password: hashedPassword,
       });
-      expect(mockRepository.save).toHaveBeenCalledWith(savedUser);
+      expect(mockUserRepo.save).toHaveBeenCalledWith(savedUser);
+      // 系统阅读记录媒体库创建逻辑触发
+      expect(mockLibraryRepo.findOne).toHaveBeenCalled();
+      expect(mockLibraryRepo.create).toHaveBeenCalled();
+      expect(mockLibraryRepo.save).toHaveBeenCalled();
       expect(result).toEqual(savedUser);
     });
 
@@ -88,7 +105,7 @@ describe('UsersService', () => {
         password: 'password123',
       };
 
-      mockRepository.findOne.mockResolvedValue({ id: 1, username: 'testuser' });
+      mockUserRepo.findOne.mockResolvedValue({ id: 1, username: 'testuser' });
 
       await expect(service.create(createUserDto)).rejects.toThrow(
         ConflictException,
@@ -99,16 +116,16 @@ describe('UsersService', () => {
   describe('findOne', () => {
     it('should return a user if found', async () => {
       const user = { id: 1, username: 'testuser', email: 'test@example.com' };
-      mockRepository.findOne.mockResolvedValue(user);
+      mockUserRepo.findOne.mockResolvedValue(user);
 
       const result = await service.findOne(1);
 
-      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(mockUserRepo.findOne).toHaveBeenCalledWith({ where: { id: 1 } });
       expect(result).toEqual(user);
     });
 
     it('should throw NotFoundException if user not found', async () => {
-      mockRepository.findOne.mockResolvedValue(null);
+      mockUserRepo.findOne.mockResolvedValue(null);
 
       await expect(service.findOne(1)).rejects.toThrow(NotFoundException);
     });

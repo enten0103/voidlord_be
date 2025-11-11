@@ -41,6 +41,8 @@
 ---
 ## 3. Upsert 语义
 ```http
+> Deprecated: `reading-records` 模块已移除，阅读进度请使用用户自动创建的系统媒体库 **“系统阅读记录”** (`is_system=true`) 来管理正在阅读/已完成的书籍集合。原本的分钟统计与进度字段暂未保留；若需扩展请在 MediaLibraryItem 上新增属性或新建独立聚合表。
+
 POST /reading-records
 Authorization: Bearer <jwt>
 Content-Type: application/json

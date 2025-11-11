@@ -23,7 +23,7 @@
 | Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
 | Media Libraries | 统一的用户/系统集合（支持书籍与子库嵌套、复制、标签、系统库保护） | 创建/列表/详情/添加书/嵌套库/删除条目/更新/复制 | `MEDIA_LIBRARIES_README.md` | MediaLibrary, MediaLibraryItem, Tag |
 | Recommendations | 首页/公共推荐分区与媒体库条目 | 推荐分区与条目 CRUD、公开聚合（推荐目标为 MediaLibrary） | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection, RecommendationItem |
-| Reading Records | 用户阅读进度与统计 | Upsert 进度、状态流转、分钟统计、汇总 | `READING_RECORDS_README.md` | ReadingRecord |
+| Reading Records (Deprecated) | 原用户阅读进度与统计（已被系统媒体库取代） | Upsert / 统计（已移除） | `READING_RECORDS_README.md` | (Removed) |
 
 ### 1.1 Books 模块功能切片
 - 创建 / 更新 / 删除 图书（模型仅含 id / create_by / timestamps / tags）
@@ -66,7 +66,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 评论回复 | 对某评论楼中楼 | POST /books/:id/comments/:commentId/replies | 登录 | 同上 |
 | 推荐公开浏览 | 获取公共推荐视图 | GET /recommendations/public | 无 | 缓存潜力 |
 | 评分 | 为图书评分 | POST /books/:id/rating | 登录 | 平均值 + 计数返回 |
-| 阅读进度 | Upsert 阅读记录 | POST /reading-records | 登录 | 逻辑去重 |
+| 阅读进度(Deprecated) | Upsert 阅读记录 | POST /reading-records | - | 模块移除，使用系统媒体库 |
 
 ---
 ## 4. 文件与基础设施
@@ -101,10 +101,10 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 图书 | 新增评论 | /books/:id/comments | POST | 登录 | 内容长度 1-2000 |
 | 图书 | 删除评论 | /books/:id/comments/:commentId | DELETE | 登录/COMMENT_MANAGE | 作者或权限 |
 | 图书 | 评分 | /books/:id/rating | POST | 登录 | 响应含平均值；评分不依赖标题 |
-| 阅读记录 | Upsert | /reading-records | POST | 登录 | minutes 增量累加 |
-| 阅读记录 | 单本记录 | /reading-records/book/:bookId | GET | 登录 | 404 不存在 |
-| 阅读记录 | 我的记录列表 | /reading-records/my | GET | 登录 | 更新时间降序 |
-| 阅读记录 | 汇总统计 | /reading-records/stats/summary | GET | 登录 | 完成率计算 |
+| 阅读记录(Deprecated) | Upsert | /reading-records | POST | - | 模块移除，使用系统媒体库 |
+| 阅读记录(Deprecated) | 单本记录 | /reading-records/book/:bookId | GET | - | 模块移除 |
+| 阅读记录(Deprecated) | 我的记录列表 | /reading-records/my | GET | - | 模块移除 |
+| 阅读记录(Deprecated) | 汇总统计 | /reading-records/stats/summary | GET | - | 模块移除 |
 | 推荐 | 分区管理 | /recommendations/sections | POST/PATCH/DELETE | RECOMMENDATION_MANAGE(1) | - |
 | 推荐 | 公共推荐 | /recommendations/public | GET | 开放 | 聚合显示（条目含 list） |
 | 认证 | 注册 | /auth/register | POST | 开放 | 返回登录态 |
