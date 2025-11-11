@@ -285,4 +285,30 @@ describe('MediaLibrariesService', () => {
     libraryRepo.findOne.mockResolvedValueOnce(null as unknown as MediaLibrary);
     await expect(service.getOne(99, 5)).rejects.toThrow(NotFoundException);
   });
+
+  it('getReadingRecord ok', async () => {
+    libraryRepo.findOne.mockResolvedValueOnce({
+      id: 77,
+      name: '系统阅读记录',
+      description: null,
+      is_public: false,
+      is_system: true,
+      owner: stubUser(5),
+      tags: [],
+      created_at: new Date(),
+      updated_at: new Date(),
+      items: [],
+    } as MediaLibrary);
+    itemRepo.find.mockResolvedValueOnce([]);
+    const r = await service.getReadingRecord(5);
+    expect(r.name).toBe('系统阅读记录');
+    expect(r.is_system).toBe(true);
+  });
+
+  it('getReadingRecord not found', async () => {
+    libraryRepo.findOne.mockResolvedValueOnce(null as unknown as MediaLibrary);
+    await expect(service.getReadingRecord(5)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
 });

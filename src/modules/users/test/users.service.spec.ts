@@ -93,8 +93,16 @@ describe('UsersService', () => {
       expect(mockUserRepo.save).toHaveBeenCalledWith(savedUser);
       // 系统阅读记录媒体库创建逻辑触发
       expect(mockLibraryRepo.findOne).toHaveBeenCalled();
-      expect(mockLibraryRepo.create).toHaveBeenCalled();
-      expect(mockLibraryRepo.save).toHaveBeenCalled();
+      expect(mockLibraryRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: '系统阅读记录',
+          is_system: true,
+          is_public: false,
+        }),
+      );
+      expect(mockLibraryRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ name: '系统阅读记录' }),
+      );
       expect(result).toEqual(savedUser);
     });
 
@@ -110,6 +118,45 @@ describe('UsersService', () => {
       await expect(service.create(createUserDto)).rejects.toThrow(
         ConflictException,
       );
+    });
+
+    it('should NOT create duplicate system library if already exists', async () => {
+      const createUserDto: CreateUserDto = {
+        username: 'u2',
+        email: 'u2@example.com',
+        password: 'password123',
+      };
+
+      const hashedPassword = 'hashedPassword2';
+      const savedUser = {
+        id: 2,
+        ...createUserDto,
+        password: hashedPassword,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      mockUserRepo.findOne.mockResolvedValueOnce(null); // uniqueness check pass
+      (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
+      mockUserRepo.create.mockReturnValue(savedUser);
+      mockUserRepo.save.mockResolvedValue(savedUser);
+      // first call to findOne (system lib existence) returns existing object to prevent creation
+      mockLibraryRepo.findOne.mockResolvedValueOnce({
+        id: 500,
+        name: '系统阅读记录',
+        is_system: true,
+      });
+
+      const result = await service.create(createUserDto);
+
+      expect(result).toEqual(savedUser);
+      // Should have looked for duplicate user once
+      expect(mockUserRepo.findOne).toHaveBeenCalledTimes(1);
+      // Should have called library findOne to check existence
+      expect(mockLibraryRepo.findOne).toHaveBeenCalledTimes(1);
+      // Should NOT create or save new system library
+      expect(mockLibraryRepo.create).not.toHaveBeenCalled();
+      expect(mockLibraryRepo.save).not.toHaveBeenCalled();
     });
   });
 

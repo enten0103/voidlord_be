@@ -65,6 +65,20 @@ export class MediaLibrariesController {
     >;
   }
 
+  @Get('reading-record')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get my system reading record media library' })
+  @ApiResponse({ status: 200, description: 'Detail' })
+  @ApiOkResponse({ type: MediaLibraryDetailDto })
+  getReadingRecord(
+    @Req() req: JwtRequestWithUser,
+  ): Promise<MediaLibraryDetailDto> {
+    return this.service.getReadingRecord(
+      req.user.userId,
+    ) as Promise<MediaLibraryDetailDto>;
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')

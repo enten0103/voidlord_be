@@ -109,6 +109,42 @@ export class MediaLibrariesService {
     };
   }
 
+  /**
+   * 获取当前用户的系统“阅读记录”媒体库（自动创建的 is_system 库）。
+   * 若不存在（异常状态）抛出 404；返回结构与 getOne 相同。
+   */
+  async getReadingRecord(userId: number) {
+    const lib = await this.libraryRepo.findOne({
+      where: { owner: { id: userId }, is_system: true, name: '系统阅读记录' },
+      relations: ['owner', 'tags'],
+    });
+    if (!lib)
+      throw new NotFoundException('System reading record library missing');
+    const items = await this.itemRepo.find({
+      where: { library: { id: lib.id } },
+      relations: ['book', 'child_library'],
+    });
+    return {
+      id: lib.id,
+      name: lib.name,
+      description: lib.description,
+      is_public: lib.is_public,
+      is_system: lib.is_system,
+      tags: (lib.tags || []).map((t) => ({ key: t.key, value: t.value })),
+      owner_id: lib.owner?.id || null,
+      created_at: lib.created_at,
+      updated_at: lib.updated_at,
+      items: items.map((i) => ({
+        id: i.id,
+        book: i.book ? { id: i.book.id } : null,
+        child_library: i.child_library
+          ? { id: i.child_library.id, name: i.child_library.name }
+          : null,
+      })),
+      items_count: items.length,
+    };
+  }
+
   async addBook(libraryId: number, userId: number, bookId: number) {
     const lib = await this.libraryRepo.findOne({
       where: { id: libraryId },
