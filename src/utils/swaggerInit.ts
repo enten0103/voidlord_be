@@ -7,14 +7,31 @@ export const swaggerInit = (app: INestApplication) => {
   const port = process.env.PORT || '3000';
   const permissionsList = PERMISSIONS.map((p) => `- ${p}`).join('\n');
   const levelExplain = `\nPermission Levels:\n- 0: 无权限 (no access)\n- 1: 基础使用 (basic)\n- 2: 授予/撤销其授予的 level 1\n- 3: 完全管理 (full)`;
+  const deprecationNotes = [
+    'Deprecated Modules:',
+    '- FavoriteList/FavoriteListItem 已移除，使用 MediaLibraries 替代',
+    '- reading-records 已移除，使用系统媒体库 “系统阅读记录” 替代',
+  ].join('\n');
+
   const config = new DocumentBuilder()
     .setTitle('Voidlord APIs')
     .setDescription(
-      'The Voidlord API description\n\nPermissions:\n' +
-        permissionsList +
+      [
+        'Voidlord 服务端 API 文档',
+        '',
+        '权限枚举 (Permissions):',
+        permissionsList,
         levelExplain,
+        '',
+        deprecationNotes,
+        '',
+        '说明:',
+        '- 系统媒体库不可删除/添加普通书籍（未来可扩展进度统计）',
+        '- 复制媒体库时自动处理命名冲突',
+        '- 标签体系支持自动去重与复用',
+      ].join('\n'),
     )
-    .setVersion('1.0')
+    .setVersion('1.1.0')
     .addServer(host ? `http://${host}:${port}` : `http://localhost:${port}`)
     .addBearerAuth(
       {
@@ -22,10 +39,10 @@ export const swaggerInit = (app: INestApplication) => {
         scheme: 'bearer',
         bearerFormat: 'JWT',
         name: 'JWT',
-        description: 'Enter JWT token',
+        description: '在此输入 JWT token',
         in: 'header',
       },
-      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+      'JWT-auth',
     )
     .build();
 
@@ -74,5 +91,12 @@ export const swaggerInit = (app: INestApplication) => {
       }
     }
   }
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    customSiteTitle: 'Voidlord API Docs',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'none',
+      defaultModelsExpandDepth: -1,
+    },
+  });
 };
