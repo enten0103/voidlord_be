@@ -96,7 +96,7 @@ export const swaggerInit = (app: INestApplication) => {
     swaggerOptions: {
       persistAuthorization: true,
       docExpansion: 'none',
-      defaultModelsExpandDepth: -1,
+      defaultModelsExpandDepth: 1, // 展开 DTO 模型，解决“模型消失”感知问题
     },
   });
 };
