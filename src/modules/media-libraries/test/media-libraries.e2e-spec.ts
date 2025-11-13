@@ -288,4 +288,48 @@ describe('MediaLibraries (e2e)', () => {
       .set('Authorization', `Bearer ${otherToken}`)
       .expect(403);
   });
+
+  it('virtual uploaded library returns all my books', async () => {
+    // create more books for user
+    const b2 = await request(httpServer)
+      .post('/books')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ tags: [{ key: 'genre', value: 'Fantasy' }] })
+      .expect(201);
+    parseBody(b2.body, (d): d is { id: number } => isRecord(d) && typeof d.id === 'number');
+    const b3 = await request(httpServer)
+      .post('/books')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ tags: [{ key: 'author', value: 'AuthorX' }] })
+      .expect(201);
+    parseBody(b3.body, (d): d is { id: number } => isRecord(d) && typeof d.id === 'number');
+
+    // fetch /books/my to compare count
+    const myBooksRes = await request(httpServer)
+      .get('/books/my')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    const myBooks: unknown = myBooksRes.body;
+    expect(Array.isArray(myBooks)).toBe(true);
+    const myCount = (myBooks as any[]).length;
+
+    const virtualRes = await request(httpServer)
+      .get('/media-libraries/virtual/my-uploaded')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    interface VirtualShape {
+      is_virtual: boolean;
+      items_count: number;
+      items: { book?: { id: number } | null }[];
+    }
+    const virtualBody: unknown = virtualRes.body;
+    expect(typeof virtualBody).toBe('object');
+    const v = virtualBody as VirtualShape;
+    expect(v.is_virtual).toBe(true);
+    expect(v.items_count).toBe(myCount);
+    expect(Array.isArray(v.items)).toBe(true);
+    if (myCount && v.items[0].book) {
+      expect(typeof v.items[0].book.id).toBe('number');
+    }
+  });
 });

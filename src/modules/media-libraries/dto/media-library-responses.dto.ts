@@ -64,6 +64,11 @@ export class MediaLibraryDetailDto extends MediaLibrarySummaryDto {
   items: MediaLibraryItemDto[];
 }
 
+export class VirtualMediaLibraryDetailDto extends MediaLibraryDetailDto {
+  @ApiProperty({ example: true })
+  is_virtual: boolean;
+}
+
 export class MediaLibraryUpdatedDto {
   @ApiProperty({ example: 1 })
   id: number;

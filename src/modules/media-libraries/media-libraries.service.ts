@@ -145,6 +145,35 @@ export class MediaLibrariesService {
     };
   }
 
+  /**
+   * 构造一个“虚拟媒体库”视图，包含当前用户上传的全部书籍。
+   * 不持久化库与条目，仅在访问时动态生成，id 固定为 0，is_virtual = true。
+   */
+  async getVirtualUploaded(userId: number) {
+    const books = await this.bookRepo.find({
+      where: { create_by: userId },
+      order: { created_at: 'DESC' },
+    });
+    return {
+      id: 0,
+      name: '我的上传图书 (虚拟库)',
+      description: null,
+      is_public: false,
+      is_system: false,
+      is_virtual: true,
+      tags: [] as { key: string; value: string }[],
+      owner_id: userId,
+      created_at: books[0]?.created_at || new Date(),
+      updated_at: books[0]?.updated_at || new Date(),
+      items: books.map((b) => ({
+        id: b.id,
+        book: { id: b.id },
+        child_library: null,
+      })),
+      items_count: books.length,
+    };
+  }
+
   async addBook(libraryId: number, userId: number, bookId: number) {
     const lib = await this.libraryRepo.findOne({
       where: { id: libraryId },

@@ -1,17 +1,16 @@
 ## 媒体库 (Media Libraries) 使用指南
 
-媒体库是对原有书单 (Book-Lists / FavoriteList) 的全面替换与上位抽象，用于统一管理：
+媒体库用于统一管理：
 - 用户自定义的图书集合
 - 嵌套的集合结构（库包含子库）
 - 系统级保留集合（如阅读记录系统库）
 - 复制 / 标签 / 可见性（公开 / 私有）
 
 ### 设计目标
-1. 移除 FavoriteList / BookList 冗余概念，避免双轨维护。
-2. 统一条目模型：MediaLibraryItem 可指向 Book 或 子 MediaLibrary。
-3. 显式系统库：`is_system` 防止误删 / 修改。
-4. 复制语义更清晰：仅复制条目与标签，名称自动去重 `(copy)` `(copy 2)`。
-5. 可扩展：后续可增加多媒体类型（非书籍）、排序字段、共享/协作权限模型。
+1. 统一条目模型：MediaLibraryItem 可指向 Book 或 子 MediaLibrary。
+2. 显式系统库：`is_system` 提供保护（限制删除与属性更新）。
+3. 复制语义清晰：仅复制书籍条目与标签，名称自动去重 `(copy)` `(copy 2)`。
+4. 可扩展：支持后续增加多媒体类型、排序字段、共享/协作权限模型。
 
 ### 数据模型
 | 实体 | 关键字段 | 说明 |
@@ -24,7 +23,7 @@
 - (owner, name) 唯一；复制时自动增量后缀。
 - 条目不同时包含 book 与 child_library；未显式做 DB 级互斥，在 Service 层约束。
 - 删除库：级联删除其 items；引用它的父库 items 同步清理（通过外键 onDelete: CASCADE）。
-- 系统库：`is_system=true` 时禁止更新名称 / 删除 / 添加或移除条目（视当前实现：add / remove / update 均做拦截）。
+- 系统库：`is_system=true` 时仅禁止删除与名称/属性更新；允许添加书籍、嵌套子库及移除条目。
 
 ### 端点一览
 | 方法 | 路径 | 描述 | 认证 | 备注 |
@@ -39,18 +38,7 @@
 | POST | /media-libraries/:id/copy | 复制库 | JWT | 公共或 owner；生成私有副本 |
 | DELETE | /media-libraries/:id | 删除库 | JWT | owner；系统库禁止 |
 
-### 与旧 Book-Lists 的映射
-| 旧端点 | 新端点 | 变化说明 |
-|--------|--------|----------|
-| POST /book-lists | POST /media-libraries | 字段基本一致；增加 is_system 内部控制 |
-| GET /book-lists/my | GET /media-libraries/my | items_count 逻辑等效 |
-| GET /book-lists/:id | GET /media-libraries/:id | 条目结构统一：book / child_library |
-| POST /book-lists/:id/books | POST /media-libraries/:id/books/:bookId | 参数从 body->路径 (更 REST) |
-| DELETE /book-lists/:id/books/:bookId | DELETE /media-libraries/:id/items/:itemId | 以条目 id 精确删除（支持统一处理书或子库） |
-| POST /book-lists/:id/copy | POST /media-libraries/:id/copy | 复制逻辑扩展 name 去重策略一致 |
-| 嵌套：POST /book-lists/:id/lists/:childId | POST /media-libraries/:id/libraries/:childId | 统一为 libraries 子路径 |
-| PATCH /book-lists/:id | PATCH /media-libraries/:id | 支持 tags / is_public 更新；系统库限制 |
-| DELETE /book-lists/:id | DELETE /media-libraries/:id | 行为一致；系统库保护 |
+<!-- 旧 Book-Lists 映射与迁移内容已移除，保持文档专注当前实现。 -->
 
 ### 返回结构示例
 创建：
@@ -125,9 +113,9 @@ POST /media-libraries
 | 操作 | 检查 | 异常 |
 |------|------|------|
 | 查看私有库 | `lib.owner.id === userId` | ForbiddenException |
-| 添加条目 (书/子库) | owner & 非系统库 | ForbiddenException |
+| 添加条目 (书/子库) | owner | ForbiddenException |
 | 移除条目 | 条目存在且属于库 & owner | NotFound / Forbidden |
-| 更新 | owner & 非系统库 | ForbiddenException |
+| 更新 (名称/属性/标签) | owner & 非系统库 | ForbiddenException |
 | 删除 | owner & 非系统库 | ForbiddenException |
 
 ### 标签策略
@@ -144,14 +132,7 @@ POST /media-libraries
 | 404 | 库 / 书籍 / 条目不存在 |
 | 409 | 名称冲突 / 重复添加条目 |
 
-### 迁移指南（从 Book-Lists）
-| 原字段/行为 | 迁移说明 |
-|--------------|----------|
-| `items_count` | 等效保留 |
-| 嵌套关系 (parent_list) | 使用 item.child_library 指向子库 |
-| 删除书籍条目 | 统一为删除条目 id：支持未来混合类型 |
-| 复制公开书单 | 复制公开或 owner 媒体库 | 
-| 私有可见性 | 逻辑不变：非 owner 且私有 => 403 |
+<!-- 迁移指南段落已移除。 -->
 
 ### 后续扩展计划（建议）
 1. Item 排序字段 (position) + 批量重排 API。
@@ -165,7 +146,7 @@ POST /media-libraries
 使用 `DELETE /media-libraries/:id/items/:itemId`，条目 id 来自库详情返回。
 
 **Q: 系统库能否添加书?**  
-不能；会抛出 `ForbiddenException('System library locked')`。
+可以；系统库仅限制删除与属性更新，不限制添加书籍、嵌套与移除条目。
 
 **Q: 复制时是否会复制嵌套子库?**  
 当前仅复制直接的书籍条目；保持操作可预期。

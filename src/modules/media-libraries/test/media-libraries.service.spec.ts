@@ -322,4 +322,29 @@ describe('MediaLibrariesService', () => {
       NotFoundException,
     );
   });
+
+  it('getVirtualUploaded returns all user books', async () => {
+    // mock books
+    bookRepo.findOne.mockReset(); // not used here
+    (bookRepo.find as any) = jest.fn().mockResolvedValue([
+      {
+        id: 1,
+        create_by: 5,
+        created_at: new Date(),
+        updated_at: new Date(),
+        tags: [],
+      },
+      {
+        id: 2,
+        create_by: 5,
+        created_at: new Date(),
+        updated_at: new Date(),
+        tags: [],
+      },
+    ] as Book[]);
+    const r = await service.getVirtualUploaded(5);
+    expect(r.is_virtual).toBe(true);
+    expect(r.items_count).toBe(2);
+    expect(r.items[0].book?.id).toBe(1);
+  });
 });

@@ -7,11 +7,7 @@ export const swaggerInit = (app: INestApplication) => {
   const port = process.env.PORT || '3000';
   const permissionsList = PERMISSIONS.map((p) => `- ${p}`).join('\n');
   const levelExplain = `\nPermission Levels:\n- 0: 无权限 (no access)\n- 1: 基础使用 (basic)\n- 2: 授予/撤销其授予的 level 1\n- 3: 完全管理 (full)`;
-  const deprecationNotes = [
-    'Deprecated Modules:',
-    '- FavoriteList/FavoriteListItem 已移除，使用 MediaLibraries 替代',
-    '- reading-records 已移除，使用系统媒体库 “系统阅读记录” 替代',
-  ].join('\n');
+  // 已移除的迁移/弃用说明文本，为保持文档简洁不再在描述中内嵌历史迁移信息。
 
   const config = new DocumentBuilder()
     .setTitle('Voidlord APIs')
@@ -23,11 +19,9 @@ export const swaggerInit = (app: INestApplication) => {
         permissionsList,
         levelExplain,
         '',
-        deprecationNotes,
-        '',
         '说明:',
-        '- 系统媒体库不可删除/添加普通书籍（未来可扩展进度统计）',
-        '- 复制媒体库时自动处理命名冲突',
+        '- 系统媒体库仅禁止删除与名称/属性更新；允许添加书籍、嵌套子库与移除条目',
+        '- 复制媒体库时自动处理命名冲突 ("(copy)", "(copy 2)" ...)',
         '- 标签体系支持自动去重与复用',
       ].join('\n'),
     )

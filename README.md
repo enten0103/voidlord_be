@@ -18,7 +18,6 @@
 
 ## 技术栈
 ### 1. 安装依赖
-# Book 模块使用指南
 ```bash
 pnpm install
 pnpm run docker:up

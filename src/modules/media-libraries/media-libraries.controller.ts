@@ -30,6 +30,7 @@ import {
   AddBookResponseDto,
   AddLibraryResponseDto,
   OkResponseDto,
+  VirtualMediaLibraryDetailDto,
 } from './dto/media-library-responses.dto';
 
 @ApiTags('media-libraries')
@@ -94,6 +95,24 @@ export class MediaLibrariesController {
     return this.service.getReadingRecord(
       req.user.userId,
     ) as Promise<MediaLibraryDetailDto>;
+  }
+
+  @Get('virtual/my-uploaded')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Virtual library of all my uploaded books',
+    description:
+      '返回当前用户上传的所有书籍组成的虚拟媒体库视图（动态生成，不持久化，id 固定为 0）。',
+  })
+  @ApiResponse({ status: 200, description: 'Virtual detail' })
+  @ApiOkResponse({ type: VirtualMediaLibraryDetailDto })
+  getVirtualMyUploaded(
+    @Req() req: JwtRequestWithUser,
+  ): Promise<VirtualMediaLibraryDetailDto> {
+    return this.service.getVirtualUploaded(
+      req.user.userId,
+    ) as Promise<VirtualMediaLibraryDetailDto>;
   }
 
   @Get(':id')
