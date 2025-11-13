@@ -37,6 +37,8 @@
 | PATCH | /media-libraries/:id | 更新属性/标签 | JWT | owner；name 去重；系统库禁止 |
 | POST | /media-libraries/:id/copy | 复制库 | JWT | 公共或 owner；生成私有副本 |
 | DELETE | /media-libraries/:id | 删除库 | JWT | owner；系统库禁止 |
+| GET | /media-libraries/reading-record | 系统“阅读记录”库详情 | JWT | 自动创建 is_system 库 |
+| GET | /media-libraries/virtual/my-uploaded | 虚拟“我的上传”库视图 | JWT | 动态聚合，不持久化 |
 
 <!-- 旧 Book-Lists 映射与迁移内容已移除，保持文档专注当前实现。 -->
 
@@ -102,12 +104,45 @@ POST /media-libraries
 }
 ```
 
+系统阅读记录库：
+```json
+GET /media-libraries/reading-record
+{
+  "id": 77,
+  "name": "系统阅读记录",
+  "is_system": true,
+  "is_public": false,
+  "owner_id": 5,
+  "items_count": 0,
+  "items": []
+}
+```
+
+虚拟“我的上传”库：
+```json
+GET /media-libraries/virtual/my-uploaded
+{
+  "id": 0,
+  "name": "我的上传图书 (虚拟库)",
+  "is_virtual": true,
+  "is_system": false,
+  "is_public": false,
+  "owner_id": 5,
+  "items_count": 3,
+  "items": [
+    { "id": 41, "book": { "id": 41 }, "child_library": null },
+    { "id": 35, "book": { "id": 35 }, "child_library": null }
+  ]
+}
+```
+
 ### 复制规则
 1. 源库不存在 -> 404
 2. 源库私有且非 owner -> 403
 3. 目标用户下名称冲突，则依次尝试：`(copy)`、`(copy 2)`、`(copy 3)`...
 4. 复制不保留 `is_public`（总是 false）与 `is_system`（总是 false）。
 5. 仅复制指向书籍的条目；嵌套库暂不级联深拷贝（可作为扩展）。
+6. 虚拟库不参与复制；其内容来源于实时查询。
 
 ### 权限与安全
 | 操作 | 检查 | 异常 |
@@ -150,6 +185,12 @@ POST /media-libraries
 
 **Q: 复制时是否会复制嵌套子库?**  
 当前仅复制直接的书籍条目；保持操作可预期。
+
+**Q: 虚拟“我的上传”库与普通库区别?**  
+不持久化；`id=0`；不可更新/删除/复制；用于前端快速获取聚合视图。
+
+**Q: 虚拟库是否包含我删除的书?**  
+不会；仅实时查询仍存在且 `create_by = 当前用户` 的书籍。
 
 ---
 若发现遗漏或改进机会，请提交 Issue / PR。✅

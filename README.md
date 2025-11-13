@@ -113,6 +113,11 @@ pnpm run start:prod
 
 - `GET /` - 应用信息
 - `GET /health` - 健康检查（包含数据库连接状态）
+### 媒体库端点
+- `GET /media-libraries/my` - 我的媒体库列表（含系统阅读记录库）
+- `GET /media-libraries/reading-record` - 系统“阅读记录”库详情视图
+- `GET /media-libraries/virtual/my-uploaded` - 虚拟库：聚合我上传的全部书籍（只读，id=0）
+- 其它：创建 / 复制 / 嵌套 / 添加书籍等详见 `docs/MEDIA_LIBRARIES_README.md`
 
 ## 🔐 权限矩阵 (Permission Matrix)
 
