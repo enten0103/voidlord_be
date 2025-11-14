@@ -5,7 +5,6 @@ import { User } from '../entities/user.entity';
 import { Book } from '../entities/book.entity';
 import { Tag } from '../entities/tag.entity';
 import { RecommendationSection } from '../entities/recommendation-section.entity';
-import { RecommendationItem } from '../entities/recommendation-item.entity';
 import { Permission } from '../entities/permission.entity';
 import { UserPermission } from '../entities/user-permission.entity';
 import { UserConfig } from '../entities/user-config.entity';
@@ -31,7 +30,6 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Book,
         Tag,
         RecommendationSection,
-        RecommendationItem,
         Permission,
         UserPermission,
         UserConfig,

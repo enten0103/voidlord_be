@@ -136,8 +136,7 @@ POST /permissions/revoke
 | 图书 | /books/:id | DELETE | BOOK_DELETE | 1 | 否 | 删除图书 |
 | 图书 | /books/* (读取/搜索/推荐) | GET | BOOK_READ (当前放宽) | 0 | 是 | 基本读取与搜索开放 |
 | 图书 | /books/my | GET | (需要登录) | 0 | 否 | 当前用户创建的图书 |
-| 推荐 | /recommendations/sections* | CRUD | RECOMMENDATION_MANAGE | 1 | 否 | 分区与条目管理 |
-| 推荐 | /recommendations/public | GET | (公开) | 0 | 是 | 启用分区聚合 |
+| 推荐 | /recommendations/sections* | CRUD | RECOMMENDATION_MANAGE | 1 | 否 | 分区管理（单库绑定） |
 | 权限 | /permissions/grant | POST | USER_UPDATE | 2 | 否 | 授予权限记录 |
 | 权限 | /permissions/revoke | POST | USER_UPDATE | 2 | 否 | 撤销权限记录 |
 | 权限 | /permissions/user/:id | GET | USER_READ | 1 | 否 | 查看用户权限 |

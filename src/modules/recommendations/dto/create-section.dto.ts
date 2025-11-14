@@ -37,4 +37,8 @@ export class CreateSectionDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @ApiProperty({ description: 'Associated mediaLibrary ID', example: 42 })
+  @IsInt()
+  mediaLibraryId: number;
 }

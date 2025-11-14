@@ -3,15 +3,13 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RecommendationsService } from '../recommendations.service';
 import { RecommendationSection } from '../../../entities/recommendation-section.entity';
-import { RecommendationItem } from '../../../entities/recommendation-item.entity';
 import { MediaLibrary } from '../../../entities/media-library.entity';
 import { User } from '../../../entities/user.entity';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 
 describe('RecommendationsService', () => {
   let service: RecommendationsService;
   let sectionRepo: jest.Mocked<Repository<RecommendationSection>>;
-  let itemRepo: jest.Mocked<Repository<RecommendationItem>>;
   let libraryRepo: jest.Mocked<Repository<MediaLibrary>>;
 
   const mockSection: RecommendationSection = {
@@ -23,7 +21,7 @@ describe('RecommendationsService', () => {
     active: true,
     created_at: new Date(),
     updated_at: new Date(),
-    items: [],
+    library: null as unknown as MediaLibrary,
   };
 
   const mockLibrary: MediaLibrary = {
@@ -49,13 +47,6 @@ describe('RecommendationsService', () => {
     save: jest.fn(),
     remove: jest.fn(),
   };
-  const mockItemRepo: Partial<jest.Mocked<Repository<RecommendationItem>>> = {
-    findOne: jest.fn(),
-    find: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    remove: jest.fn(),
-  };
   const mockLibraryRepo: Partial<jest.Mocked<Repository<MediaLibrary>>> = {
     findOne: jest.fn(),
     find: jest.fn(),
@@ -70,10 +61,6 @@ describe('RecommendationsService', () => {
           useValue: mockSectionRepo,
         },
         {
-          provide: getRepositoryToken(RecommendationItem),
-          useValue: mockItemRepo,
-        },
-        {
           provide: getRepositoryToken(MediaLibrary),
           useValue: mockLibraryRepo,
         },
@@ -82,76 +69,98 @@ describe('RecommendationsService', () => {
 
     service = module.get(RecommendationsService);
     sectionRepo = module.get(getRepositoryToken(RecommendationSection));
-    itemRepo = module.get(getRepositoryToken(RecommendationItem));
     libraryRepo = module.get(getRepositoryToken(MediaLibrary));
   });
 
   afterEach(() => jest.clearAllMocks());
 
   it('createSection ok', async () => {
-    sectionRepo.findOne.mockResolvedValue(null);
-    sectionRepo.create.mockReturnValue(mockSection);
-    sectionRepo.save.mockResolvedValue(mockSection);
+    sectionRepo.findOne.mockResolvedValue(null); // uniqueness check
+    libraryRepo.findOne.mockResolvedValue(mockLibrary); // library exists & public
+    const createdSection: RecommendationSection = {
+      ...mockSection,
+      id: 1,
+      key: 'today_hot',
+      title: '今日最热',
+      library: mockLibrary,
+    } as RecommendationSection;
+    sectionRepo.create.mockReturnValue(createdSection);
+    sectionRepo.save.mockResolvedValue(createdSection);
     const r = await service.createSection({
       key: 'today_hot',
       title: '今日最热',
+      mediaLibraryId: mockLibrary.id,
     });
     expect(r.key).toBe('today_hot');
+    expect(r.library?.id).toBe(mockLibrary.id);
   });
 
   it('createSection duplicate', async () => {
-    sectionRepo.findOne.mockResolvedValue(mockSection);
+    sectionRepo.findOne.mockResolvedValue(mockSection); // duplicate key
+    libraryRepo.findOne.mockResolvedValue(mockLibrary);
     await expect(
-      service.createSection({ key: 'today_hot', title: 'A' }),
+      service.createSection({
+        key: 'today_hot',
+        title: 'A',
+        mediaLibraryId: mockLibrary.id,
+      }),
     ).rejects.toThrow(ConflictException);
   });
-
-  it('addItem flow', async () => {
+  it('updateSection switch library', async () => {
+    // existing section with library A
+    const libA = { ...mockLibrary } as MediaLibrary;
+    const libB: MediaLibrary = {
+      ...mockLibrary,
+      id: 11,
+      name: 'LibB',
+    } as MediaLibrary;
     sectionRepo.findOne.mockResolvedValue({
       ...mockSection,
-      items: [],
+      library: libA,
     } as RecommendationSection);
-    libraryRepo.findOne.mockResolvedValue(mockLibrary);
-    itemRepo.findOne.mockResolvedValue(null);
-    const newItem: RecommendationItem = {
-      id: 99,
-      position: 0,
-      section: mockSection,
-      library: mockLibrary,
-      created_at: new Date(),
-      updated_at: new Date(),
-    } as RecommendationItem;
-    itemRepo.create.mockReturnValue(newItem);
-    itemRepo.save.mockResolvedValue(newItem);
-    const item = await service.addItem(1, { mediaLibraryId: 10 });
-    expect(item.library.id).toBe(10);
+    libraryRepo.findOne.mockResolvedValue(libB);
+    sectionRepo.save.mockResolvedValue({
+      ...mockSection,
+      id: 1,
+      library: libB,
+    } as RecommendationSection);
+    const updated = await service.updateSection(1, { mediaLibraryId: libB.id });
+    expect(updated.library?.id).toBe(libB.id);
   });
 
-  it('addItem duplicate', async () => {
-    sectionRepo.findOne.mockResolvedValue({
+  it('updateSection duplicate key', async () => {
+    const lib = { ...mockLibrary } as MediaLibrary;
+    sectionRepo.findOne.mockResolvedValueOnce({
       ...mockSection,
-      items: [],
-    } as RecommendationSection);
-    libraryRepo.findOne.mockResolvedValue(mockLibrary);
-    itemRepo.findOne.mockResolvedValue({ id: 1 } as RecommendationItem);
-    await expect(service.addItem(1, { mediaLibraryId: 10 })).rejects.toThrow(
+      library: lib,
+    } as RecommendationSection); // getSection
+    sectionRepo.findOne.mockResolvedValueOnce({
+      id: 99,
+    } as RecommendationSection); // duplicate key check
+    await expect(service.updateSection(1, { key: 'dup_key' })).rejects.toThrow(
       ConflictException,
     );
   });
 
-  it('removeItem ok', async () => {
-    itemRepo.findOne.mockResolvedValue({
-      id: 5,
-      section: { id: 1 },
-    } as RecommendationItem);
-    itemRepo.remove.mockResolvedValue({} as RecommendationItem);
-    await service.removeItem(1, 5);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(itemRepo.remove).toHaveBeenCalled();
-  });
-
-  it('removeItem not found', async () => {
-    itemRepo.findOne.mockResolvedValue(null);
-    await expect(service.removeItem(1, 5)).rejects.toThrow(NotFoundException);
+  it('batchReorder updates sort_order', async () => {
+    const lib = { ...mockLibrary } as MediaLibrary;
+    const s1: RecommendationSection = {
+      ...mockSection,
+      id: 1,
+      sort_order: 0,
+      library: lib,
+    } as RecommendationSection;
+    const s2: RecommendationSection = {
+      ...mockSection,
+      id: 2,
+      sort_order: 1,
+      library: lib,
+    } as RecommendationSection;
+    sectionRepo.findBy.mockResolvedValue([s1, s2]);
+    sectionRepo.save.mockResolvedValue(s1);
+    await service.batchReorder([2, 1]);
+    // objects mutated prior to save
+    expect(s1.sort_order).toBe(1);
+    expect(s2.sort_order).toBe(0);
   });
 });

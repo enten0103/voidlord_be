@@ -8,7 +8,6 @@ import { UsersModule } from '../src/modules/users/users.module';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { BooksModule } from '../src/modules/books/books.module';
 import { RecommendationSection } from '../src/entities/recommendation-section.entity';
-import { RecommendationItem } from '../src/entities/recommendation-item.entity';
 import { Permission } from '../src/entities/permission.entity';
 import { UserPermission } from '../src/entities/user-permission.entity';
 import { RecommendationsModule } from '../src/modules/recommendations/recommendations.module';
@@ -76,7 +75,6 @@ export async function createTestModule(): Promise<TestingModule> {
           Book,
           Tag,
           RecommendationSection,
-          RecommendationItem,
           Permission,
           UserPermission,
           UserConfig,
@@ -94,7 +92,6 @@ export async function createTestModule(): Promise<TestingModule> {
         Book,
         Tag,
         RecommendationSection,
-        RecommendationItem,
         Permission,
         UserPermission,
         UserConfig,

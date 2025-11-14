@@ -5,7 +5,6 @@ import { User } from '../entities/user.entity';
 import { Book } from '../entities/book.entity';
 import { Tag } from '../entities/tag.entity';
 import { RecommendationSection } from '../entities/recommendation-section.entity';
-import { RecommendationItem } from '../entities/recommendation-item.entity';
 import { Permission } from '../entities/permission.entity';
 import { UserPermission } from '../entities/user-permission.entity';
 import { PERMISSIONS } from '../modules/auth/permissions.constants';
@@ -31,7 +30,6 @@ import * as bcrypt from 'bcryptjs';
       Book,
       Tag,
       RecommendationSection,
-      RecommendationItem,
       Permission,
       UserPermission,
     ],

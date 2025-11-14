@@ -22,7 +22,7 @@
 |------|----------|----------|------|----------|
 | Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
 | Media Libraries | 统一的用户/系统集合（支持书籍与子库嵌套、复制、标签、系统库保护） | 创建/列表/详情/添加书/嵌套库/删除条目/更新/复制 | `MEDIA_LIBRARIES_README.md` | MediaLibrary, MediaLibraryItem, Tag |
-| Recommendations | 首页/公共推荐分区与媒体库条目 | 推荐分区与条目 CRUD、公开聚合（推荐目标为 MediaLibrary） | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection, RecommendationItem |
+| Recommendations | 首页推荐分区（单库绑定） | 分区 CRUD / 单库切换 / 排序重排 | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection |
 | Reading Records (Deprecated) | 原用户阅读进度与统计（已被系统媒体库取代） | Upsert / 统计（已移除） | `READING_RECORDS_README.md` | (Removed) |
 
 ### 1.1 Books 模块功能切片
@@ -64,7 +64,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 |------|------|----------|------|------|
 | 评论 (顶层) | 图书下新增评论 | POST /books/:id/comments | 登录 | 作者或 COMMENT_MANAGE 删除 |
 | 评论回复 | 对某评论楼中楼 | POST /books/:id/comments/:commentId/replies | 登录 | 同上 |
-| 推荐公开浏览 | 获取公共推荐视图 | GET /recommendations/public | 无 | 缓存潜力 |
+| 推荐浏览 | 获取启用的推荐分区 | GET /recommendations/sections | 登录 | 可加入缓存 |
 | 评分 | 为图书评分 | POST /books/:id/rating | 登录 | 平均值 + 计数返回 |
 | 阅读进度(Deprecated) | Upsert 阅读记录 | POST /reading-records | - | 模块移除，使用系统媒体库 |
 
@@ -105,8 +105,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 阅读记录(Deprecated) | 单本记录 | /reading-records/book/:bookId | GET | - | 模块移除 |
 | 阅读记录(Deprecated) | 我的记录列表 | /reading-records/my | GET | - | 模块移除 |
 | 阅读记录(Deprecated) | 汇总统计 | /reading-records/stats/summary | GET | - | 模块移除 |
-| 推荐 | 分区管理 | /recommendations/sections | POST/PATCH/DELETE | RECOMMENDATION_MANAGE(1) | - |
-| 推荐 | 公共推荐 | /recommendations/public | GET | 开放 | 聚合显示（条目含 list） |
+| 推荐 | 分区管理 | /recommendations/sections | POST/PATCH/DELETE | RECOMMENDATION_MANAGE(1) | 单库绑定 |
 | 认证 | 注册 | /auth/register | POST | 开放 | 返回登录态 |
 | 认证 | 登录 | /auth/login | POST | 开放 | 返回登录态 |
 | 认证 | Profile | /auth/profile | GET | 登录 | 基本资料 |
@@ -134,7 +133,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 模块 | 单元覆盖 | E2E 场景 | 关键断言 | 备注 |
 |------|----------|----------|----------|------|
 | Books | Service + Controller（含搜索/推荐/评论） | CRUD / 搜索六模式 / 推荐排序 / 评论权限 | 精简模型字段（无 hash/title/description）正确返回 | 评分与评论分页边界 |
-| Recommendations | 分区与条目 CRUD | 公共聚合输出 | 排序与过滤 | - |
+| Recommendations | 分区 CRUD + 单库绑定 | 重排与过滤 | 排序更新 | - |
 | Reading Records | Upsert / 汇总 / 状态计算 | 进度更新 / 删除 / 统计 | finished_ratio / 时间字段 | - |
 | Permissions | 授予 / 撤销逻辑 | 授权失败 / 升级规则 | 等级限制与403/401 | - |
 | Files | 策略生成 / 所有权删除判断 | 上传/删除路径 | 权限分支 | 需更多负载测试 |
@@ -176,7 +175,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | `BOOKS_README.md` | 精简图书模型 + 标签 + 评论/评分完整指南（已移除 hash/title/description） |
 | `BOOKS_TAG_SEARCH.md` | 六种标签搜索模式与推荐细节 |
 | `PERMISSIONS_GUIDE.md` | 等级化权限与授权流程 |
-| `RECOMMENDATIONS_GUIDE.md` | 推荐分区/条目管理与公开接口 |
+| `RECOMMENDATIONS_GUIDE.md` | 推荐分区（单库绑定）管理与排序接口 |
 | `AUTH_README.md` | 用户注册、登录与 JWT 保护端点 |
 | `READING_RECORDS_README.md` | 阅读记录 Upsert + 汇总统计 |
 | `MEDIA_LIBRARIES_README.md` | 媒体库（替代书单） CRUD / 嵌套 / 复制 / 系统库 |

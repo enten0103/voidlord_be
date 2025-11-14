@@ -2,25 +2,19 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { RecommendationSection } from '../../entities/recommendation-section.entity';
-import { RecommendationItem } from '../../entities/recommendation-item.entity';
 import { MediaLibrary } from '../../entities/media-library.entity';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
-import { AddItemDto } from './dto/add-item.dto';
-import { ReorderItemsDto } from './dto/reorder-items.dto';
 
 @Injectable()
 export class RecommendationsService {
   constructor(
     @InjectRepository(RecommendationSection)
     private sectionRepo: Repository<RecommendationSection>,
-    @InjectRepository(RecommendationItem)
-    private itemRepo: Repository<RecommendationItem>,
     @InjectRepository(MediaLibrary)
     private libraryRepo: Repository<MediaLibrary>,
   ) {}
@@ -28,7 +22,20 @@ export class RecommendationsService {
   async createSection(dto: CreateSectionDto): Promise<RecommendationSection> {
     const exists = await this.sectionRepo.findOne({ where: { key: dto.key } });
     if (exists) throw new ConflictException('Section key already exists');
-    const section = this.sectionRepo.create({ ...dto });
+    // validate mediaLibraryId
+    const lib = await this.libraryRepo.findOne({
+      where: { id: dto.mediaLibraryId },
+    });
+    if (!lib) throw new NotFoundException('Library not found');
+    if (!lib.is_public) throw new ConflictException('Library must be public');
+    const section = this.sectionRepo.create({
+      key: dto.key,
+      title: dto.title,
+      description: dto.description,
+      sort_order: dto.sort_order ?? 0,
+      active: dto.active ?? true,
+      library: lib,
+    });
     return this.sectionRepo.save(section);
   }
 
@@ -38,17 +45,18 @@ export class RecommendationsService {
     return this.sectionRepo.find({
       where: includeInactive ? {} : { active: true },
       order: { sort_order: 'ASC', id: 'ASC' },
-      relations: ['items', 'items.library'],
+      relations: ['library'],
     });
   }
 
   async getSection(id: number): Promise<RecommendationSection> {
     const section = await this.sectionRepo.findOne({
       where: { id },
-      relations: ['items', 'items.library'],
+      relations: ['library'],
     });
-    if (!section) throw new NotFoundException('Section not found');
-    section.items.sort((a, b) => a.position - b.position || a.id - b.id);
+    if (!section) {
+      throw new NotFoundException('Section not found');
+    }
     return section;
   }
 
@@ -66,6 +74,14 @@ export class RecommendationsService {
     if (dto.description !== undefined) section.description = dto.description;
     if (dto.sort_order !== undefined) section.sort_order = dto.sort_order;
     if (dto.active !== undefined) section.active = dto.active;
+    if (dto.mediaLibraryId !== undefined) {
+      const lib = await this.libraryRepo.findOne({
+        where: { id: dto.mediaLibraryId },
+      });
+      if (!lib) throw new NotFoundException('Library not found');
+      if (!lib.is_public) throw new ConflictException('Library must be public');
+      section.library = lib;
+    }
     return this.sectionRepo.save(section);
   }
 
@@ -88,80 +104,5 @@ export class RecommendationsService {
     await this.sectionRepo.save([...map.values()]);
   }
 
-  async addItem(
-    sectionId: number,
-    dto: AddItemDto,
-  ): Promise<RecommendationItem> {
-    const section = await this.sectionRepo.findOne({
-      where: { id: sectionId },
-      relations: ['items'],
-    });
-    if (!section) throw new NotFoundException('Section not found');
-    const library = await this.libraryRepo.findOne({
-      where: { id: dto.mediaLibraryId },
-    });
-    if (!library) throw new NotFoundException('Library not found');
-
-    const dup = await this.itemRepo.findOne({
-      where: {
-        section: { id: sectionId },
-        library: { id: dto.mediaLibraryId },
-      },
-    });
-    if (dup) throw new ConflictException('Library already in section');
-
-    let position: number;
-    if (dto.position !== undefined) {
-      position = dto.position;
-    } else {
-      position =
-        section.items.length === 0
-          ? 0
-          : Math.max(...section.items.map((i) => i.position)) + 1;
-    }
-
-    const item = this.itemRepo.create({
-      section,
-      library,
-      position,
-      note: dto.note,
-    });
-    return this.itemRepo.save(item);
-  }
-
-  async removeItem(sectionId: number, itemId: number): Promise<void> {
-    const item = await this.itemRepo.findOne({
-      where: { id: itemId },
-      relations: ['section'],
-    });
-    if (!item || item.section.id !== sectionId)
-      throw new NotFoundException('Item not found in section');
-    await this.itemRepo.remove(item);
-  }
-
-  async reorderItems(sectionId: number, dto: ReorderItemsDto): Promise<void> {
-    const items = await this.itemRepo.find({
-      where: { section: { id: sectionId } },
-    });
-    const map = new Map(items.map((i) => [i.id, i]));
-    let pos = 0;
-    for (const id of dto.itemIds) {
-      const item = map.get(id);
-      if (item) item.position = pos++;
-      else throw new BadRequestException(`Item ${id} not found in section`);
-    }
-    await this.itemRepo.save([...map.values()]);
-  }
-
-  async publicRecommendations(): Promise<RecommendationSection[]> {
-    const sections = await this.sectionRepo.find({
-      where: { active: true },
-      order: { sort_order: 'ASC', id: 'ASC' },
-      relations: ['items', 'items.library'],
-    });
-    for (const s of sections) {
-      s.items.sort((a, b) => a.position - b.position || a.id - b.id);
-    }
-    return sections;
-  }
+  // Simplified model: Section directly references one public MediaLibrary.
 }

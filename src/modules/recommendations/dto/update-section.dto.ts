@@ -49,4 +49,13 @@ export class UpdateSectionDto {
   @IsOptional()
   @IsArray()
   sectionOrder?: number[];
+
+  @ApiProperty({
+    description: 'Replace associated mediaLibrary',
+    required: false,
+    example: 42,
+  })
+  @IsOptional()
+  @IsInt()
+  mediaLibraryId?: number;
 }

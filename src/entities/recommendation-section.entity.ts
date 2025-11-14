@@ -2,13 +2,13 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  ManyToOne,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { RecommendationItem } from './recommendation-item.entity';
+import { MediaLibrary } from './media-library.entity';
 
 @Entity('recommendation_sections')
 @Index(['key'], { unique: true })
@@ -45,12 +45,7 @@ export class RecommendationSection {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ApiProperty({
-    type: () => [RecommendationItem],
-    description: 'Items under this section',
-  })
-  @OneToMany(() => RecommendationItem, (item) => item.section, {
-    cascade: true,
-  })
-  items: RecommendationItem[];
+  @ApiProperty({ description: 'Associated media library for this section' })
+  @ManyToOne(() => MediaLibrary, { eager: true, onDelete: 'CASCADE' })
+  library: MediaLibrary;
 }
