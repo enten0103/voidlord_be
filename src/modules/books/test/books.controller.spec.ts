@@ -6,6 +6,9 @@ import { PermissionGuard } from '../../auth/guards/permission.guard';
 import { BadRequestException } from '@nestjs/common';
 import { PermissionsService } from '../../permissions/permissions.service';
 import type { JwtRequestWithUser } from '../../../types/request.interface';
+import { CreateBookDto } from '../dto/create-book.dto';
+import { UpdateBookDto } from '../dto/update-book.dto';
+import { SearchBooksDto } from '../dto/search-books.dto';
 
 describe('BooksController', () => {
   let controller: BooksController;
@@ -69,7 +72,7 @@ describe('BooksController', () => {
 
   describe('create', () => {
     it('should create a book', async () => {
-      const createBookDto = { tags: [] } as never;
+  const createBookDto: CreateBookDto = { tags: [] };
 
       mockBooksService.create.mockResolvedValue(mockBook);
 
@@ -142,9 +145,9 @@ describe('BooksController', () => {
 
   describe('searchByTags (condition-based)', () => {
     it('should search books with single eq condition', async () => {
-      const searchDto = {
+      const searchDto: SearchBooksDto = {
         conditions: [{ target: 'author', op: 'eq', value: 'John Doe' }],
-      } as never;
+      };
       mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
       expect(result).toEqual([mockBook]);
@@ -155,12 +158,12 @@ describe('BooksController', () => {
     });
 
     it('should search books with multiple AND eq conditions', async () => {
-      const searchDto = {
+      const searchDto: SearchBooksDto = {
         conditions: [
           { target: 'author', op: 'eq', value: 'John Doe' },
           { target: 'genre', op: 'eq', value: 'Fiction' },
         ],
-      } as never;
+      };
       mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
       expect(result).toEqual([mockBook]);
@@ -171,7 +174,7 @@ describe('BooksController', () => {
     });
 
     it('should return all books when conditions missing', async () => {
-      const searchDto = {} as never;
+  const searchDto: SearchBooksDto = {};
       mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
       expect(result).toEqual([mockBook]);
@@ -278,7 +281,7 @@ describe('BooksController', () => {
 
   describe('update', () => {
     it('should update a book', async () => {
-      const updateBookDto = { tags: [] } as never;
+  const updateBookDto: UpdateBookDto = { tags: [] };
       const updatedBook = { ...mockBook };
 
       mockBooksService.update.mockResolvedValue(updatedBook);
