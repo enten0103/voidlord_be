@@ -185,9 +185,17 @@ export class BooksController {
           title: 'Multiple tag IDs (AND logic)',
           example: { tagIds: '12,34,56' },
         },
+        {
+          title: 'Return all (no criteria)',
+          example: {},
+        },
       ],
     },
     examples: {
+      fuzzy: {
+        summary: 'Fuzzy (partial, case-insensitive) matches tag key OR value',
+        value: { q: 'asim' },
+      },
       byTagKeys: {
         summary: 'Tag keys only',
         value: { tagKeys: 'author,genre' },
@@ -212,6 +220,14 @@ export class BooksController {
       byMultipleTagIds: {
         summary: 'Multiple tag IDs AND',
         value: { tagIds: '5,8,11' },
+      },
+      priorityDemo: {
+        summary: 'Priority demo: q overrides other fields',
+        value: { q: 'asim', tagKeys: 'genre', tagKey: 'author', tagValue: 'Other' },
+      },
+      allBooks: {
+        summary: 'Return all books (empty body)',
+        value: {},
       },
     },
   })

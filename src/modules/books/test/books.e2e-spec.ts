@@ -509,6 +509,36 @@ describe('Books (e2e)', () => {
         .expect(201);
       expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
     });
+
+    it('should fuzzy search books by partial match (q)', async () => {
+      const response = await request(httpServer)
+        .post('/books/search')
+        .send({ q: 'asim' })
+        .expect(201);
+      const body = parseBody(response.body, isBookLiteArray);
+      // Expect only Asimov books (2)
+      expect(body).toHaveLength(2);
+      expect(body.map((b) => b.id).sort()).toEqual([bookId1, bookId3].sort());
+    });
+
+    it('should prioritize fuzzy search over other modes when q present', async () => {
+      const response = await request(httpServer)
+        .post('/books/search')
+        .send({ q: 'asim', tagKeys: 'author,genre' })
+        .expect(201);
+      const body = parseBody(response.body, isBookLiteArray);
+      // Tag keys would return 3 books, fuzzy should restrict to 2
+      expect(body).toHaveLength(2);
+      expect(body.map((b) => b.id).sort()).toEqual([bookId1, bookId3].sort());
+    });
+
+    it('should return empty array for blank fuzzy query', async () => {
+      const response = await request(httpServer)
+        .post('/books/search')
+        .send({ q: '   ' })
+        .expect(201);
+      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
+    });
   });
 
   describe('/books/tags/:key/:value (GET)', () => {
