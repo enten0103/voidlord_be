@@ -389,6 +389,89 @@ describe('BooksService', () => {
     });
   });
 
+  describe('searchByConditions', () => {
+    it('should delegate to findAll when conditions empty', async () => {
+      const spy = jest
+        .spyOn(service, 'findAll')
+        .mockResolvedValueOnce([mockBook]);
+      const res = await service.searchByConditions([]);
+      expect(spy).toHaveBeenCalled();
+      expect(res).toEqual([mockBook]);
+    });
+
+    it('should build AND chain for eq, neq, match', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockBook]),
+      };
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
+      const res = await service.searchByConditions([
+        { target: 'author', op: 'eq', value: 'John Doe' },
+        { target: 'genre', op: 'neq', value: 'Fiction' },
+        { target: 'year', op: 'match', value: '195' },
+      ]);
+      expect(res).toEqual([mockBook]);
+      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'book',
+      );
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'book.tags',
+        'tag',
+      );
+      // andWhere call assertions (eq, neq, match)
+      type AndWhereCall = [string, Record<string, unknown>];
+      const calls: AndWhereCall[] = (
+        mockQueryBuilder.andWhere as unknown as jest.Mock
+      ).mock.calls as AndWhereCall[];
+      expect(calls).toHaveLength(3);
+      // eq
+      expect(calls[0][0]).toContain('EXISTS');
+      expect(calls[0][0]).toContain('t.key = :key0');
+      expect(calls[0][0]).toContain('t.value = :val0');
+      expect(calls[0][1]).toEqual({
+        key0: 'author',
+        val0: 'John Doe',
+      });
+      // neq
+      expect(calls[1][0]).toContain('NOT EXISTS');
+      expect(calls[1][0]).toContain('t.key = :key1');
+      expect(calls[1][0]).toContain('t.value = :val1');
+      expect(calls[1][1]).toEqual({
+        key1: 'genre',
+        val1: 'Fiction',
+      });
+      // match
+      expect(calls[2][0]).toContain('EXISTS');
+      expect(calls[2][0]).toContain('ILIKE :val2');
+      expect(calls[2][1]).toEqual({
+        key2: 'year',
+        val2: '%195%',
+      });
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'book.created_at',
+        'DESC',
+      );
+    });
+
+    it('should throw BadRequestException for unsupported op', async () => {
+      const invalid = [
+        { target: 'x', op: 'eq', value: '1' },
+        { target: 'y', op: 'invalid', value: '2' } as unknown as {
+          target: string;
+          op: 'eq' | 'neq' | 'match';
+          value: string;
+        },
+      ];
+      await expect(service.searchByConditions(invalid)).rejects.toThrow(
+        'Unsupported op: invalid',
+      );
+    });
+  });
+
   describe('recommendByBook', () => {
     it('should return empty array when limit <= 0', async () => {
       const result = await service.recommendByBook(1, 0);

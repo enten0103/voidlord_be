@@ -192,87 +192,37 @@ export class BooksController {
       ],
     },
     examples: {
-      fuzzy: {
-        summary: 'Fuzzy (partial, case-insensitive) matches tag key OR value',
-        value: { q: 'asim' },
+      singleEq: {
+        summary: 'Single equality condition',
+        value: { conditions: [{ target: 'author', op: 'eq', value: 'Isaac Asimov' }] },
       },
-      byTagKeys: {
-        summary: 'Tag keys only',
-        value: { tagKeys: 'author,genre' },
-      },
-      bySingleKeyValue: {
-        summary: 'Single key-value pair',
-        value: { tagKey: 'author', tagValue: 'Isaac Asimov' },
-      },
-      byMultipleKeyValues: {
-        summary: 'Multiple key-value OR',
+      andCombo: {
+        summary: 'AND combination (author eq + genre eq)',
         value: {
-          tagFilters: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
+          conditions: [
+            { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+            { target: 'genre', op: 'eq', value: 'Science Fiction' },
           ],
         },
       },
-      bySingleTagId: {
-        summary: 'Single tag ID',
-        value: { tagId: 5 },
+      neqExample: {
+        summary: 'Exclude a specific value (neq)',
+        value: {
+          conditions: [
+            { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+            { target: 'genre', op: 'neq', value: 'Science Fiction' },
+          ],
+        },
       },
-      byMultipleTagIds: {
-        summary: 'Multiple tag IDs AND',
-        value: { tagIds: '5,8,11' },
+      matchExample: {
+        summary: 'Partial match (ILIKE)',
+        value: { conditions: [{ target: 'author', op: 'match', value: 'asim' }] },
       },
-      priorityDemo: {
-        summary: 'Priority demo: q overrides other fields',
-        value: { q: 'asim', tagKeys: 'genre', tagKey: 'author', tagValue: 'Other' },
-      },
-      allBooks: {
-        summary: 'Return all books (empty body)',
-        value: {},
-      },
+      empty: { summary: 'Empty body returns all', value: {} },
     },
   })
   async searchByTags(@Body() searchDto: SearchBooksDto) {
-    // 首先处理模糊查询 (q) – 对 tag.key / tag.value 进行部分匹配
-    if (searchDto.q) {
-      return this.booksService.findByFuzzy(searchDto.q);
-    }
-    // 按tag keys搜索
-    if (searchDto.tagKeys) {
-      const tagKeys = searchDto.tagKeys.split(',').map((tag) => tag.trim());
-      return this.booksService.findByTags(tagKeys);
-    }
-
-    // 按单个key-value对搜索
-    if (searchDto.tagKey && searchDto.tagValue) {
-      return this.booksService.findByTagKeyValue(
-        searchDto.tagKey,
-        searchDto.tagValue,
-      );
-    }
-
-    // 按多个key-value对搜索
-    if (searchDto.tagFilters && searchDto.tagFilters.length > 0) {
-      return this.booksService.findByMultipleTagValues(searchDto.tagFilters);
-    }
-
-    // 按单个tag ID搜索
-    if (searchDto.tagId) {
-      return this.booksService.findByTagId(searchDto.tagId);
-    }
-
-    // 按多个tag IDs搜索
-    if (searchDto.tagIds) {
-      const tagIds = searchDto.tagIds
-        .split(',')
-        .map((id) => parseInt(id.trim()))
-        .filter((id) => !isNaN(id));
-      if (tagIds.length > 0) {
-        return this.booksService.findByTagIds(tagIds);
-      }
-    }
-
-    // 如果没有提供搜索条件，返回所有书籍
-    return this.booksService.findAll();
+    return this.booksService.searchByConditions(searchDto.conditions || []);
   }
 
   @Get('tags/:key/:value')

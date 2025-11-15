@@ -391,153 +391,172 @@ describe('Books (e2e)', () => {
   });
 
   describe('/books/search (POST)', () => {
-    let bookId1: number;
-    let bookId2: number;
-    let bookId3: number;
+    let bookId1: number; // Asimov + SF + 1950
+    let bookId2: number; // Tolkien + Fantasy + 1954
+    let bookId3: number; // Asimov + SF + 1951
+    let bookId4: number; // Asimov + Fantasy + 1960 (for neq test)
 
     beforeEach(async () => {
-      // 清理数据 - 使用级联删除
+      // 清理数据
       const books = await bookRepository.find();
-      if (books.length > 0) {
-        await bookRepository.remove(books);
-      }
-
+      if (books.length > 0) await bookRepository.remove(books);
       const tags = await tagRepository.find();
-      if (tags.length > 0) {
-        await tagRepository.remove(tags);
-      }
+      if (tags.length > 0) await tagRepository.remove(tags);
 
-      // 创建测试数据
-      const book1 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-            { key: 'year', value: '1950' },
-          ],
-        });
-      bookId1 = parseBody(book1.body, isBookLite).id;
+      // 数据集
+      bookId1 = parseBody(
+        (
+          await request(httpServer)
+            .post('/books')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+              tags: [
+                { key: 'author', value: 'Isaac Asimov' },
+                { key: 'genre', value: 'Science Fiction' },
+                { key: 'year', value: '1950' },
+              ],
+            })
+        ).body,
+        isBookLite,
+      ).id;
 
-      const book2 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'J.R.R. Tolkien' },
-            { key: 'genre', value: 'Fantasy' },
-            { key: 'year', value: '1954' },
-          ],
-        });
-      bookId2 = parseBody(book2.body, isBookLite).id;
+      bookId2 = parseBody(
+        (
+          await request(httpServer)
+            .post('/books')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+              tags: [
+                { key: 'author', value: 'J.R.R. Tolkien' },
+                { key: 'genre', value: 'Fantasy' },
+                { key: 'year', value: '1954' },
+              ],
+            })
+        ).body,
+        isBookLite,
+      ).id;
 
-      const book3 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-            { key: 'year', value: '1951' },
-          ],
-        });
-      bookId3 = parseBody(book3.body, isBookLite).id;
+      bookId3 = parseBody(
+        (
+          await request(httpServer)
+            .post('/books')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+              tags: [
+                { key: 'author', value: 'Isaac Asimov' },
+                { key: 'genre', value: 'Science Fiction' },
+                { key: 'year', value: '1951' },
+              ],
+            })
+        ).body,
+        isBookLite,
+      ).id;
+
+      bookId4 = parseBody(
+        (
+          await request(httpServer)
+            .post('/books')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+              tags: [
+                { key: 'author', value: 'Isaac Asimov' },
+                { key: 'genre', value: 'Fantasy' },
+                { key: 'year', value: '1960' },
+              ],
+            })
+        ).body,
+        isBookLite,
+      ).id;
     });
 
-    it('should search books by tag keys', async () => {
-      const response = await request(httpServer)
+    it('single eq condition', async () => {
+      const res = await request(httpServer)
         .post('/books/search')
         .send({
-          tagKeys: 'author,genre',
+          conditions: [{ target: 'author', op: 'eq', value: 'Isaac Asimov' }],
         })
         .expect(201);
-      const body1 = parseBody(response.body, isBookLiteArray);
-      expect(body1).toHaveLength(3);
-      expect(body1.map((book) => book.id).sort()).toEqual(
-        [bookId1, bookId2, bookId3].sort(),
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.map((b) => b.id).sort()).toEqual(
+        [bookId1, bookId3, bookId4].sort(),
       );
     });
 
-    it('should search books by specific tag key-value pair', async () => {
-      const response = await request(httpServer)
+    it('AND eq conditions', async () => {
+      const res = await request(httpServer)
         .post('/books/search')
         .send({
-          tagKey: 'author',
-          tagValue: 'Isaac Asimov',
-        })
-        .expect(201);
-      const body2 = parseBody(response.body, isBookLiteArray);
-      expect(body2).toHaveLength(2);
-      expect(body2.map((book) => book.id).sort()).toEqual(
-        [bookId1, bookId3].sort(),
-      );
-    });
-
-    it('should search books by multiple tag filters', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({
-          tagFilters: [
-            { key: 'genre', value: 'Fantasy' },
-            { key: 'year', value: '1950' },
+          conditions: [
+            { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+            { target: 'genre', op: 'eq', value: 'Science Fiction' },
           ],
         })
         .expect(201);
-      const body3 = parseBody(response.body, isBookLiteArray);
-      expect(body3).toHaveLength(2);
-      expect(body3.map((book) => book.id).sort()).toEqual(
-        [bookId1, bookId2].sort(),
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.map((b) => b.id).sort()).toEqual([bookId1, bookId3].sort());
+    });
+
+    it('eq + neq conditions', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({
+          conditions: [
+            { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+            { target: 'genre', op: 'neq', value: 'Science Fiction' },
+          ],
+        })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.map((b) => b.id)).toEqual([bookId4]);
+    });
+
+    it('match condition (partial ILIKE)', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({
+          conditions: [{ target: 'author', op: 'match', value: 'asim' }],
+        })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.map((b) => b.id).sort()).toEqual(
+        [bookId1, bookId3, bookId4].sort(),
       );
     });
 
-    it('should return all books when no search criteria provided', async () => {
-      const response = await request(httpServer)
+    it('single eq condition for Tolkien author', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({
+          conditions: [{ target: 'author', op: 'eq', value: 'J.R.R. Tolkien' }],
+        })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.map((b) => b.id)).toEqual([bookId2]);
+    });
+
+    it('eq genre Fantasy returns Tolkien + Asimov Fantasy', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({ conditions: [{ target: 'genre', op: 'eq', value: 'Fantasy' }] })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body.map((b) => b.id).sort()).toEqual([bookId2, bookId4].sort());
+    });
+
+    it('empty body returns all books', async () => {
+      const res = await request(httpServer)
         .post('/books/search')
         .send({})
         .expect(201);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(3);
+      const body = parseBody(res.body, isBookLiteArray);
+      expect(body).toHaveLength(4);
     });
 
-    it('should return empty array when no books match criteria', async () => {
-      const response = await request(httpServer)
+    it('invalid operator should return 400', async () => {
+      await request(httpServer)
         .post('/books/search')
-        .send({
-          tagKey: 'author',
-          tagValue: 'Nonexistent Author',
-        })
-        .expect(201);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
-    });
-
-    it('should fuzzy search books by partial match (q)', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({ q: 'asim' })
-        .expect(201);
-      const body = parseBody(response.body, isBookLiteArray);
-      // Expect only Asimov books (2)
-      expect(body).toHaveLength(2);
-      expect(body.map((b) => b.id).sort()).toEqual([bookId1, bookId3].sort());
-    });
-
-    it('should prioritize fuzzy search over other modes when q present', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({ q: 'asim', tagKeys: 'author,genre' })
-        .expect(201);
-      const body = parseBody(response.body, isBookLiteArray);
-      // Tag keys would return 3 books, fuzzy should restrict to 2
-      expect(body).toHaveLength(2);
-      expect(body.map((b) => b.id).sort()).toEqual([bookId1, bookId3].sort());
-    });
-
-    it('should return empty array for blank fuzzy query', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({ q: '   ' })
-        .expect(201);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
+        .send({ conditions: [{ target: 'author', op: 'unknown', value: 'x' }] })
+        .expect(400);
     });
   });
 
@@ -822,97 +841,6 @@ describe('Books (e2e)', () => {
     });
   });
 
-  describe('/books/search (POST) with tag IDs', () => {
-    let bookId1: number;
-    let bookId2: number;
-    let authorTagId: number;
-    let genreTagId: number;
-
-    beforeEach(async () => {
-      // 清理数据 - 使用级联删除
-      const books = await bookRepository.find();
-      if (books.length > 0) {
-        await bookRepository.remove(books);
-      }
-
-      const tags = await tagRepository.find();
-      if (tags.length > 0) {
-        await tagRepository.remove(tags);
-      }
-
-      // 创建测试数据
-      const book1 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-          ],
-        });
-      bookId1 = parseBody(book1.body, isBookLite).id;
-
-      const book2 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Fantasy' },
-          ],
-        });
-      bookId2 = parseBody(book2.body, isBookLite).id;
-
-      // 获取tag IDs
-      const authorTag = await tagRepository.findOne({
-        where: { key: 'author', value: 'Isaac Asimov' },
-      });
-      const genreTag = await tagRepository.findOne({
-        where: { key: 'genre', value: 'Science Fiction' },
-      });
-      if (!authorTag || !genreTag) {
-        throw new Error('Required tags not found');
-      }
-      authorTagId = authorTag.id;
-      genreTagId = genreTag.id;
-    });
-
-    it('should search books by single tag ID', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({
-          tagId: authorTagId,
-        })
-        .expect(201);
-      const body = parseBody(response.body, isBookLiteArray);
-      expect(body).toHaveLength(2);
-      expect(body.map((book) => book.id).sort()).toEqual(
-        [bookId1, bookId2].sort(),
-      );
-    });
-
-    it('should search books by multiple tag IDs', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({
-          tagIds: `${authorTagId},${genreTagId}`,
-        })
-        .expect(201);
-      const body = parseBody(response.body, isBookLiteArray);
-      expect(body).toHaveLength(1);
-      expect(body[0].id).toBe(bookId1);
-    });
-
-    it('should return empty array for non-existent tag ID', async () => {
-      const response = await request(httpServer)
-        .post('/books/search')
-        .send({
-          tagId: 999999,
-        })
-        .expect(201);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
-    });
-  });
 
   describe('/books/recommend/:id (GET)', () => {
     let baseId: number;

@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
@@ -438,6 +439,60 @@ export class BooksService {
       })
       .orderBy('book.created_at', 'DESC')
       .getMany();
+  }
+
+  /**
+   * 条件数组搜索：每个条件在指定 tag.key 上应用一个操作符；多个条件逻辑 AND。
+   * 支持操作符：
+   *  - eq  : 存在指定 key 且 value 全等
+   *  - neq : 不存在指定 key+value 组合（允许该 key 缺失或值不同）
+   *  - match : 存在指定 key 且 value ILIKE 模糊匹配
+   */
+  async searchByConditions(
+    conditions: Array<{
+      target: string;
+      op: 'eq' | 'neq' | 'match';
+      value: string;
+    }>,
+  ): Promise<Book[]> {
+    const list = (conditions || []).filter(
+      (c) => c && c.target && c.op && typeof c.value === 'string',
+    );
+    if (list.length === 0) {
+      return this.findAll();
+    }
+    const qb = this.bookRepository
+      .createQueryBuilder('book')
+      .leftJoinAndSelect('book.tags', 'tag');
+
+    list.forEach((c, idx) => {
+      const keyParam = `key${idx}`;
+      const valParam = `val${idx}`;
+      switch (c.op) {
+        case 'eq':
+          qb.andWhere(
+            `EXISTS (SELECT 1 FROM book_tags bt JOIN tag t ON t.id = bt.tag_id WHERE bt.book_id = book.id AND t.key = :${keyParam} AND t.value = :${valParam})`,
+            { [keyParam]: c.target, [valParam]: c.value },
+          );
+          break;
+        case 'neq':
+          qb.andWhere(
+            `NOT EXISTS (SELECT 1 FROM book_tags bt JOIN tag t ON t.id = bt.tag_id WHERE bt.book_id = book.id AND t.key = :${keyParam} AND t.value = :${valParam})`,
+            { [keyParam]: c.target, [valParam]: c.value },
+          );
+          break;
+        case 'match':
+          qb.andWhere(
+            `EXISTS (SELECT 1 FROM book_tags bt JOIN tag t ON t.id = bt.tag_id WHERE bt.book_id = book.id AND t.key = :${keyParam} AND t.value ILIKE :${valParam})`,
+            { [keyParam]: c.target, [valParam]: `%${c.value}%` },
+          );
+          break;
+        default:
+          throw new BadRequestException('Unsupported op: ' + String(c.op));
+      }
+    });
+
+    return qb.orderBy('book.created_at', 'DESC').getMany();
   }
 
   /**

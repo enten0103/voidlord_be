@@ -1,20 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsOptional,
-  IsString,
-  IsArray,
-  ValidateNested,
-  IsNumber,
-  IsPositive,
-} from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class TagFilterDto {
-  @ApiProperty({ description: 'Tag key', example: 'author' })
+export class SearchConditionDto {
+  @ApiProperty({ description: 'Tag key to search within', example: 'author' })
   @IsString()
-  key: string;
+  target: string;
 
-  @ApiProperty({ description: 'Tag value', example: 'John Doe' })
+  @ApiProperty({
+    description: 'Operator applied on the tag value',
+    example: 'eq',
+    enum: ['eq', 'neq', 'match'],
+  })
+  @IsString()
+  @IsIn(['eq', 'neq', 'match'])
+  op: 'eq' | 'neq' | 'match';
+
+  @ApiProperty({ description: 'Value used by the operator', example: 'Isaac Asimov' })
   @IsString()
   value: string;
 }
@@ -22,73 +24,17 @@ export class TagFilterDto {
 export class SearchBooksDto {
   @ApiProperty({
     description:
-      'Fuzzy query across tag key & value (case-insensitive, partial match)',
+      'Array of search conditions. Books must satisfy ALL conditions (logical AND). When empty or omitted returns all books.',
     required: false,
-    example: 'asim',
-  })
-  @IsOptional()
-  @IsString()
-  q?: string;
-
-  @ApiProperty({
-    description: 'Search by tag keys only (comma-separated)',
-    required: false,
-    example: 'author,genre',
-  })
-  @IsOptional()
-  @IsString()
-  tagKeys?: string;
-
-  @ApiProperty({
-    description: 'Search by specific tag key-value pair',
-    required: false,
-    example: 'author',
-  })
-  @IsOptional()
-  @IsString()
-  tagKey?: string;
-
-  @ApiProperty({
-    description: 'Search by specific tag value (used with tagKey)',
-    required: false,
-    example: 'John Doe',
-  })
-  @IsOptional()
-  @IsString()
-  tagValue?: string;
-
-  @ApiProperty({
-    description: 'Search by multiple tag key-value pairs',
-    required: false,
-    type: [TagFilterDto],
+    type: [SearchConditionDto],
     example: [
-      { key: 'author', value: 'John Doe' },
-      { key: 'genre', value: 'Fiction' },
+      { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+      { target: 'genre', op: 'neq', value: 'Fantasy' },
     ],
   })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => TagFilterDto)
-  tagFilters?: TagFilterDto[];
-
-  @ApiProperty({
-    description: 'Search by single tag ID',
-    required: false,
-    example: 1,
-  })
-  @IsOptional()
-  @IsNumber()
-  @IsPositive()
-  @Type(() => Number)
-  tagId?: number;
-
-  @ApiProperty({
-    description: 'Search by multiple tag IDs (comma-separated)',
-    required: false,
-    example: '1,2,3',
-  })
-  @IsOptional()
-  @IsString()
-  tagIds?: string;
+  @Type(() => SearchConditionDto)
+  conditions?: SearchConditionDto[];
 }

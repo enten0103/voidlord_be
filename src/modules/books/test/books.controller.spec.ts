@@ -31,6 +31,7 @@ describe('BooksController', () => {
     findByMultipleTagValues: jest.fn(),
     findByTagId: jest.fn(),
     findByTagIds: jest.fn(),
+    searchByConditions: jest.fn(),
     recommendByBook: jest.fn(),
   };
 
@@ -139,81 +140,43 @@ describe('BooksController', () => {
 
   // findByHash removed
 
-  describe('searchByTags', () => {
-    it('should search books by tag keys', async () => {
-      const searchDto = { tagKeys: 'author,genre' };
-      mockBooksService.findByTags.mockResolvedValue([mockBook]);
-
-      const result = await controller.searchByTags(searchDto);
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTags).toHaveBeenCalledWith(['author', 'genre']);
-    });
-
-    it('should search books by tag key-value pair', async () => {
-      const searchDto = { tagKey: 'author', tagValue: 'John Doe' };
-      mockBooksService.findByTagKeyValue.mockResolvedValue([mockBook]);
-
-      const result = await controller.searchByTags(searchDto);
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagKeyValue).toHaveBeenCalledWith(
-        'author',
-        'John Doe',
-      );
-    });
-
-    it('should search books by multiple tag filters', async () => {
+  describe('searchByTags (condition-based)', () => {
+    it('should search books with single eq condition', async () => {
       const searchDto = {
-        tagFilters: [
-          { key: 'author', value: 'John Doe' },
-          { key: 'genre', value: 'Fiction' },
-        ],
-      };
-      mockBooksService.findByMultipleTagValues.mockResolvedValue([mockBook]);
-
+        conditions: [{ target: 'author', op: 'eq', value: 'John Doe' }],
+      } as never;
+      mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
-
       expect(result).toEqual([mockBook]);
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByMultipleTagValues).toHaveBeenCalledWith(
-        searchDto.tagFilters,
+      expect(service.searchByConditions).toHaveBeenCalledWith(
+        searchDto.conditions,
       );
     });
 
-    it('should return all books when no search criteria provided', async () => {
-      const searchDto = {};
-      mockBooksService.findAll.mockResolvedValue([mockBook]);
-
+    it('should search books with multiple AND eq conditions', async () => {
+      const searchDto = {
+        conditions: [
+          { target: 'author', op: 'eq', value: 'John Doe' },
+          { target: 'genre', op: 'eq', value: 'Fiction' },
+        ],
+      } as never;
+      mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
-
       expect(result).toEqual([mockBook]);
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findAll).toHaveBeenCalled();
+      expect(service.searchByConditions).toHaveBeenCalledWith(
+        searchDto.conditions,
+      );
     });
 
-    it('should search books by single tag ID', async () => {
-      const searchDto = { tagId: 1 };
-      mockBooksService.findByTagId.mockResolvedValue([mockBook]);
-
+    it('should return all books when conditions missing', async () => {
+      const searchDto = {} as never;
+      mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
-
       expect(result).toEqual([mockBook]);
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagId).toHaveBeenCalledWith(1);
-    });
-
-    it('should search books by multiple tag IDs', async () => {
-      const searchDto = { tagIds: '1,2,3' };
-      mockBooksService.findByTagIds.mockResolvedValue([mockBook]);
-
-      const result = await controller.searchByTags(searchDto);
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagIds).toHaveBeenCalledWith([1, 2, 3]);
+      expect(service.searchByConditions).toHaveBeenCalledWith([]);
     });
   });
 
