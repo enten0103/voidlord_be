@@ -140,7 +140,11 @@ export class BooksController {
   // findByHash removed (no hash field)
 
   @Post('search')
-  @ApiOperation({ summary: 'Search books by tags' })
+  @ApiOperation({
+    summary: 'Search books (fuzzy + tag modes)',
+    description:
+      'Priority: q (fuzzy ILIKE) > tagKeys OR > tagKey+tagValue > tagFilters OR > tagId > tagIds AND. First matched pattern is executed.',
+  })
   @ApiResponse({
     status: 201,
     description: 'Books found successfully',
@@ -149,7 +153,7 @@ export class BooksController {
   @ApiResponse({ status: 400, description: 'Invalid search parameters' })
   @ApiBody({
     description:
-      'Provide one of the supported search patterns. If multiple patterns are supplied, priority order applies: tagKeys > (tagKey+tagValue) > tagFilters > tagId > tagIds. When none is provided, all books are returned.',
+      'Supported search body fields (first matched wins): q (fuzzy), tagKeys, tagKey+tagValue, tagFilters, tagId, tagIds. When none is provided, all books are returned.',
     schema: {
       oneOf: [
         {
