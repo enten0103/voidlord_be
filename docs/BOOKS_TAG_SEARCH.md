@@ -1,47 +1,100 @@
-# 📑 标签搜索与推荐说明
+# 📑 标签搜索与推荐说明 (2025 重构版)
 
-## 搜索统一入口
-POST /books/search 支持以下字段(优先级从高到低)：
-1. q: 模糊匹配 (ILIKE) tag.key 或 tag.value 的任意子串（大小写不敏感）
-2. tagKeys: "author,genre"  (OR)
-3. tagKey + tagValue 单键值精确匹配
-4. tagFilters: [{key,value},...] (多键值 OR)
-5. tagId: 单标签 ID
-6. tagIds: "1,2,3" (全部包含 AND)
-7. 空对象 => 全部书籍
+## BREAKING CHANGE: 统一条件数组搜索
+`POST /books/search` 现仅接受一个字段：`conditions`，不再支持旧的 `q / tagKeys / tagKey+tagValue / tagFilters / tagId / tagIds` 等模式。
 
-Controller 按顺序匹配第一个命中模式；一旦 `q` 存在即走模糊搜索，不再执行后续精确/组合模式。
+### 请求结构
+```jsonc
+{
+  "conditions": [
+    { "target": "author", "op": "eq", "value": "Isaac Asimov" },
+    { "target": "genre", "op": "neq", "value": "Fantasy" },
+    { "target": "year", "op": "match", "value": "195" }
+  ]
+}
+```
+- `target`: 对应 tag.key
+- `op`: 操作符之一 `eq | neq | match`
+  - `eq`  : 存在指定 key 且 value 全等
+  - `neq` : 不存在指定 key+value 组合 (允许缺失或值不同)。实现为 `NOT EXISTS (...)`
+  - `match`: 存在指定 key 且 `value ILIKE %输入%`
+- `value`: 字符串；`match` 自动包裹 `%`
 
-注：搜索逻辑不受 `create_by` 字段影响，但返回的 `Book` 对象会包含 `create_by` 以便审计与展示。
+多个条件之间逻辑 **AND**：必须全部满足。
+空或缺失 `conditions` => 返回全部书籍。
 
-### 示例（模糊与精确）
+### 示例 (curl)
 ```bash
-curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{"q":"asim"}'
-curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{"tagKeys":"author,genre"}'
-curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{"tagKey":"author","tagValue":"Asimov"}'
-curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{"tagFilters":[{"key":"author","value":"Asimov"},{"key":"year","value":"1950"}]}'
-curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{"tagIds":"5,8,11"}'
+# 单条件 eq
+curl -X POST http://localhost:3000/books/search \
+  -H "Content-Type: application/json" \
+  -d '{"conditions":[{"target":"author","op":"eq","value":"Isaac Asimov"}]}'
+
+# 多条件 AND (eq + eq)
+curl -X POST http://localhost:3000/books/search \
+  -H "Content-Type: application/json" \
+  -d '{"conditions":[{"target":"author","op":"eq","value":"Isaac Asimov"},{"target":"genre","op":"eq","value":"Science Fiction"}]}'
+
+# eq + neq 排除某具体组合
+curl -X POST http://localhost:3000/books/search \
+  -H "Content-Type: application/json" \
+  -d '{"conditions":[{"target":"author","op":"eq","value":"Isaac Asimov"},{"target":"genre","op":"neq","value":"Science Fiction"}]}'
+
+# match 模糊 (ILIKE)
+curl -X POST http://localhost:3000/books/search \
+  -H "Content-Type: application/json" \
+  -d '{"conditions":[{"target":"author","op":"match","value":"asim"}]}'
+
+# 空条件 => 全部
+curl -X POST http://localhost:3000/books/search -H "Content-Type: application/json" -d '{}'
 ```
 
-### 多标签 AND 实现
-QueryBuilder 分组 + HAVING：
-```ts
-qb.groupBy('book.id')
-  .having('COUNT(DISTINCT tag.id) = :len', { len: ids.length })
-  .andWhere('tag.id IN (:...ids)', { ids });
+### 查询实现要点
+每个条件转换为子查询：
+```sql
+-- eq
+EXISTS (
+  SELECT 1 FROM book_tags bt JOIN tag t ON t.id = bt.tag_id
+  WHERE bt.book_id = book.id AND t.key = :keyN AND t.value = :valN
+)
+-- neq
+NOT EXISTS (
+  SELECT 1 FROM book_tags bt JOIN tag t ON t.id = bt.tag_id
+  WHERE bt.book_id = book.id AND t.key = :keyN AND t.value = :valN
+)
+-- match
+EXISTS (
+  SELECT 1 FROM book_tags bt JOIN tag t ON t.id = bt.tag_id
+  WHERE bt.book_id = book.id AND t.key = :keyN AND t.value ILIKE :valN
+)
 ```
+按顺序 `qb.andWhere(...)` 构建 AND 链；最终按 `book.created_at DESC` 排序。
 
-## 推荐功能
-GET /books/recommend/:id?limit=5 按共享标签数量 desc，然后创建时间 desc；limit 默认 5，最大 50。
+### 迁移说明
+旧客户端需将：
+- `q` => `{ target: <key>, op: "match", value: <substring> }`（若需原先同时匹配 key/value，可分多条件）
+- `tagKeys` => 多个 `eq` 或改由单条件 `match` (视需求)；旧逻辑 OR 不再原样支持，需自行拆分多次请求或后续扩展。
+- `tagKey+tagValue` => 单个 `eq` 条件
+- `tagFilters` => 多个 `eq` 条件 (旧逻辑 OR -> 现在 AND；如需 OR 等待后续扩展)
+- `tagId / tagIds` => 不再通过 /books/search；使用保留的 ID 相关专用 GET 接口（若仍存在）。
+
+### 后续扩展计划 (Potential)
+| Feature | 状态 | 说明 |
+|---------|------|------|
+| OR/分组逻辑 | 待设计 | 拓展 DSL 或引入表达式树 |
+| NOT 多值 | 可用 (使用多条 neq) | 性能与可读性需观察 |
+| 权重/评分加权搜索 | 待评估 | 与推荐结果混合排序 |
+| pg_trgm 相似度 | 待评估 | 提升 match 排序质量 |
+| 向量/嵌入语义搜索 | 规划 | 与条件过滤结合 |
+
+## 推荐功能保持不变
+`GET /books/recommend/:id?limit=5`：共享标签数降序 + 创建时间降序，`limit` 默认 5，最大 50。
 ```bash
 curl "http://localhost:3000/books/recommend/42?limit=10"
 ```
 
-## 测试覆盖
-单元 & E2E 覆盖：模糊 + 六种搜索模式、空条件、无匹配、URL 编码、推荐排序/limit/错误参数。
+## 测试覆盖 (当前)
+单元 & E2E：eq / neq / match / AND 组合 / 空条件 / 非法 op / 推荐排序与 limit。
 
-## 扩展方向
-- 标签权重/评分
-- AND/OR/NOT 逻辑表达式
-- 协同过滤或嵌入向量混合推荐
-- 模糊搜索升级为 pg_trgm 相似度排序（按相似度 + 时间综合排序）
+---
+如需回退到旧模式，请使用 git tag 对应版本；本改动已通过所有现有测试。
