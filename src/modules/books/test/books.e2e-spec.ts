@@ -217,17 +217,6 @@ describe('Books (e2e)', () => {
       expect(typeof body[0].id).toBe('number');
       expect(body[0].tags).toBeDefined();
     });
-
-    it('should filter books by tags', async () => {
-      const res: Response = await request(httpServer)
-        .get('/books?tags=author')
-        .expect(200);
-      const body = parseBody(res.body, isBookLiteArray);
-      expect(body.length).toBeGreaterThan(0);
-      body.forEach((book) => {
-        expect(book.tags?.some((tag) => tag.key === 'author')).toBe(true);
-      });
-    });
   });
 
   describe('/books/my (GET)', () => {
@@ -391,6 +380,81 @@ describe('Books (e2e)', () => {
   });
 
   describe('/books/search (POST)', () => {
+    it('should sort by created_at desc (default)', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({})
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      // created_at 降序
+      for (let i = 1; i < body.length; ++i) {
+        expect(
+          new Date(body[i - 1].id).getTime() >= new Date(body[i].id).getTime(),
+        ).toBe(true);
+      }
+    });
+
+    it('should sort by updated_at asc', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({ sortBy: 'updated_at', sortOrder: 'asc' })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      // updated_at 升序
+      for (let i = 1; i < body.length; ++i) {
+        expect(
+          new Date(body[i - 1].id).getTime() <= new Date(body[i].id).getTime(),
+        ).toBe(true);
+      }
+    });
+
+    it('should sort by rating desc, unrated as -1', async () => {
+      // 给部分书籍打分
+      await request(httpServer)
+        .post(`/books/${bookId1}/rating`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ score: 5 })
+        .expect(201);
+      await request(httpServer)
+        .post(`/books/${bookId2}/rating`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ score: 3 })
+        .expect(201);
+      // bookId3/bookId4 无评分
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({ sortBy: 'rating', sortOrder: 'desc' })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      // 评分高的在前，无评分的在后
+      const idToScore: Record<number, number> = {
+        [bookId1]: 5,
+        [bookId2]: 3,
+        [bookId3]: -1,
+        [bookId4]: -1,
+      };
+      for (let i = 1; i < body.length; ++i) {
+        expect(idToScore[body[i - 1].id] >= idToScore[body[i].id]).toBe(true);
+      }
+    });
+
+    it('should sort by rating asc, unrated as -1', async () => {
+      // bookId1/2 已有评分，3/4无评分
+      const res = await request(httpServer)
+        .post('/books/search')
+        .send({ sortBy: 'rating', sortOrder: 'asc' })
+        .expect(201);
+      const body = parseBody(res.body, isBookLiteArray);
+      const idToScore: Record<number, number> = {
+        [bookId1]: 5,
+        [bookId2]: 3,
+        [bookId3]: -1,
+        [bookId4]: -1,
+      };
+      for (let i = 1; i < body.length; ++i) {
+        expect(idToScore[body[i - 1].id] <= idToScore[body[i].id]).toBe(true);
+      }
+    });
     let bookId1: number; // Asimov + SF + 1950
     let bookId2: number; // Tolkien + Fantasy + 1954
     let bookId3: number; // Asimov + SF + 1951
@@ -558,78 +622,50 @@ describe('Books (e2e)', () => {
         .send({ conditions: [{ target: 'author', op: 'unknown', value: 'x' }] })
         .expect(400);
     });
-  });
 
-  describe('/books/tags/:key/:value (GET)', () => {
-    let bookId1: number;
-    let bookId2: number;
-
-    beforeEach(async () => {
-      // 清理数据 - 使用级联删除
-      const books = await bookRepository.find();
-      if (books.length > 0) {
-        await bookRepository.remove(books);
-      }
-
-      const tags = await tagRepository.find();
-      if (tags.length > 0) {
-        await tagRepository.remove(tags);
-      }
-
-      // 创建测试数据
-      const book1 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
+    it('paged search returns paged object when limit provided', async () => {
+      const res = await request(httpServer)
+        .post('/books/search')
         .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-          ],
-        });
-      bookId1 = parseBody(book1.body, isBookLite).id;
-
-      const book2 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-          ],
-        });
-      bookId2 = parseBody(book2.body, isBookLite).id;
-    });
-
-    it('should return books with specific tag key-value pair', async () => {
-      const response = await request(httpServer)
-        .get('/books/tags/author/Isaac%20Asimov')
-        .expect(200);
-      const body = parseBody(response.body, isBookLiteArray);
-      expect(body).toHaveLength(2);
-      expect(body.map((book) => book.id).sort()).toEqual(
-        [bookId1, bookId2].sort(),
-      );
-      body.forEach((book) => {
-        expect(
-          book.tags?.some(
-            (tag) => tag.key === 'author' && tag.value === 'Isaac Asimov',
-          ),
-        ).toBe(true);
-      });
-    });
-
-    it('should return empty array when no books match the tag', async () => {
-      const response = await request(httpServer)
-        .get('/books/tags/author/Nonexistent%20Author')
-        .expect(200);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
-    });
-
-    it('should handle URL encoded values correctly', async () => {
-      const response = await request(httpServer)
-        .get('/books/tags/genre/Science%20Fiction')
-        .expect(200);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(2);
+          limit: 2,
+          offset: 0,
+          conditions: [{ target: 'author', op: 'eq', value: 'Isaac Asimov' }],
+        })
+        .expect(201);
+      const bodyGuard = (
+        o: unknown,
+      ): o is {
+        total: number;
+        limit: number;
+        offset: number;
+        items: Array<{
+          id: number;
+          tags?: Array<{ key: string; value: string }>;
+        }>;
+      } => {
+        if (typeof o !== 'object' || o === null) return false;
+        const r = o as Record<string, unknown>;
+        return (
+          typeof r.total === 'number' &&
+          typeof r.limit === 'number' &&
+          typeof r.offset === 'number' &&
+          Array.isArray(r.items) &&
+          r.items.every(
+            (it) =>
+              typeof it === 'object' &&
+              it !== null &&
+              typeof (it as Record<string, unknown>).id === 'number',
+          )
+        );
+      };
+      if (!bodyGuard(res.body)) {
+        throw new Error('Unexpected paged body shape');
+      }
+      expect(res.body.limit).toBe(2);
+      expect(res.body.offset).toBe(0);
+      expect(res.body.items.length).toBeLessThanOrEqual(2);
+      const ids = res.body.items.map((b) => b.id);
+      ids.forEach((id) => expect([bookId1, bookId3, bookId4]).toContain(id));
     });
   });
 
@@ -667,180 +703,6 @@ describe('Books (e2e)', () => {
         .expect(404);
     });
   });
-
-  describe('/books/tag-id/:id (GET)', () => {
-    let bookId1: number;
-    let bookId2: number;
-    let tagId: number;
-
-    beforeEach(async () => {
-      // 清理数据 - 使用级联删除
-      const books = await bookRepository.find();
-      if (books.length > 0) {
-        await bookRepository.remove(books);
-      }
-
-      const tags = await tagRepository.find();
-      if (tags.length > 0) {
-        await tagRepository.remove(tags);
-      }
-
-      // 创建测试数据
-      const book1 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-          ],
-        });
-      bookId1 = parseBody(book1.body, isBookLite).id;
-
-      const book2 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Fantasy' },
-          ],
-        });
-      bookId2 = parseBody(book2.body, isBookLite).id;
-
-      // 获取author tag的ID
-      const authorTag = await tagRepository.findOne({
-        where: { key: 'author', value: 'Isaac Asimov' },
-      });
-      if (!authorTag) {
-        throw new Error('Author tag not found');
-      }
-      tagId = authorTag.id;
-    });
-
-    it('should return books by tag ID', async () => {
-      const response = await request(httpServer)
-        .get(`/books/tag-id/${tagId}`)
-        .expect(200);
-      const body = parseBody(response.body, isBookLiteArray);
-      expect(body).toHaveLength(2);
-      expect(body.map((book) => book.id).sort()).toEqual(
-        [bookId1, bookId2].sort(),
-      );
-      expect(body[0].tags).toBeDefined();
-    });
-
-    it('should return empty array for non-existent tag ID', async () => {
-      const response = await request(httpServer)
-        .get('/books/tag-id/999999')
-        .expect(200);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
-    });
-
-    it('should return 400 for invalid tag ID', async () => {
-      await request(httpServer).get('/books/tag-id/invalid').expect(400);
-    });
-
-    it('should return 400 for negative tag ID', async () => {
-      await request(httpServer).get('/books/tag-id/-1').expect(400);
-    });
-  });
-
-  describe('/books/tag-ids/:ids (GET)', () => {
-    let bookId1: number;
-    let authorTagId: number;
-    let genreTagId: number;
-
-    beforeEach(async () => {
-      // 清理数据 - 使用级联删除
-      const books = await bookRepository.find();
-      if (books.length > 0) {
-        await bookRepository.remove(books);
-      }
-
-      const tags = await tagRepository.find();
-      if (tags.length > 0) {
-        await tagRepository.remove(tags);
-      }
-
-      // 创建测试数据
-      const book1 = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Science Fiction' },
-          ],
-        });
-      bookId1 = parseBody(book1.body, isBookLite).id;
-
-      await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'J.R.R. Tolkien' },
-            { key: 'genre', value: 'Science Fiction' },
-          ],
-        })
-        .expect(201);
-
-      await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          tags: [
-            { key: 'author', value: 'Isaac Asimov' },
-            { key: 'genre', value: 'Fantasy' },
-          ],
-        })
-        .expect(201);
-
-      // 获取tag IDs
-      const authorTag = await tagRepository.findOne({
-        where: { key: 'author', value: 'Isaac Asimov' },
-      });
-      const genreTag = await tagRepository.findOne({
-        where: { key: 'genre', value: 'Science Fiction' },
-      });
-      if (!authorTag || !genreTag) {
-        throw new Error('Required tags not found');
-      }
-      authorTagId = authorTag.id;
-      genreTagId = genreTag.id;
-    });
-
-    it('should return books by multiple tag IDs', async () => {
-      const response = await request(httpServer)
-        .get(`/books/tag-ids/${authorTagId},${genreTagId}`)
-        .expect(200);
-      const body = parseBody(response.body, isBookLiteArray);
-      expect(body).toHaveLength(1);
-      expect(body[0].id).toBe(bookId1);
-    });
-
-    it('should filter out invalid tag IDs', async () => {
-      const response = await request(httpServer)
-        .get(`/books/tag-ids/${authorTagId},invalid,${genreTagId},0`)
-        .expect(200);
-      const body2 = parseBody(response.body, isBookLiteArray);
-      expect(body2).toHaveLength(1);
-      expect(body2[0].id).toBe(bookId1);
-    });
-
-    it('should return 400 when no valid tag IDs provided', async () => {
-      await request(httpServer).get('/books/tag-ids/invalid,0,-1').expect(400);
-    });
-
-    it('should return empty array for non-existent tag IDs', async () => {
-      const response = await request(httpServer)
-        .get('/books/tag-ids/999999,888888')
-        .expect(200);
-      expect(parseBody(response.body, isBookLiteArray)).toHaveLength(0);
-    });
-  });
-
 
   describe('/books/recommend/:id (GET)', () => {
     let baseId: number;

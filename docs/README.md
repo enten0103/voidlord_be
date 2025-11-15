@@ -20,7 +20,7 @@
 
 | 模块 | 职责概述 | 关键能力 | 文档 | 主要实体 |
 |------|----------|----------|------|----------|
-| Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
+| Books | 最小化图书模型 + 标签管理 | CRUD（仅标签/作者信息）、标签多对多、推荐、统一条件搜索、评论、评分 | `BOOKS_README.md` / `BOOKS_TAG_SEARCH.md` | Book, Tag, Comment |
 | Media Libraries | 统一的用户/系统集合（支持书籍与子库嵌套、复制、标签、系统库保护） | 创建/列表/详情/添加书/嵌套库/删除条目/更新/复制 | `MEDIA_LIBRARIES_README.md` | MediaLibrary, MediaLibraryItem, Tag |
 | Recommendations | 首页推荐分区（单库绑定） | 分区 CRUD / 单库切换 / 排序重排 | `RECOMMENDATIONS_GUIDE.md` | RecommendationSection |
 | Reading Records (Deprecated) | 原用户阅读进度与统计（已被系统媒体库取代） | Upsert / 统计（已移除） | `READING_RECORDS_README.md` | (Removed) |
@@ -28,10 +28,11 @@
 ### 1.1 Books 模块功能切片
 - 创建 / 更新 / 删除 图书（模型仅含 id / create_by / timestamps / tags）
 - 标签去重与级联创建
-- 多模式标签搜索（6 种优先级匹配）
+- 统一条件数组搜索（eq / neq / match AND）
 - 推荐（共享标签数 + 创建时间降序）
 - 评论与楼中楼回复（分页 / 权限校验）
 - 评分（1-5 分）
+- 排序与分页：`POST /books/search` 支持可选 `limit/offset` 与 `sortBy=created_at|updated_at|rating` + `sortOrder=asc|desc`；rating 排序将未评分视为 -1 (COALESCE)。
 
 ### 1.2 Reading Records 关键规则
 - user+book 唯一；Upsert 自动创建或更新
@@ -95,7 +96,8 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 |------|--------|-------------|------|----------|------|
 | 图书 | 创建图书 | /books | POST | BOOK_CREATE(1) | 自动写 create_by；无标题/描述字段 |
 | 图书 | 我的图书 | /books/my | GET | 登录 | 按创建时间倒序 |
-| 图书 | 标签搜索统一入口 | /books/search | POST | (当前开放) | 模糊 q + 6 精确模式优先匹配 (q>keys>key+value>filters>id>ids) |
+| 图书 | 标签搜索统一入口 | /books/search | POST | (当前开放) | 统一 conditions AND：eq/neq/match；旧 q / tagKeys / tagId 等已移除 |
+| 图书 | 搜索分页与排序 | /books/search | POST | (当前开放) | 可选 limit/offset + sortBy(created_at|updated_at|rating) + sortOrder(asc|desc) |
 | 图书 | 推荐 | /books/recommend/:id | GET | (开放) | limit 默认5（基于标签相似度） |
 | 图书 | 评论列表 | /books/:id/comments | GET | 开放 | 分页 limit<=100；与精简 Book 模型无耦合 |
 | 图书 | 新增评论 | /books/:id/comments | POST | 登录 | 内容长度 1-2000 |
@@ -113,12 +115,15 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 媒体库 | 创建库 | /media-libraries | POST | 登录 | name 唯一，可附 tags |
 | 媒体库 | 我的库列表 | /media-libraries/my | GET | 登录 | 含 items_count, tags |
 | 媒体库 | 库详情 | /media-libraries/:id | GET | 登录/公开 | items 中含 book 或 child_library |
+| 媒体库 | 库详情分页 | /media-libraries/:id | GET | 登录/公开 | 可选 limit/offset 返回 items_count/limit/offset |
 | 媒体库 | 添加书籍 | /media-libraries/:id/books/:bookId | POST | 登录(owner) | 系统库禁止 |
 | 媒体库 | 嵌套子库 | /media-libraries/:id/libraries/:childId | POST | 登录(owner) | 禁止 self/重复 |
 | 媒体库 | 删除条目 | /media-libraries/:id/items/:itemId | DELETE | 登录(owner) | 统一删除书或子库条目 |
 | 媒体库 | 更新库 | /media-libraries/:id | PATCH | 登录(owner) | name 去重 / tags 覆盖 / 系统库锁定 |
 | 媒体库 | 复制库 | /media-libraries/:id/copy | POST | 登录 | 仅复制书籍条目，名称自动去重 |
 | 媒体库 | 删除库 | /media-libraries/:id | DELETE | 登录(owner) | 系统库禁止 |
+| 媒体库 | 系统阅读记录 | /media-libraries/reading-record | GET | 登录 | 自动创建 is_system 库，支持分页 |
+| 媒体库 | 虚拟上传库 | /media-libraries/virtual/my-uploaded | GET | 登录 | 动态聚合，支持分页 limit/offset |
 | 权限 | 授予 | /permissions/grant | POST | USER_UPDATE(2) | level2 仅授予 level1 |
 | 权限 | 撤销 | /permissions/revoke | POST | USER_UPDATE(2) | level2 仅撤销自己授予 |
 | 权限 | 用户权限查看 | /permissions/user/:id | GET | USER_READ(1) | 列表 |
@@ -133,11 +138,13 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 模块 | 单元覆盖 | E2E 场景 | 关键断言 | 备注 |
 |------|----------|----------|----------|------|
 | Books | Service + Controller（含搜索/推荐/评论） | CRUD / 搜索：模糊 + 六模式 / 推荐排序 / 评论权限 | 精简模型字段（无 hash/title/description）正确返回 | 评分与评论分页边界 |
+| Books | 搜索排序与分页 | sortBy(created_at/updated_at/rating)+sortOrder / limit/offset | 排序 + 分页 E2E | rating 未评分=-1 处理验证 |
 | Recommendations | 分区 CRUD + 单库绑定 | 重排与过滤 | 排序更新 | - |
 | Reading Records | Upsert / 汇总 / 状态计算 | 进度更新 / 删除 / 统计 | finished_ratio / 时间字段 | - |
 | Permissions | 授予 / 撤销逻辑 | 授权失败 / 升级规则 | 等级限制与403/401 | - |
 | Files | 策略生成 / 所有权删除判断 | 上传/删除路径 | 权限分支 | 需更多负载测试 |
 | Media Libraries | 库 CRUD / 条目添加 / 嵌套 / 复制 | 添加书籍 / 嵌套库 / 复制名称去重 | 系统库锁定、重复冲突、私有访问控制 | - |
+| Media Libraries | 分页 | 库详情 / 阅读记录 / 虚拟上传 limit/offset | 元数据 items_count/limit/offset | 双形态响应 (未分页保持旧结构) |
 
 质量门槛：当前 Lint 0 错误；所有单元与 E2E 用例通过。新增功能需：
 1. 提供最小单元测试（正常 + 至少1边界）
@@ -173,7 +180,7 @@ Level1: 基础访问; Level2: 授予/撤销自己授予的 level1; Level3: 完�
 | 文档 | 描述 |
 |------|------|
 | `BOOKS_README.md` | 精简图书模型 + 标签 + 评论/评分完整指南（已移除 hash/title/description） |
-| `BOOKS_TAG_SEARCH.md` | 模糊 q + 六种标签搜索模式与推荐细节 |
+| `BOOKS_TAG_SEARCH.md` | 条件数组搜索（eq/neq/match）与推荐细节（旧多模式已移除） |
 | `PERMISSIONS_GUIDE.md` | 等级化权限与授权流程 |
 | `RECOMMENDATIONS_GUIDE.md` | 推荐分区（单库绑定）管理与排序接口 |
 | `AUTH_README.md` | 用户注册、登录与 JWT 保护端点 |

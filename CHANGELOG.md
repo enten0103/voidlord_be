@@ -3,6 +3,30 @@
 全部显著变更会记录在此文件中。格式参考 Conventional Commits。
 
 ## [unreleased]
+### 💥 Breaking
+- remove(books): 删除所有旧标签搜索模式与相关 GET 端点 (`/books/tags/:key/:value`, `/books/tag-id/:id`, `/books/tag-ids/:ids`)；统一仅保留 POST `/books/search` 条件数组形式。
+
+### 🛠 Refactor
+- refactor(books): 简化搜索实现为 AND 链式子查询，移除多模式优先级分支逻辑。
+
+### 🧪 Test
+- test(books): 增加重复条件与空字符串值、非法操作符的单元与 E2E 测试用例；移除全部旧端点测试。
+- test(books): 新增搜索排序 (created_at|updated_at|rating) 单元与 E2E 测试（含未评分视为 -1 逻辑，分页与非分页）。
+- test(media-libraries): 库详情 / 系统阅读记录 / 虚拟“我的上传” 分页 E2E 场景与单元测试，验证元数据与子集长度。
+
+### 📄 Docs
+- docs(books): 更新 `BOOKS_TAG_SEARCH.md`、根 `README.md` 与文档索引 README；新增 Swagger 示例（重复条件 / 空值 / 非法 op）。
+- docs(books): 补充搜索排序与分页参数说明 (sortBy/sortOrder/limit/offset) 与示例。
+- docs(media-libraries): README 增加分页响应形态与三端点使用示例；索引 README 更新功能矩阵备注。
+
+### ✨ Feat
+- feat(books): 统一条件数组搜索 (operators: eq / neq / match) 支持空值匹配与重复条件容忍；新增可选分页 (limit/offset) 返回 { total, limit, offset, items }。
+- feat(books): 搜索支持排序 `sortBy=created_at|updated_at|rating` + `sortOrder=asc|desc`；rating 排序将未评分视为 -1 (COALESCE)。
+- feat(media-libraries): 库详情 / 系统阅读记录 / 虚拟上传库支持分页 (limit/offset) 返回 { items_count, limit, offset, items } 元数据；未传分页参数保持原有兼容形态。
+
+### 🧹 Chore
+- chore(swagger): 移除遗留的基于旧模式的 oneOf 示例，新增统一 schema + 扩展 examples。
+- chore(swagger): 统一 limit/offset 与 sortBy/sortOrder 的 @ApiQuery 多行描述格式；媒体库端点新增分页注释。
 ### ✨ Feat
 - feat(book-lists): 为 FavoriteList 添加标签支持 (ManyToMany with Tag) 与嵌套结构 (FavoriteListItem.parent_list)
 - feat(book-lists): 标签去重与自动创建逻辑，复制书单时继承标签

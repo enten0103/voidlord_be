@@ -136,6 +136,78 @@ GET /media-libraries/virtual/my-uploaded
 }
 ```
 
+### 分页 (Pagination)
+媒体库相关三个获取端点支持分页：
+1. 库详情：`GET /media-libraries/:id?limit=20&offset=0`
+2. 系统阅读记录：`GET /media-libraries/reading-record?limit=10&offset=0`
+3. 虚拟上传库：`GET /media-libraries/virtual/my-uploaded?limit=30&offset=0`
+
+参数规则：
+- limit: 可选，1-100，缺失或未提供则不触发分页模式。
+- offset: 可选，>=0。
+- 至少提供一个参数 (limit 或 offset) 即进入分页响应形态。
+
+响应形态：
+未分页（兼容旧版）：
+```jsonc
+{
+  "id": 10,
+  "name": "收藏夹",
+  "items_count": 5,
+  "items": [ /* 全量条目 */ ]
+}
+```
+
+分页启用：
+```jsonc
+{
+  "id": 10,
+  "name": "收藏夹",
+  "items_count": 50,          // 总条目数 (COUNT)
+  "limit": 20,                // 请求的上限 (规范化后)
+  "offset": 0,                // 跳过条目数
+  "items": [ /* 截取子集，长度<=limit */ ]
+}
+```
+
+库详情分页条目排序：按 `added_at DESC` 保障新近加入的书籍或子库优先展示。阅读记录与虚拟上传库沿用相同排序逻辑，以便一致的用户体验。
+
+边界行为：
+- offset >= items_count 时返回空数组但保留元数据。
+- limit 超过上限自动截断至 100。
+- 仅提供 offset 不提供 limit 时：采用默认 limit=20（可在后续通过配置外置化）。
+
+与 Books 搜索分页差异：Books 搜索分页返回 `{ total, limit, offset, items }`（无 id/name 上下文）；媒体库分页保留库自身字段并加入 limit/offset 元数据。
+
+Swagger：三个端点均附加 @ApiQuery(limit/offset) 注释，描述取值范围与响应差异；示例中建议展示分页与非分页双形态用于前端集成参考。
+
+### 示例：分页虚拟上传库
+```http
+GET /media-libraries/virtual/my-uploaded?limit=3&offset=1
+Authorization: Bearer <token>
+```
+```jsonc
+{
+  "id": 0,
+  "name": "我的上传图书 (虚拟库)",
+  "is_virtual": true,
+  "items_count": 12,
+  "limit": 3,
+  "offset": 1,
+  "items": [ { "id": 100 }, { "id": 99 }, { "id": 98 } ]
+}
+```
+
+### 测试覆盖
+- 单元测试：库详情分页路径 (findAndCount) + 响应元数据。
+- E2E：库详情 / 阅读记录 / 虚拟上传 三端点分页场景，验证 items_count >= limit，子集长度与元数据字段存在性。
+
+### 后续扩展建议（分页相关）
+1. 支持 cursor 分页：对高频滚动场景减少 offset 扫描成本。
+2. items_count 可选延迟计算：在大规模数据集下懒加载总数提升响应速度。
+3. 分页缓存键：`library:{id}:page:{limit}:{offset}` 提升热门库访问性能。
+4. limit 上限与默认值通过配置文件或环境变量调整。
+
 ### 复制规则
 1. 源库不存在 -> 404
 2. 源库私有且非 owner -> 403

@@ -354,93 +354,6 @@ export class BooksService {
     };
   }
 
-  async findByTags(tagKeys: string[]): Promise<Book[]> {
-    return this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.tags', 'tag')
-      .where('tag.key IN (:...tagKeys)', { tagKeys })
-      .orderBy('book.created_at', 'DESC')
-      .getMany();
-  }
-
-  async findByTagKeyValue(key: string, value: string): Promise<Book[]> {
-    return this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.tags', 'tag')
-      .where('tag.key = :key AND tag.value = :value', { key, value })
-      .orderBy('book.created_at', 'DESC')
-      .getMany();
-  }
-
-  async findByMultipleTagValues(
-    tagFilters: { key: string; value: string }[],
-  ): Promise<Book[]> {
-    const queryBuilder = this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.tags', 'tag');
-
-    const conditions = tagFilters
-      .map(
-        (filter, index) =>
-          `(tag.key = :key${index} AND tag.value = :value${index})`,
-      )
-      .join(' OR ');
-
-    const parameters: Record<string, string> = tagFilters.reduce(
-      (params, filter, index) => {
-        params[`key${index}`] = filter.key;
-        params[`value${index}`] = filter.value;
-        return params;
-      },
-      {},
-    );
-
-    return queryBuilder
-      .where(conditions, parameters)
-      .orderBy('book.created_at', 'DESC')
-      .getMany();
-  }
-
-  async findByTagId(tagId: number): Promise<Book[]> {
-    return this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.tags', 'tag')
-      .where('tag.id = :tagId', { tagId })
-      .orderBy('book.created_at', 'DESC')
-      .getMany();
-  }
-
-  async findByTagIds(tagIds: number[]): Promise<Book[]> {
-    return this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.tags', 'tag')
-      .where(
-        'book.id IN (' +
-          'SELECT bt.book_id FROM book_tags bt ' +
-          'WHERE bt.tag_id IN (:...tagIds) ' +
-          'GROUP BY bt.book_id ' +
-          'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
-          ')',
-        { tagIds, tagCount: tagIds.length },
-      )
-      .orderBy('book.created_at', 'DESC')
-      .getMany();
-  }
-
-  async findByFuzzy(query: string): Promise<Book[]> {
-    const q = (query || '').trim();
-    if (!q) return [];
-    // 简单 ILIKE 模糊匹配；后续可升级为 pg_trgm 相似度排序
-    return this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.tags', 'tag')
-      .where('tag.key ILIKE :pattern OR tag.value ILIKE :pattern', {
-        pattern: `%${q}%`,
-      })
-      .orderBy('book.created_at', 'DESC')
-      .getMany();
-  }
-
   /**
    * 条件数组搜索：每个条件在指定 tag.key 上应用一个操作符；多个条件逻辑 AND。
    * 支持操作符：
@@ -454,12 +367,85 @@ export class BooksService {
       op: 'eq' | 'neq' | 'match';
       value: string;
     }>,
-  ): Promise<Book[]> {
+    limit?: number,
+    offset?: number,
+    sortBy?: 'created_at' | 'updated_at' | 'rating',
+    sortOrder?: 'asc' | 'desc',
+  ): Promise<
+    Book[] | { total: number; limit: number; offset: number; items: Book[] }
+  > {
     const list = (conditions || []).filter(
       (c) => c && c.target && c.op && typeof c.value === 'string',
     );
+    const pagingRequested =
+      typeof limit === 'number' || typeof offset === 'number';
+    const sortField = sortBy || 'created_at';
+    const sortDir =
+      (sortOrder || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     if (list.length === 0) {
-      return this.findAll();
+      // no conditions -> either full list or paged full list
+      if (!pagingRequested) {
+        // 非分页直接返回全部，排序
+        if (sortField === 'rating') {
+          // 评分排序
+          return this.bookRepository
+            .createQueryBuilder('book')
+            .leftJoinAndSelect('book.tags', 'tag')
+            .leftJoin(
+              (qb) =>
+                qb
+                  .select('book_rating.bookId', 'book_id')
+                  .addSelect('AVG(book_rating.score)', 'avg_rating')
+                  .from('book_rating', 'book_rating')
+                  .groupBy('book_rating.bookId'),
+              'br',
+              'br.book_id = book.id',
+            )
+            .orderBy('COALESCE(br.avg_rating, -1)', sortDir)
+            .addOrderBy('book.created_at', 'DESC')
+            .getMany();
+        } else {
+          // created_at/updated_at
+          return this.bookRepository.find({
+            relations: ['tags'],
+            order: { [sortField]: sortDir },
+          });
+        }
+      }
+      let take = typeof limit === 'number' ? limit : 20;
+      if (take <= 0) take = 20;
+      if (take > 100) take = 100;
+      let skip = typeof offset === 'number' ? offset : 0;
+      if (skip < 0) skip = 0;
+      if (sortField === 'rating') {
+        // 分页+评分排序
+        const qb = this.bookRepository
+          .createQueryBuilder('book')
+          .leftJoinAndSelect('book.tags', 'tag')
+          .leftJoin(
+            (qb) =>
+              qb
+                .select('book_rating.bookId', 'book_id')
+                .addSelect('AVG(book_rating.score)', 'avg_rating')
+                .from('book_rating', 'book_rating')
+                .groupBy('book_rating.bookId'),
+            'br',
+            'br.book_id = book.id',
+          )
+          .orderBy('COALESCE(br.avg_rating, -1)', sortDir)
+          .addOrderBy('book.created_at', 'DESC');
+        const [items, total] = await qb.take(take).skip(skip).getManyAndCount();
+        return { total, limit: take, offset: skip, items };
+      } else {
+        // created_at/updated_at
+        const [items, total] = await this.bookRepository.findAndCount({
+          relations: ['tags'],
+          order: { [sortField]: sortDir },
+          take,
+          skip,
+        });
+        return { total, limit: take, offset: skip, items };
+      }
     }
     const qb = this.bookRepository
       .createQueryBuilder('book')
@@ -492,7 +478,34 @@ export class BooksService {
       }
     });
 
-    return qb.orderBy('book.created_at', 'DESC').getMany();
+    // 排序
+    if (sortField === 'rating') {
+      qb.leftJoin(
+        (qb2) =>
+          qb2
+            .select('book_rating.bookId', 'book_id')
+            .addSelect('AVG(book_rating.score)', 'avg_rating')
+            .from('book_rating', 'book_rating')
+            .groupBy('book_rating.bookId'),
+        'br',
+        'br.book_id = book.id',
+      );
+      qb.orderBy('COALESCE(br.avg_rating, -1)', sortDir);
+      qb.addOrderBy('book.created_at', 'DESC');
+    } else {
+      qb.orderBy(`book.${sortField}`, sortDir);
+    }
+
+    if (!pagingRequested) {
+      return qb.getMany();
+    }
+    let take = typeof limit === 'number' ? limit : 20;
+    if (take <= 0) take = 20;
+    if (take > 100) take = 100;
+    let skip = typeof offset === 'number' ? offset : 0;
+    if (skip < 0) skip = 0;
+    const [items, total] = await qb.take(take).skip(skip).getManyAndCount();
+    return { total, limit: take, offset: skip, items };
   }
 
   /**
