@@ -21,6 +21,16 @@ export class TagFilterDto {
 
 export class SearchBooksDto {
   @ApiProperty({
+    description:
+      'Fuzzy query across tag key & value (case-insensitive, partial match)',
+    required: false,
+    example: 'asim',
+  })
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @ApiProperty({
     description: 'Search by tag keys only (comma-separated)',
     required: false,
     example: 'author,genre',

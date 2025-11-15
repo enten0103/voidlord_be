@@ -353,6 +353,42 @@ describe('BooksService', () => {
     });
   });
 
+  describe('findByFuzzy', () => {
+    it('should return empty array on blank query', async () => {
+      const res = await service.findByFuzzy('   ');
+      expect(res).toEqual([]);
+    });
+
+    it('should perform fuzzy ILIKE search on tag key/value', async () => {
+      const mockQueryBuilder = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockBook]),
+      };
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
+      );
+      const res = await service.findByFuzzy('john');
+      expect(res).toEqual([mockBook]);
+      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'book',
+      );
+      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
+        'book.tags',
+        'tag',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'tag.key ILIKE :pattern OR tag.value ILIKE :pattern',
+        { pattern: '%john%' },
+      );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'book.created_at',
+        'DESC',
+      );
+    });
+  });
+
   describe('recommendByBook', () => {
     it('should return empty array when limit <= 0', async () => {
       const result = await service.recommendByBook(1, 0);

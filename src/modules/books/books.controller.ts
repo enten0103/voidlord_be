@@ -153,6 +153,10 @@ export class BooksController {
     schema: {
       oneOf: [
         {
+          title: 'Fuzzy query across tag key/value',
+          example: { q: 'asim' },
+        },
+        {
           title: 'Tag keys list',
           example: { tagKeys: 'author,genre' },
         },
@@ -208,6 +212,10 @@ export class BooksController {
     },
   })
   async searchByTags(@Body() searchDto: SearchBooksDto) {
+    // 首先处理模糊查询 (q) – 对 tag.key / tag.value 进行部分匹配
+    if (searchDto.q) {
+      return this.booksService.findByFuzzy(searchDto.q);
+    }
     // 按tag keys搜索
     if (searchDto.tagKeys) {
       const tagKeys = searchDto.tagKeys.split(',').map((tag) => tag.trim());

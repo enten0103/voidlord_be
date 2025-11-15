@@ -426,6 +426,20 @@ export class BooksService {
       .getMany();
   }
 
+  async findByFuzzy(query: string): Promise<Book[]> {
+    const q = (query || '').trim();
+    if (!q) return [];
+    // 简单 ILIKE 模糊匹配；后续可升级为 pg_trgm 相似度排序
+    return this.bookRepository
+      .createQueryBuilder('book')
+      .leftJoinAndSelect('book.tags', 'tag')
+      .where('tag.key ILIKE :pattern OR tag.value ILIKE :pattern', {
+        pattern: `%${q}%`,
+      })
+      .orderBy('book.created_at', 'DESC')
+      .getMany();
+  }
+
   /**
    * 根据指定书籍的标签推荐相似书籍：
    *  - 统计与目标书籍共享标签的数量（去重计数）
