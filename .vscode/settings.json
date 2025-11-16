@@ -4,6 +4,5 @@
     "explorer.fileNesting.patterns": {
         "package.json": "pnpm-lock.yaml, pnpm-workspace.yaml,  .eslintrc.cjs, .prettierrc.json",
         "tsconfig.json": "jest-e2e.json,tsconfig.build.json,eslint.config.mjs, nest-cli.json,.prettierrc,jest.config.ts, docker-compose.yml, .eslintrc.cjs, .prettierrc.json",
-        ".env": ".env.local, .env.development, .env.production, .env.test, .gitignore",
     }
 }

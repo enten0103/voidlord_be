@@ -365,3 +365,85 @@ test/                 # E2E 测试目录
 4. **HTTPS**: 使用反向代理（如 Nginx）启用 HTTPS
 5. **监控**: 添加日志和监控解决方案
 6. **健康检查**: 利用 `/health` 端点进行应用和数据库监控
+
+## 持续集成与部署（CI/CD）
+
+本项目提供 GitHub Actions 工作流 `CI-CD`，在推送到 `master` 分支时自动执行：
+
+1. 安装依赖并运行 Lint、单元测试与 E2E 测试。
+2. 构建多阶段 Docker 镜像并推送到 GitHub Container Registry (GHCR)。
+3. 通过 SSH 登录生产服务器，拉取最新镜像并使用 `docker-compose.prod.yml` 滚动更新。
+
+### 新增文件概述
+
+- `Dockerfile`：多阶段构建，裁剪为仅生产依赖。
+- `.dockerignore`：防止无关文件进入镜像构建上下文。
+- `docker-compose.prod.yml`：生产编排文件，CI 部署时使用 `sed` 替换镜像 tag。
+- `.github/workflows/cd.yml`：CI/CD 工作流配置。
+
+### 需要配置的 GitHub Secrets
+
+在仓库 Settings -> Secrets -> Actions 中添加：
+
+- `GHCR_TOKEN`：拥有 `read:packages write:packages` 权限的 PAT（或使用默认 `GITHUB_TOKEN` 搭配 `packages: write` 权限改写工作流）。
+- `PROD_HOST`：生产服务器 IP 或域名。
+- `PROD_SSH_USER`：SSH 登录用户名。
+- `PROD_SSH_KEY`：私钥内容（建议只读部署账号，格式为 OpenSSH）。
+
+可选扩展：如需自定义端口、S3 参数、JWT_SECRET 等，可再添加对应 Secrets 并在工作流中以 `env` 注入。
+
+### 生产服务器准备步骤（一次性）
+
+```bash
+sudo mkdir -p /opt/voidlord && cd /opt/voidlord
+# 将仓库中的 docker-compose.prod.yml 与 .env 上传或通过 git clone 获取
+# .env 示例（使用强密码与安全配置）
+cat > .env <<'EOF'
+DB_NAME=voidlord
+DB_USERNAME=postgres
+DB_PASSWORD=强密码123!
+MINIO_ACCESS_KEY=更换为安全AK
+MINIO_SECRET_KEY=更换为安全SK
+JWT_SECRET=更长更复杂的随机串
+EOF
+
+# 预拉一次占位镜像（可选）
+docker pull ghcr.io/REPLACE_OWNER/voidlord-be:latest || true
+
+# 首次启动（若未由 CI 自动部署）
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### 工作流镜像 Tag 约定
+
+工作流使用 `docker/metadata-action` 自动生成：
+
+- `latest`（分支）
+- 语义版本（若推送 tag）
+- `sha-<git sha>` 精确定位镜像（部署阶段使用）
+
+### 回滚策略
+
+在生产服务器执行：
+```bash
+docker images | grep voidlord-be
+docker pull <之前的tag>
+sed -i "s|image: ghcr.io/.*/voidlord-be:.*|image: <之前的tag>|g" docker-compose.prod.yml
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### 本地模拟构建
+
+```bash
+docker build -t voidlord-be:local .
+docker run --env-file .env -p 3000:3000 voidlord-be:local
+```
+
+### 后续可增强项
+
+- 引入数据库迁移（关闭同步，改用 migrations）。
+- 加入镜像安全扫描（Trivy）。
+- 推送通知（钉钉/企业微信/Slack）。
+- 灰度 / 蓝绿部署（以两个 compose 文件或 K8s 实现）。
+
+> 如需切换到 Kubernetes，可将镜像推送逻辑复用，并新增 Helm Chart 与 `kubectl`/`helm` 部署步骤。

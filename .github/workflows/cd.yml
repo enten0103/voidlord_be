@@ -1,0 +1,123 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: voidlord_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd="curl -f http://localhost:9000/minio/health/ready || exit 1" --health-interval=10s --health-timeout=5s --health-retries=5
+        command: server /data
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: voidlord_test
+      MINIO_ENDPOINT: http://localhost:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_FORCE_PATH_STYLE: true
+      MINIO_BUCKET: voidlord
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
+      - name: E2E tests
+        run: pnpm test:e2e
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/voidlord-be
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            export IMAGE=ghcr.io/${{ github.repository_owner }}/voidlord-be:sha-${{ github.sha }}
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GHCR_TOKEN }}
+            cd /opt/voidlord
+            echo "Pulling latest code to sync .env.example"
+            git fetch origin master
+            git checkout origin/master -- .env.example
+            echo "Generating .env from .env.example"
+            cp .env.example .env
+            sed -i "s|^PORT=.*|PORT=${{ secrets.PORT }}|" .env
+            sed -i "s|^PUBLIC_HOST_IP=.*|PUBLIC_HOST_IP=${{ secrets.PUBLIC_HOST_IP }}|" .env
+            sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}|" .env
+            echo "Pulling image $IMAGE"
+            docker pull $IMAGE
+            sed -i "s|image: ghcr.io/.*/voidlord-be:.*|image: $IMAGE|g" docker-compose.prod.yml
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
