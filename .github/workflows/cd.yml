@@ -30,11 +30,13 @@ jobs:
       MINIO_SECRET_KEY: minioadmin
       MINIO_FORCE_PATH_STYLE: true
       MINIO_BUCKET: voidlord
-      # 测试环境缺失 JWT_SECRET 导致 sign 报错，这里提供 CI 专用密钥及必要占位
+      JWT_EXPIRES_IN: 1h
       JWT_SECRET: test-ci-secret
       PORT: 3000
       PUBLIC_HOST_IP: localhost
       ADMIN_PASSWORD: admin123
+      ADMIN_USERNAME: admin
+      ADMIN_EMAIL: admin@example.com
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
