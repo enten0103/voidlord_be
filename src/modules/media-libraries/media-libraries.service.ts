@@ -76,7 +76,7 @@ export class MediaLibrariesService {
     }));
   }
 
-  async getOne(id: number, userId?: number) {
+  async getOne(id: number, userId?: number, limit?: number, offset?: number) {
     const lib = await this.libraryRepo.findOne({
       where: { id },
       relations: ['owner', 'tags'],
@@ -84,10 +84,33 @@ export class MediaLibrariesService {
     if (!lib) throw new NotFoundException('Library not found');
     const isOwner = userId && lib.owner?.id === userId;
     if (!lib.is_public && !isOwner) throw new ForbiddenException('Private');
-    const items = await this.itemRepo.find({
-      where: { library: { id } },
-      relations: ['book', 'child_library'],
-    });
+    const pagingRequested =
+      typeof limit === 'number' || typeof offset === 'number';
+    let items: MediaLibraryItem[] = [];
+    let totalCount = 0;
+    if (pagingRequested) {
+      let take = typeof limit === 'number' ? limit : 20;
+      if (take <= 0) take = 20;
+      if (take > 100) take = 100;
+      let skip = typeof offset === 'number' ? offset : 0;
+      if (skip < 0) skip = 0;
+      const [subset, count] = await this.itemRepo.findAndCount({
+        where: { library: { id } },
+        relations: ['book', 'child_library'],
+        order: { added_at: 'DESC' },
+        take,
+        skip,
+      });
+      items = subset;
+      totalCount = count;
+    } else {
+      items = await this.itemRepo.find({
+        where: { library: { id } },
+        relations: ['book', 'child_library'],
+        order: { added_at: 'DESC' },
+      });
+      totalCount = items.length;
+    }
     return {
       id: lib.id,
       name: lib.name,
@@ -105,7 +128,18 @@ export class MediaLibrariesService {
           ? { id: i.child_library.id, name: i.child_library.name }
           : null,
       })),
-      items_count: items.length,
+      items_count: totalCount,
+      ...(pagingRequested
+        ? {
+            limit:
+              typeof limit === 'number' && limit > 0
+                ? limit > 100
+                  ? 100
+                  : limit
+                : 20,
+            offset: typeof offset === 'number' && offset >= 0 ? offset : 0,
+          }
+        : {}),
     };
   }
 
@@ -113,17 +147,40 @@ export class MediaLibrariesService {
    * 获取当前用户的系统“阅读记录”媒体库（自动创建的 is_system 库）。
    * 若不存在（异常状态）抛出 404；返回结构与 getOne 相同。
    */
-  async getReadingRecord(userId: number) {
+  async getReadingRecord(userId: number, limit?: number, offset?: number) {
     const lib = await this.libraryRepo.findOne({
       where: { owner: { id: userId }, is_system: true, name: '系统阅读记录' },
       relations: ['owner', 'tags'],
     });
     if (!lib)
       throw new NotFoundException('System reading record library missing');
-    const items = await this.itemRepo.find({
-      where: { library: { id: lib.id } },
-      relations: ['book', 'child_library'],
-    });
+    const pagingRequested =
+      typeof limit === 'number' || typeof offset === 'number';
+    let items: MediaLibraryItem[] = [];
+    let totalCount = 0;
+    if (pagingRequested) {
+      let take = typeof limit === 'number' ? limit : 20;
+      if (take <= 0) take = 20;
+      if (take > 100) take = 100;
+      let skip = typeof offset === 'number' ? offset : 0;
+      if (skip < 0) skip = 0;
+      const [subset, count] = await this.itemRepo.findAndCount({
+        where: { library: { id: lib.id } },
+        relations: ['book', 'child_library'],
+        order: { added_at: 'DESC' },
+        take,
+        skip,
+      });
+      items = subset;
+      totalCount = count;
+    } else {
+      items = await this.itemRepo.find({
+        where: { library: { id: lib.id } },
+        relations: ['book', 'child_library'],
+        order: { added_at: 'DESC' },
+      });
+      totalCount = items.length;
+    }
     return {
       id: lib.id,
       name: lib.name,
@@ -141,7 +198,18 @@ export class MediaLibrariesService {
           ? { id: i.child_library.id, name: i.child_library.name }
           : null,
       })),
-      items_count: items.length,
+      items_count: totalCount,
+      ...(pagingRequested
+        ? {
+            limit:
+              typeof limit === 'number' && limit > 0
+                ? limit > 100
+                  ? 100
+                  : limit
+                : 20,
+            offset: typeof offset === 'number' && offset >= 0 ? offset : 0,
+          }
+        : {}),
     };
   }
 
@@ -149,11 +217,32 @@ export class MediaLibrariesService {
    * 构造一个“虚拟媒体库”视图，包含当前用户上传的全部书籍。
    * 不持久化库与条目，仅在访问时动态生成，id 固定为 0，is_virtual = true。
    */
-  async getVirtualUploaded(userId: number) {
-    const books = await this.bookRepo.find({
-      where: { create_by: userId },
-      order: { created_at: 'DESC' },
-    });
+  async getVirtualUploaded(userId: number, limit?: number, offset?: number) {
+    const pagingRequested =
+      typeof limit === 'number' || typeof offset === 'number';
+    let books: Book[] = [];
+    let totalCount = 0;
+    if (pagingRequested) {
+      let take = typeof limit === 'number' ? limit : 20;
+      if (take <= 0) take = 20;
+      if (take > 100) take = 100;
+      let skip = typeof offset === 'number' ? offset : 0;
+      if (skip < 0) skip = 0;
+      const [subset, count] = await this.bookRepo.findAndCount({
+        where: { create_by: userId },
+        order: { created_at: 'DESC' },
+        take,
+        skip,
+      });
+      books = subset;
+      totalCount = count;
+    } else {
+      books = await this.bookRepo.find({
+        where: { create_by: userId },
+        order: { created_at: 'DESC' },
+      });
+      totalCount = books.length;
+    }
     return {
       id: 0,
       name: '我的上传图书 (虚拟库)',
@@ -170,7 +259,18 @@ export class MediaLibrariesService {
         book: { id: b.id },
         child_library: null,
       })),
-      items_count: books.length,
+      items_count: totalCount,
+      ...(pagingRequested
+        ? {
+            limit:
+              typeof limit === 'number' && limit > 0
+                ? limit > 100
+                  ? 100
+                  : limit
+                : 20,
+            offset: typeof offset === 'number' && offset >= 0 ? offset : 0,
+          }
+        : {}),
     };
   }
 

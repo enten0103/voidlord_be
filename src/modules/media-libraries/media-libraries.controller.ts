@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,10 +17,12 @@ import {
   ApiTags,
   ApiOkResponse,
   ApiCreatedResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { JwtRequestWithUser } from '../../types/request.interface';
 import { MediaLibrariesService } from './media-libraries.service';
+import { PaginateQueryDto } from './dto/paginate-query.dto';
 import { CreateMediaLibraryDto } from './dto/create-media-library.dto';
 import {
   MediaLibraryCreatedDto,
@@ -89,11 +92,25 @@ export class MediaLibrariesController {
   @ApiResponse({ status: 404, description: '系统阅读记录库缺失（异常状态）' })
   @ApiResponse({ status: 200, description: 'Detail' })
   @ApiOkResponse({ type: MediaLibraryDetailDto })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description:
+      '分页每页数量 (1-100)。提供任一分页参数时，响应包含 items_count/limit/offset。',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: '分页偏移 (>=0)。未提供则为 0。',
+  })
   getReadingRecord(
     @Req() req: JwtRequestWithUser,
+    @Query() page?: PaginateQueryDto,
   ): Promise<MediaLibraryDetailDto> {
     return this.service.getReadingRecord(
       req.user.userId,
+      page?.limit,
+      page?.offset,
     ) as Promise<MediaLibraryDetailDto>;
   }
 
@@ -107,11 +124,24 @@ export class MediaLibrariesController {
   })
   @ApiResponse({ status: 200, description: 'Virtual detail' })
   @ApiOkResponse({ type: VirtualMediaLibraryDetailDto })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: '分页每页数量 (1-100)。虚拟库也支持分页。',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: '分页偏移 (>=0)。',
+  })
   getVirtualMyUploaded(
     @Req() req: JwtRequestWithUser,
+    @Query() page?: PaginateQueryDto,
   ): Promise<VirtualMediaLibraryDetailDto> {
     return this.service.getVirtualUploaded(
       req.user.userId,
+      page?.limit,
+      page?.offset,
     ) as Promise<VirtualMediaLibraryDetailDto>;
   }
 
@@ -127,13 +157,26 @@ export class MediaLibrariesController {
   @ApiResponse({ status: 403, description: '私有库拒绝访问 (Private)' })
   @ApiResponse({ status: 404, description: '未找到 (Library not found)' })
   @ApiOkResponse({ type: MediaLibraryDetailDto })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: '分页每页数量 (1-100)。未传则返回完整 items（可能很大）。',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: '分页偏移 (>=0)。',
+  })
   getOne(
     @Param('id') id: string,
     @Req() req: JwtRequestWithUser,
+    @Query() page?: PaginateQueryDto,
   ): Promise<MediaLibraryDetailDto> {
     return this.service.getOne(
       +id,
       req.user.userId,
+      page?.limit,
+      page?.offset,
     ) as Promise<MediaLibraryDetailDto>;
   }
 

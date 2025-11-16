@@ -54,6 +54,16 @@ function parseBody<T>(data: unknown, guard: (d: unknown) => d is T): T {
   throw new Error('Unexpected body shape');
 }
 
+// 分页响应类型与守卫
+interface PagedResp { limit: number; offset: number; items_count: number; items: unknown[] }
+function isPagedResp(v: unknown): v is PagedResp {
+  return isRecord(v) &&
+    typeof v.limit === 'number' &&
+    typeof v.offset === 'number' &&
+    typeof v.items_count === 'number' &&
+    Array.isArray(v.items);
+}
+
 // ---- Test Suite ----
 describe('MediaLibraries (e2e)', () => {
   let app: INestApplication;
@@ -215,6 +225,137 @@ describe('MediaLibraries (e2e)', () => {
       .post(`/media-libraries/${libId}/books/${bookId}`)
       .set('Authorization', `Bearer ${otherToken}`)
       .expect(403);
+  });
+
+  it('library detail pagination returns subset with metadata', async () => {
+    // 创建库并添加多本书
+    const lib = await request(httpServer)
+      .post('/media-libraries')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ name: 'PagedDetailLib' })
+      .expect(201);
+    const libId = parseBody(lib.body, isLibraryLite).id;
+    // 添加 3 本书到库
+    for (let i = 0; i < 3; i++) {
+      const bRes = await request(httpServer)
+        .post('/books')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ tags: [{ key: 'idx', value: String(i) }] })
+        .expect(201);
+      const bookObj = parseBody(
+        bRes.body,
+        (d): d is { id: number } => {
+          if (typeof d !== 'object' || d === null) return false;
+          return typeof (d as { id?: unknown }).id === 'number';
+        },
+      );
+      const bId = bookObj.id;
+      await request(httpServer)
+        .post(`/media-libraries/${libId}/books/${bId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(201);
+    }
+    const pageRes = await request(httpServer)
+      .get(`/media-libraries/${libId}?limit=2&offset=0`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    interface DetailPagedShape { items: any[]; items_count: number; limit: number; offset: number; }
+    const body: unknown = pageRes.body;
+    expect(isRecord(body)).toBe(true);
+    const detail = body as DetailPagedShape;
+    expect(detail.limit).toBe(2);
+    expect(detail.offset).toBe(0);
+    expect(detail.items_count).toBeGreaterThanOrEqual(3);
+    expect(Array.isArray(detail.items)).toBe(true);
+    expect(detail.items.length).toBeLessThanOrEqual(2);
+  });
+
+  it('reading-record system library supports pagination', async () => {
+    // 获取系统阅读记录库 id
+    const listRes = await request(httpServer)
+      .get('/media-libraries/my')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    interface LibSummary { id: number; is_system?: boolean; name?: string }
+    const libsRaw: unknown = listRes.body;
+    expect(Array.isArray(libsRaw)).toBe(true);
+    const libs: LibSummary[] = (libsRaw as unknown[]).filter(
+      (x): x is LibSummary =>
+        isRecord(x) && typeof x.id === 'number',
+    );
+    const reading = libs.find(
+      (l) => !!l.is_system && l.name === '系统阅读记录',
+    );
+    expect(reading).toBeDefined();
+    const readingId = reading!.id;
+    // 创建多本书并加入阅读记录库
+    const bookIds: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const bRes = await request(httpServer)
+        .post('/books')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ tags: [{ key: 'rr', value: String(i) }] })
+        .expect(201);
+      const bId = parseBody(
+        bRes.body,
+        (d): d is { id: number } => isRecord(d) && typeof d.id === 'number',
+      ).id;
+      bookIds.push(bId);
+      await request(httpServer)
+        .post(`/media-libraries/${readingId}/books/${bId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(201);
+    }
+    // 分页获取 limit=2 offset=0
+    const page0 = await request(httpServer)
+      .get(`/media-libraries/reading-record?limit=2&offset=0`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+  const p0Raw: unknown = page0.body;
+  const p0Body = parseBody(p0Raw, isPagedResp);
+  expect(p0Body.limit).toBe(2);
+  expect(p0Body.offset).toBe(0);
+  expect(p0Body.items_count).toBeGreaterThanOrEqual(5);
+  expect(Array.isArray(p0Body.items)).toBe(true);
+  expect(p0Body.items.length).toBeLessThanOrEqual(2);
+    // 分页获取第二页 offset=2
+    const page1 = await request(httpServer)
+      .get(`/media-libraries/reading-record?limit=2&offset=2`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    const p1Raw: unknown = page1.body;
+    const p1Body = parseBody(p1Raw, isPagedResp);
+    expect(p1Body.limit).toBe(2);
+    expect(p1Body.offset).toBe(2);
+    expect(Array.isArray(p1Body.items)).toBe(true);
+  });
+
+  it('virtual uploaded library supports pagination', async () => {
+    // 创建多本书（已有一本文档中 bookId，可再创建 4 本）
+    for (let i = 0; i < 4; i++) {
+      await request(httpServer)
+        .post('/books')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ tags: [{ key: 'vu', value: String(i) }] })
+        .expect(201);
+    }
+    // 获取全部书籍数量
+    const myBooksRes = await request(httpServer)
+      .get('/books/my')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+  const totalBooks = Array.isArray(myBooksRes.body) ? myBooksRes.body.length : 0;
+    // 分页获取虚拟库
+    const vPage = await request(httpServer)
+      .get('/media-libraries/virtual/my-uploaded?limit=3&offset=1')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    const vRaw: unknown = vPage.body;
+    const vBody = parseBody(vRaw, isPagedResp);
+    expect(vBody.limit).toBe(3);
+    expect(vBody.offset).toBe(1);
+    expect(vBody.items_count).toBe(totalBooks);
+    expect(vBody.items.length).toBeLessThanOrEqual(3);
   });
 
   it('nest child library & prevent duplicate nesting', async () => {

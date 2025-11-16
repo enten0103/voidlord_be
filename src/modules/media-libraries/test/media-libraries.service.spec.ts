@@ -44,6 +44,7 @@ describe('MediaLibrariesService', () => {
     save: jest.fn(),
     remove: jest.fn(),
     count: jest.fn(),
+    findAndCount: jest.fn(),
   };
   const mockBookRepo: Partial<jest.Mocked<Repository<Book>>> = {
     findOne: jest.fn(),
@@ -297,7 +298,59 @@ describe('MediaLibrariesService', () => {
     await expect(service.getOne(99, 5)).rejects.toThrow(NotFoundException);
   });
 
+  it('getOne pagination returns subset with metadata', async () => {
+    const libEntity = {
+      id: 50,
+      name: 'PagedLib',
+      description: null,
+      is_public: true,
+      is_system: false,
+      owner: stubUser(5),
+      tags: [],
+      created_at: new Date(),
+      updated_at: new Date(),
+    } as MediaLibrary;
+    libraryRepo.findOne.mockResolvedValueOnce(libEntity);
+    const fullItems: MediaLibraryItem[] = [
+      {
+        id: 1,
+        library: libEntity,
+        book: { id: 10 } as Book,
+        child_library: null,
+      } as MediaLibraryItem,
+      {
+        id: 2,
+        library: libEntity,
+        book: { id: 11 } as Book,
+        child_library: null,
+      } as MediaLibraryItem,
+      {
+        id: 3,
+        library: libEntity,
+        book: { id: 12 } as Book,
+        child_library: null,
+      } as MediaLibraryItem,
+    ];
+    (itemRepo.findAndCount as unknown as jest.Mock).mockResolvedValueOnce([
+      fullItems.slice(0, 2),
+      fullItems.length,
+    ]);
+    const res = await service.getOne(50, 5, 2, 0);
+    interface PagedShape {
+      items: MediaLibraryItem[];
+      items_count: number;
+      limit: number;
+      offset: number;
+    }
+    const paged = res as unknown as PagedShape;
+    expect(paged.items.length).toBe(2);
+    expect(paged.items_count).toBe(3);
+    expect(paged.limit).toBe(2);
+    expect(paged.offset).toBe(0);
+  });
+
   it('getReadingRecord ok', async () => {
+    libraryRepo.findOne.mockReset();
     libraryRepo.findOne.mockResolvedValueOnce({
       id: 77,
       name: '系统阅读记录',
@@ -317,6 +370,7 @@ describe('MediaLibrariesService', () => {
   });
 
   it('getReadingRecord not found', async () => {
+    libraryRepo.findOne.mockReset();
     libraryRepo.findOne.mockResolvedValueOnce(null as unknown as MediaLibrary);
     await expect(service.getReadingRecord(5)).rejects.toThrow(
       NotFoundException,
