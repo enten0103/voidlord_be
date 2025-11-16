@@ -34,17 +34,51 @@ DB_PORT=5432
 DB_USERNAME=postgres
 ### 数据验证
 DB_NAME=voidlord
-DB_SYNCHRONIZE=true    # 开发环境自动同步数据库结构
-## 🧪 测试覆盖
+### 图书端点
 
-# JWT配置
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRES_IN=1d
+- `POST /books` - 创建图书（需要 `BOOK_CREATE` level ≥ 1）
+- `GET /books` - 获取所有图书（可匿名）
+- `POST /books/search` - 统一条件数组搜索（可匿名，支持 eq / neq / match，AND 逻辑，详见下方）
+- `GET /books/recommend/:id` - 相似推荐（可匿名）
+- `GET /books/my` - 获取本人上传图书（需登录）
+- `PATCH /books/:id` - 更新图书（需要 `BOOK_UPDATE` level ≥ 1）
+- `DELETE /books/:id` - 删除图书（需要 `BOOK_DELETE` level ≥ 1）
 
-# 应用配置
-PORT=3000
+#### 统一标签搜索 POST /books/search
 
-# MinIO / S3 对象存储
+通过 POST `/books/search`，请求体传递 `conditions` 条件数组，所有条件为 AND 关系，支持操作符：
+- `eq`：等于
+- `neq`：不等于（排除）
+- `match`：模糊匹配（ILIKE）
+
+分页：请求体可选 `limit`/`offset`，启用分页时响应为对象，否则为数组。
+
+**响应双形态示例：**
+
+- 未分页（无 limit/offset）：
+```jsonc
+[
+  { "id": 1, "tags": [{ "key": "author", "value": "Isaac Asimov" }] },
+  { "id": 2, "tags": [{ "key": "author", "value": "J.R.R. Tolkien" }] }
+]
+```
+
+- 分页（带 limit/offset）：
+```jsonc
+{
+  "total": 42,
+  "limit": 20,
+  "offset": 0,
+  "items": [
+    { "id": 1, "tags": [{ "key": "author", "value": "Isaac Asimov" }] },
+    { "id": 5, "tags": [{ "key": "author", "value": "Isaac Asimov" }] }
+  ]
+}
+```
+
+**注意：** 所有 GET 标签搜索相关端点（如 `/books/tags/:key/:value`、`/books/tag-id/:id` 等）已彻底移除，仅保留 POST `/books/search`。
+
+更多用法与示例详见 `docs/BOOKS_TAG_SEARCH.md`。
 MINIO_ENDPOINT=http://localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
