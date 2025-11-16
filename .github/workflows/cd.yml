@@ -69,6 +69,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_digest: ${{ steps.meta.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
@@ -100,6 +102,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Show digest
+        run: echo "Image digest=${{ steps.meta.outputs.digest }}"
 
   deploy:
     needs: build-and-push
@@ -136,15 +140,30 @@ jobs:
           script: |
             set -e
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
             REPO="ghcr.io/${{ github.repository_owner }}/voidlord-be"
-            IMAGE="$REPO:sha-$SHORT_SHA"
-            echo "Pulling image $IMAGE"
-            if ! docker pull "$IMAGE"; then
-              echo "sha tag not found, fallback to latest"
-              IMAGE="$REPO:latest"
-              docker pull "$IMAGE"
+            DIGEST='${{ needs.build-and-push.outputs.image_digest }}'
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            PRIMARY_IMAGE="$REPO@$DIGEST"
+            FALLBACK_TAG1="$REPO:sha-$SHORT_SHA"
+            FALLBACK_TAG2="$REPO:latest"
+            echo "Attempt pulling by digest: $PRIMARY_IMAGE"
+            PULL_OK=0
+            for i in 1 2 3 4 5; do
+              if docker pull "$PRIMARY_IMAGE"; then PULL_OK=1; IMAGE="$PRIMARY_IMAGE"; break; fi
+              echo "Digest pull attempt $i failed; retrying..."; sleep $((i*5));
+            done
+            if [ $PULL_OK -ne 1 ]; then
+              echo "Digest pull failed, trying tag $FALLBACK_TAG1"
+              if docker pull "$FALLBACK_TAG1"; then IMAGE="$FALLBACK_TAG1"; PULL_OK=1; fi
             fi
+            if [ $PULL_OK -ne 1 ]; then
+              echo "Trying fallback tag $FALLBACK_TAG2"
+              if docker pull "$FALLBACK_TAG2"; then IMAGE="$FALLBACK_TAG2"; PULL_OK=1; fi
+            fi
+            if [ $PULL_OK -ne 1 ]; then echo "All pull attempts failed" >&2; exit 1; fi
+            echo "Using image reference: $IMAGE"
+            docker image inspect "$IMAGE" >/dev/null || { echo "Image not present after pull" >&2; exit 1; }
+            echo "Top 5 layers (docker image inspect):"; docker image inspect "$IMAGE" | grep -E 'sha256:' | head -n 5 || true
             mkdir -p /opt/voidlord
             cd /opt/voidlord
             echo "Overwriting docker-compose.prod.yml (force)"
@@ -230,7 +249,10 @@ jobs:
             grep -q '^JWT_SECRET=your-super-secret-jwt-key-change-in-production' .env && echo "WARNING: default JWT_SECRET" >&2 || true
             grep -q '^DB_PASSWORD=postgres' .env && echo "WARNING: default DB_PASSWORD" >&2 || true
             (grep -q '^MINIO_ACCESS_KEY=minioadmin' .env || grep -q '^MINIO_SECRET_KEY=minioadmin' .env) && echo "WARNING: default MinIO credentials" >&2 || true
-            # ensure latest selected image is present (already pulled in loop if selected)
-            sed -i "s|image: ghcr.io/.*/voidlord-be:.*|image: $IMAGE|g" docker-compose.prod.yml
-            docker compose -f docker-compose.prod.yml up -d
-            docker image prune -f
+            # 只更新 compose 中镜像引用，不自动启动，便于手动调试镜像拉取与启动
+            sed -i "s|image: ghcr.io/.*/voidlord-be[:@].*|image: $IMAGE|g" docker-compose.prod.yml
+            echo "docker-compose.prod.yml 和 .env 已生成/更新。"
+            echo "请手动登录服务器执行："
+            echo "  cd /opt/voidlord"
+            echo "  docker compose -f docker-compose.prod.yml pull"
+            echo "  docker compose -f docker-compose.prod.yml up -d"
