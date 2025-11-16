@@ -30,53 +30,28 @@ jobs:
       MINIO_SECRET_KEY: minioadmin
       MINIO_FORCE_PATH_STYLE: true
       MINIO_BUCKET: voidlord
-      JWT_EXPIRES_IN: 1h
       JWT_SECRET: test-ci-secret
       PORT: 3000
       PUBLIC_HOST_IP: localhost
       ADMIN_PASSWORD: admin123
-      ADMIN_USERNAME: admin
-      ADMIN_EMAIL: admin@example.com
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install pnpm (global)
-        run: |
-          npm install -g pnpm@latest
-          pnpm -v
-      - name: Env presence check (non-secret)
-        run: |
-          echo "== Environment Variable Presence Check (test job) =="
-          VARS=(DB_HOST DB_PORT DB_USERNAME DB_PASSWORD DB_NAME MINIO_ENDPOINT MINIO_ACCESS_KEY MINIO_SECRET_KEY MINIO_FORCE_PATH_STYLE MINIO_BUCKET PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET)
-          for v in "${VARS[@]}"; do
-            val="${!v}"
-            if [ -n "$val" ]; then
-              if [[ "$v" =~ (PASSWORD|SECRET|JWT_SECRET) ]]; then
-                echo "$v=SET(len=${#val})"
-              else
-                echo "$v=$val"
-              fi
-            else
-              echo "$v=NOT_SET"
-            fi
-          done
+      - name: Install pnpm
+        run: npm i -g pnpm@9 && pnpm -v
       - name: Start MinIO
-        run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin \
-            -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
-      - name: Wait for MinIO
+        run: docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio:latest server /data
+      - name: Wait MinIO
         run: |
           for i in {1..15}; do
-            if curl -sf http://localhost:9000/minio/health/ready > /dev/null; then echo "MinIO ready"; exit 0; fi
-            echo "Waiting MinIO ($i)"; sleep 2;
+            if curl -sf http://localhost:9000/minio/health/ready >/dev/null; then echo ready; exit 0; fi
+            sleep 2; echo "wait $i";
           done
-          echo "MinIO failed to start"; docker logs minio; exit 1
-      - name: Install dependencies
+          docker logs minio; exit 1
+      - name: Install deps
         run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint
@@ -97,38 +72,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install pnpm (global)
-        run: |
-          npm install -g pnpm@latest
-          pnpm -v
-      - name: Build job env presence check
-        run: |
-          echo "== Environment Variable Presence Check (build job) =="
-          VARS=(PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET)
-          for v in "${VARS[@]}"; do
-            val="${!v}"
-            if [ -n "$val" ]; then
-              if [[ "$v" =~ (PASSWORD|SECRET|JWT_SECRET) ]]; then
-                echo "$v=SET(len=${#val})"
-              else
-                echo "$v=$val"
-              fi
-            else
-              echo "$v=NOT_SET"
-            fi
-          done
-      - name: Login to GHCR
+      - name: Install pnpm
+        run: npm i -g pnpm@9 && pnpm -v
+      - name: Login GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata
+      - name: Meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/voidlord-be
-      - name: Build and push
+      - name: Build & Push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -143,8 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: voidlordBe
     steps:
-      - uses: actions/checkout@v4
-      - name: Deployment secrets presence check
+      - name: Secrets presence
         env:
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
@@ -157,72 +113,65 @@ jobs:
           MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
           MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
         run: |
-          echo "== Required Secrets Presence (names only) =="
-          MISSING_LIST=""
+          echo "== Deploy secrets check =="
+          MISSING=""
           for v in PROD_HOST PROD_SSH_USER PROD_SSH_PASSWORD PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
-            if [ -n "${!v}" ]; then
-              echo "$v=SET"
-            else
-              echo "$v=MISSING"; MISSING_LIST="$MISSING_LIST $v";
-            fi
+            if [ -z "${!v}" ]; then echo "$v=MISSING"; MISSING="$MISSING $v"; else echo "$v=SET"; fi
           done
-          if [ -n "$MISSING_LIST" ]; then
-            echo "❌ 缺失 Secrets: $MISSING_LIST" >&2
-            exit 1
-          fi
-      - name: Deploy over SSH
+          if [ -n "$MISSING" ]; then echo "Missing required secrets:$MISSING" >&2; exit 1; fi
+      - name: Deploy
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
           password: ${{ secrets.PROD_SSH_PASSWORD }}
           script: |
-            export IMAGE=ghcr.io/${{ github.repository_owner }}/voidlord-be:sha-${{ github.sha }}
+            set -e
+            IMAGE="ghcr.io/${{ github.repository_owner }}/voidlord-be:sha-${{ github.sha }}"
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            mkdir -p /opt/voidlord
             cd /opt/voidlord
-            echo "Pulling latest code to sync .env.example"
-            git fetch origin master
-            git checkout origin/master -- .env.example
-            echo "Generating .env from .env.example"
+            if [ ! -f docker-compose.prod.yml ]; then
+              echo "Creating docker-compose.prod.yml"
+              {
+                echo "version: '3.8'";
+                echo "services:";
+                echo "  app:";
+                echo "    image: ghcr.io/${{ github.repository_owner }}/voidlord-be:latest";
+                echo "    restart: always";
+                echo "    ports:";
+                echo "      - '3000:3000'";
+                echo "    env_file: .env";
+              } > docker-compose.prod.yml
+            fi
+            if [ ! -f .env.example ]; then
+              echo "Creating .env.example"
+              {
+                echo "PORT=3000";
+                echo "PUBLIC_HOST_IP=localhost";
+                echo "ADMIN_PASSWORD=admin123";
+                echo "JWT_SECRET=your-super-secret-jwt-key-change-in-production";
+                echo "DB_PASSWORD=postgres";
+                echo "MINIO_ACCESS_KEY=minioadmin";
+                echo "MINIO_SECRET_KEY=minioadmin";
+              } > .env.example
+            fi
             cp .env.example .env
-            sed -i "s|^PORT=.*|PORT=${PORT}|" .env
-            sed -i "s|^PUBLIC_HOST_IP=.*|PUBLIC_HOST_IP=${PUBLIC_HOST_IP}|" .env
-            sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" .env
-            # 生产环境关键变量完整性检查（为空则失败）
-            echo "Validating generated .env (critical keys not empty)";
-            CRITICAL_KEYS="PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
-            FAIL_KEYS=""
-            for k in $CRITICAL_KEYS; do
-              VAL=$(grep -E "^${k}=" .env | head -n1 | cut -d'=' -f2-)
-              if [ -z "$VAL" ]; then
-                echo "[MISSING] $k"; FAIL_KEYS="$FAIL_KEYS $k";
-              else
-                if echo "$k" | grep -Eq "(PASSWORD|SECRET|JWT_SECRET)"; then
-                  echo "[OK] $k (len=${#VAL})"
-                else
-                  echo "[OK] $k=$VAL"
-                fi
-              fi
+            [ -n "${{ secrets.PORT }}" ] && sed -i "s|^PORT=.*|PORT=${{ secrets.PORT }}|" .env
+            [ -n "${{ secrets.PUBLIC_HOST_IP }}" ] && sed -i "s|^PUBLIC_HOST_IP=.*|PUBLIC_HOST_IP=${{ secrets.PUBLIC_HOST_IP }}|" .env
+            [ -n "${{ secrets.ADMIN_PASSWORD }}" ] && sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}|" .env
+            [ -n "${{ secrets.JWT_SECRET }}" ] && sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${{ secrets.JWT_SECRET }}|" .env
+            [ -n "${{ secrets.DB_PASSWORD }}" ] && sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|" .env
+            [ -n "${{ secrets.MINIO_ACCESS_KEY }}" ] && sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}|" .env
+            [ -n "${{ secrets.MINIO_SECRET_KEY }}" ] && sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}|" .env
+            echo "Preview (.env):"; grep -E '^(PORT|PUBLIC_HOST_IP)=' .env || true
+            for k in PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
+              VAL=$(grep -E "^$k=" .env | cut -d'=' -f2-); [ -z "$VAL" ] && echo "Missing $k" && exit 1
             done
-            if [ -n "$FAIL_KEYS" ]; then
-              echo "❌ 关键环境变量为空: $FAIL_KEYS" >&2
-              exit 1
-            # 默认值警告（不阻断部署）
-            JWT_ACTUAL=$(grep -E "^JWT_SECRET=" .env | cut -d'=' -f2-)
-            DB_ACTUAL=$(grep -E "^DB_PASSWORD=" .env | cut -d'=' -f2-)
-            MINIO_AK=$(grep -E "^MINIO_ACCESS_KEY=" .env | cut -d'=' -f2-)
-            MINIO_SK=$(grep -E "^MINIO_SECRET_KEY=" .env | cut -d'=' -f2-)
-            if [ "$JWT_ACTUAL" = "your-super-secret-jwt-key-change-in-production" ]; then
-              echo "⚠ WARNING: JWT_SECRET 使用默认占位值，请在环境 Secrets 中覆盖。" >&2
-            fi
-            if [ "$DB_ACTUAL" = "postgres" ]; then
-              echo "⚠ WARNING: DB_PASSWORD=postgres 是弱默认值，建议更换。" >&2
-            fi
-            if [ "$MINIO_AK" = "minioadmin" ] || [ "$MINIO_SK" = "minioadmin" ]; then
-              echo "⚠ WARNING: MinIO 默认凭证(minioadmin)仍在使用，建议替换。" >&2
-            fi
-            echo "Pulling image $IMAGE"
-            docker pull $IMAGE
+            grep -q '^JWT_SECRET=your-super-secret-jwt-key-change-in-production' .env && echo "WARNING: default JWT_SECRET" >&2 || true
+            grep -q '^DB_PASSWORD=postgres' .env && echo "WARNING: default DB_PASSWORD" >&2 || true
+            (grep -q '^MINIO_ACCESS_KEY=minioadmin' .env || grep -q '^MINIO_SECRET_KEY=minioadmin' .env) && echo "WARNING: default MinIO credentials" >&2 || true
+            docker pull "$IMAGE"
             sed -i "s|image: ghcr.io/.*/voidlord-be:.*|image: $IMAGE|g" docker-compose.prod.yml
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
