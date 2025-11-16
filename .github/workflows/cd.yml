@@ -88,6 +88,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/voidlord-be
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=master,enable=${{ github.ref == 'refs/heads/master' }}
+            type=sha,format=short
       - name: Build & Push
         uses: docker/build-push-action@v6
         with:
@@ -128,15 +132,19 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
           password: ${{ secrets.PROD_SSH_PASSWORD }}
+          command_timeout: 600s
           script: |
             set -e
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
             REPO="ghcr.io/${{ github.repository_owner }}/voidlord-be"
-            IMAGE=""; for TAG in "sha-$SHORT_SHA" "master" "latest"; do
-              if docker pull "$REPO:$TAG" >/dev/null 2>&1; then IMAGE="$REPO:$TAG"; echo "Selected image tag: $TAG"; break; fi
-            done
-            if [ -z "$IMAGE" ]; then echo "No available image tag (sha-short/master/latest) found." >&2; exit 1; fi
+            IMAGE="$REPO:sha-$SHORT_SHA"
+            echo "Pulling image $IMAGE"
+            if ! docker pull "$IMAGE"; then
+              echo "sha tag not found, fallback to latest"
+              IMAGE="$REPO:latest"
+              docker pull "$IMAGE"
+            fi
             mkdir -p /opt/voidlord
             cd /opt/voidlord
             if [ ! -f docker-compose.prod.yml ]; then
@@ -145,7 +153,7 @@ jobs:
                 echo "version: '3.8'";
                 echo "services:";
                 echo "  app:";
-                echo "    image: ghcr.io/${{ github.repository_owner }}/voidlord-be:latest";
+                echo "    image: $IMAGE";
                 echo "    restart: always";
                 echo "    ports:";
                 echo "      - '3000:3000'";
