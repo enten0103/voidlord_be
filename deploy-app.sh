@@ -8,11 +8,9 @@ set -e
 WORK_DIR="/opt/voidlord"
 COMPOSE_FILE="docker-compose.prod.yml"
 
-# !!! SECURITY WARNING !!!
-# GHCR credentials are hard-coded for current operational needs.
-# Rotate and remove them from this script as soon as possible.
-GHCR_USERNAME="enten0103"          # TODO: 如需更换账号请修改此处
-GHCR_PASSWORD="CHANGE_ME_TOKEN"    # TODO: 替换为实际 GHCR Token 或密码
+# GHCR credentials placeholders. CI will replace these with real values.
+GHCR_USERNAME="__GHCR_USERNAME_PLACEHOLDER__"
+GHCR_PASSWORD="__GHCR_PASSWORD_PLACEHOLDER__"
 
 echo "========================================="
 echo "VoidLord BE Manual Deployment Script"

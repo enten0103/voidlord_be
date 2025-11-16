@@ -141,6 +141,13 @@ jobs:
           command_timeout: 120s
           script: |
             set -e
+            # Replace GHCR credentials placeholders in deploy-app.sh if present
+            if [ -f /opt/voidlord/deploy-app.sh ]; then
+              echo "Patching GHCR credentials in /opt/voidlord/deploy-app.sh"
+              sed -i "s|__GHCR_USERNAME_PLACEHOLDER__|enten0103|g" /opt/voidlord/deploy-app.sh
+              sed -i "s|__GHCR_PASSWORD_PLACEHOLDER__|${{ secrets.GHCR_PASSWORD }}|g" /opt/voidlord/deploy-app.sh
+            fi
+
             REPO="ghcr.io/${{ github.repository_owner }}/voidlord-be"
             DIGEST='${{ needs.build-and-push.outputs.image_digest }}'
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
