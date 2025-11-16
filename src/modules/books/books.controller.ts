@@ -23,6 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { ApiPermission } from '../auth/permissions.decorator';
 import { BooksService } from './books.service';
@@ -83,17 +84,7 @@ export class BooksController {
     description: 'Books retrieved successfully',
     type: [BookResponseDto],
   })
-  @ApiQuery({
-    name: 'tags',
-    required: false,
-    description: 'Filter by tag keys (comma-separated)',
-    example: 'author,genre',
-  })
-  findAll(@Query('tags') tags?: string) {
-    if (tags) {
-      const tagKeys = tags.split(',').map((tag) => tag.trim());
-      return this.booksService.findByTags(tagKeys);
-    }
+  findAll() {
     return this.booksService.findAll();
   }
 
@@ -141,60 +132,81 @@ export class BooksController {
 
   @Post('search')
   @ApiOperation({
-    summary: 'Search books (fuzzy + tag modes)',
+    summary: 'Search books via unified conditions array',
     description:
-      'Priority: q (fuzzy ILIKE) > tagKeys OR > tagKey+tagValue > tagFilters OR > tagId > tagIds AND. First matched pattern is executed.',
+      'Use logical AND over an array of { target, op, value } conditions. Operators: eq (exact), neq (exclude exact), match (ILIKE partial). Empty body returns all books. Deprecated legacy modes (q/tagKeys/tagKey+tagValue/tagFilters/tagId/tagIds) have been removed.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Books found successfully',
-    type: [BookResponseDto],
-  })
-  @ApiResponse({ status: 400, description: 'Invalid search parameters' })
-  @ApiBody({
-    description:
-      'Supported search body fields (first matched wins): q (fuzzy), tagKeys, tagKey+tagValue, tagFilters, tagId, tagIds. When none is provided, all books are returned.',
+    description: 'Books found successfully (array or paged object)',
     schema: {
       oneOf: [
         {
-          title: 'Fuzzy query across tag key/value',
-          example: { q: 'asim' },
+          title: 'Array result (no pagination requested)',
+          type: 'array',
+          items: { $ref: '#/components/schemas/BookResponseDto' },
+          example: [
+            { id: 1, tags: [{ key: 'author', value: 'Isaac Asimov' }] },
+            { id: 2, tags: [{ key: 'author', value: 'J.R.R. Tolkien' }] },
+          ],
         },
         {
-          title: 'Tag keys list',
-          example: { tagKeys: 'author,genre' },
-        },
-        {
-          title: 'Single key-value',
-          example: { tagKey: 'author', tagValue: 'John Doe' },
-        },
-        {
-          title: 'Multiple key-value filters (OR logic)',
+          title: 'Paged result (limit/offset provided)',
+          type: 'object',
+          properties: {
+            total: { type: 'number', example: 42 },
+            limit: { type: 'number', example: 20 },
+            offset: { type: 'number', example: 0 },
+            items: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/BookResponseDto' },
+            },
+          },
+          required: ['total', 'limit', 'offset', 'items'],
           example: {
-            tagFilters: [
-              { key: 'author', value: 'John Doe' },
-              { key: 'genre', value: 'Fiction' },
+            total: 42,
+            limit: 20,
+            offset: 0,
+            items: [
+              { id: 1, tags: [{ key: 'author', value: 'Isaac Asimov' }] },
+              { id: 5, tags: [{ key: 'author', value: 'Isaac Asimov' }] },
             ],
           },
         },
-        {
-          title: 'Single tag ID',
-          example: { tagId: 12 },
-        },
-        {
-          title: 'Multiple tag IDs (AND logic)',
-          example: { tagIds: '12,34,56' },
-        },
-        {
-          title: 'Return all (no criteria)',
-          example: {},
-        },
       ],
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid search parameters' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        conditions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              target: { type: 'string', example: 'author' },
+              op: {
+                type: 'string',
+                enum: ['eq', 'neq', 'match'],
+                example: 'eq',
+              },
+              value: { type: 'string', example: 'Isaac Asimov' },
+            },
+            required: ['target', 'op', 'value'],
+          },
+          description:
+            'Logical AND over all conditions. Empty or omitted returns all books.',
+        },
+      },
     },
     examples: {
       singleEq: {
         summary: 'Single equality condition',
-        value: { conditions: [{ target: 'author', op: 'eq', value: 'Isaac Asimov' }] },
+        value: {
+          conditions: [{ target: 'author', op: 'eq', value: 'Isaac Asimov' }],
+        },
       },
       andCombo: {
         summary: 'AND combination (author eq + genre eq)',
@@ -216,60 +228,46 @@ export class BooksController {
       },
       matchExample: {
         summary: 'Partial match (ILIKE)',
-        value: { conditions: [{ target: 'author', op: 'match', value: 'asim' }] },
+        value: {
+          conditions: [{ target: 'author', op: 'match', value: 'asim' }],
+        },
+      },
+      duplicateConditions: {
+        summary: 'Duplicate conditions (AND semantics)',
+        value: {
+          conditions: [
+            { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+            { target: 'author', op: 'eq', value: 'Isaac Asimov' },
+          ],
+        },
+      },
+      emptyStringValue: {
+        summary: 'Empty string value (exact match on empty tag value)',
+        value: {
+          conditions: [{ target: 'year', op: 'eq', value: '' }],
+        },
+      },
+      invalidOperator: {
+        summary: 'Invalid operator example (will 400)',
+        value: {
+          conditions: [{ target: 'author', op: 'unknown', value: 'x' }],
+        },
       },
       empty: { summary: 'Empty body returns all', value: {} },
     },
   })
   async searchByTags(@Body() searchDto: SearchBooksDto) {
-    return this.booksService.searchByConditions(searchDto.conditions || []);
+    const result = await this.booksService.searchByConditions(
+      searchDto.conditions || [],
+      searchDto.limit,
+      searchDto.offset,
+      searchDto.sortBy,
+      searchDto.sortOrder,
+    );
+    return result;
   }
 
-  @Get('tags/:key/:value')
-  @ApiOperation({ summary: 'Get books by specific tag key-value pair' })
-  @ApiResponse({
-    status: 200,
-    description: 'Books retrieved successfully',
-    type: [BookResponseDto],
-  })
-  findByTagKeyValue(@Param('key') key: string, @Param('value') value: string) {
-    return this.booksService.findByTagKeyValue(key, value);
-  }
-
-  @Get('tag-id/:id')
-  @ApiOperation({ summary: 'Get books by tag ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Books retrieved successfully',
-    type: [BookResponseDto],
-  })
-  @ApiResponse({ status: 400, description: 'Invalid tag ID' })
-  findByTagId(@Param('id') id: string) {
-    const tagId = parseInt(id);
-    if (isNaN(tagId) || tagId <= 0) {
-      throw new BadRequestException('Invalid tag ID');
-    }
-    return this.booksService.findByTagId(tagId);
-  }
-
-  @Get('tag-ids/:ids')
-  @ApiOperation({ summary: 'Get books by multiple tag IDs (comma-separated)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Books retrieved successfully',
-    type: [BookResponseDto],
-  })
-  @ApiResponse({ status: 400, description: 'Invalid tag IDs' })
-  findByTagIds(@Param('ids') ids: string) {
-    const tagIds = ids
-      .split(',')
-      .map((id) => parseInt(id.trim()))
-      .filter((id) => !isNaN(id) && id > 0);
-    if (tagIds.length === 0) {
-      throw new BadRequestException('No valid tag IDs provided');
-    }
-    return this.booksService.findByTagIds(tagIds);
-  }
+  // Deprecated tag-based GET endpoints removed in favor of unified POST /books/search conditions.
 
   @Get('recommend/:id')
   @ApiOperation({ summary: 'Recommend similar books by book ID' })
@@ -404,15 +402,27 @@ export class BooksController {
 
   // Ratings
   @Get(':id/rating')
-  @ApiOperation({ summary: 'Get book rating aggregate (public)' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get book rating aggregate (public, with myRating if logged in)',
+  })
+  @ApiBearerAuth('JWT-auth')
   @ApiResponse({
     status: 200,
-    description: 'Aggregate rating',
-    schema: { example: { bookId: 1, avg: 4.5, count: 12 } },
+    description: 'Aggregate rating (with myRating if logged in)',
+    schema: { example: { bookId: 1, avg: 4.5, count: 12, myRating: 5 } },
   })
   @ApiResponse({ status: 404, description: 'Book not found' })
-  getRating(@Param('id') id: string) {
-    return this.booksService.getRating(+id);
+  getRating(
+    @Param('id') id: string,
+    @Req() req: import('../../types/request.interface').JwtRequestWithUser,
+  ) {
+    // 支持可选鉴权，未登录时 req.user 可能不存在
+    const userId =
+      req.user && typeof req.user.userId === 'number'
+        ? req.user.userId
+        : undefined;
+    return this.booksService.getRating(+id, userId);
   }
 
   @Get(':id/rating/me')

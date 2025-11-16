@@ -833,23 +833,36 @@ describe('Books (e2e)', () => {
       createdId = parseBody(res.body, isBookLite).id;
     });
 
-    it('public can read aggregate rating (initially zero)', async () => {
+    it('public can read aggregate rating (initially zero, myRating null)', async () => {
       const res = await request(httpServer)
         .get(`/books/${createdId}/rating`)
         .expect(200);
       const agg0 = parseBody(
         res.body,
-        (o): o is { bookId: number; avg: number; count: number } => {
+        (
+          o,
+        ): o is {
+          bookId: number;
+          avg: number;
+          count: number;
+          myRating: null;
+        } => {
           if (typeof o !== 'object' || o === null) return false;
           const r = o as Record<string, unknown>;
           return (
             typeof r.bookId === 'number' &&
             typeof r.avg === 'number' &&
-            typeof r.count === 'number'
+            typeof r.count === 'number' &&
+            r.myRating === null
           );
         },
       );
-      expect(agg0).toEqual({ bookId: createdId, avg: 0, count: 0 });
+      expect(agg0).toEqual({
+        bookId: createdId,
+        avg: 0,
+        count: 0,
+        myRating: null,
+      });
     });
 
     it('user can set and update own rating (1-5)', async () => {
@@ -887,7 +900,7 @@ describe('Books (e2e)', () => {
       });
       expect(r2b.myRating).toBe(3);
 
-      // get my rating
+      // get my rating (dedicated endpoint)
       const me = await request(httpServer)
         .get(`/books/${createdId}/rating/me`)
         .set('Authorization', `Bearer ${authToken}`)
@@ -897,6 +910,59 @@ describe('Books (e2e)', () => {
         return typeof (o as Record<string, unknown>).myRating === 'number';
       });
       expect(meb.myRating).toBe(3);
+
+      // aggregate with auth should include myRating=3
+      const aggAuth = await request(httpServer)
+        .get(`/books/${createdId}/rating`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      const aggAuthBody = parseBody(
+        aggAuth.body,
+        (
+          o,
+        ): o is {
+          bookId: number;
+          avg: number;
+          count: number;
+          myRating: number;
+        } => {
+          if (typeof o !== 'object' || o === null) return false;
+          const r = o as Record<string, unknown>;
+          return (
+            typeof r.bookId === 'number' &&
+            typeof r.avg === 'number' &&
+            typeof r.count === 'number' &&
+            typeof r.myRating === 'number'
+          );
+        },
+      );
+      expect(aggAuthBody.myRating).toBe(3);
+
+      // aggregate without auth still myRating null
+      const aggNoAuth = await request(httpServer)
+        .get(`/books/${createdId}/rating`)
+        .expect(200);
+      const aggNoAuthBody = parseBody(
+        aggNoAuth.body,
+        (
+          o,
+        ): o is {
+          bookId: number;
+          avg: number;
+          count: number;
+          myRating: null;
+        } => {
+          if (typeof o !== 'object' || o === null) return false;
+          const r = o as Record<string, unknown>;
+          return (
+            typeof r.bookId === 'number' &&
+            typeof r.avg === 'number' &&
+            typeof r.count === 'number' &&
+            r.myRating === null
+          );
+        },
+      );
+      expect(aggNoAuthBody.myRating).toBeNull();
     });
 
     it('requires auth to rate and delete my rating', async () => {
@@ -926,12 +992,18 @@ describe('Books (e2e)', () => {
       expect(delBody.ok).toBe(true);
       const agg = await request(httpServer)
         .get(`/books/${createdId}/rating`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
-      const aggb = parseBody(agg.body, (o): o is { count: number } => {
-        if (typeof o !== 'object' || o === null) return false;
-        return typeof (o as Record<string, unknown>).count === 'number';
-      });
+      const aggb = parseBody(
+        agg.body,
+        (o): o is { count: number; myRating: null } => {
+          if (typeof o !== 'object' || o === null) return false;
+          const r = o as Record<string, unknown>;
+          return typeof r.count === 'number' && r.myRating === null;
+        },
+      );
       expect(aggb.count).toBeGreaterThanOrEqual(0);
+      expect(aggb.myRating).toBeNull();
     });
   });
 

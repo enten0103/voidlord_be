@@ -29,11 +29,6 @@ describe('BooksController', () => {
     // findByHash removed
     update: jest.fn(),
     remove: jest.fn(),
-    findByTags: jest.fn(),
-    findByTagKeyValue: jest.fn(),
-    findByMultipleTagValues: jest.fn(),
-    findByTagId: jest.fn(),
-    findByTagIds: jest.fn(),
     searchByConditions: jest.fn(),
     recommendByBook: jest.fn(),
   };
@@ -72,7 +67,7 @@ describe('BooksController', () => {
 
   describe('create', () => {
     it('should create a book', async () => {
-  const createBookDto: CreateBookDto = { tags: [] };
+      const createBookDto: CreateBookDto = { tags: [] };
 
       mockBooksService.create.mockResolvedValue(mockBook);
 
@@ -90,22 +85,10 @@ describe('BooksController', () => {
   describe('findAll', () => {
     it('should return all books', async () => {
       mockBooksService.findAll.mockResolvedValue([mockBook]);
-
       const result = await controller.findAll();
-
       expect(result).toEqual([mockBook]);
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.findAll).toHaveBeenCalled();
-    });
-
-    it('should return books filtered by tags', async () => {
-      mockBooksService.findByTags.mockResolvedValue([mockBook]);
-
-      const result = await controller.findAll('author,genre');
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTags).toHaveBeenCalledWith(['author', 'genre']);
     });
   });
 
@@ -154,6 +137,10 @@ describe('BooksController', () => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.searchByConditions).toHaveBeenCalledWith(
         searchDto.conditions,
+        searchDto.limit,
+        searchDto.offset,
+        searchDto.sortBy,
+        searchDto.sortOrder,
       );
     });
 
@@ -170,85 +157,25 @@ describe('BooksController', () => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(service.searchByConditions).toHaveBeenCalledWith(
         searchDto.conditions,
+        searchDto.limit,
+        searchDto.offset,
+        searchDto.sortBy,
+        searchDto.sortOrder,
       );
     });
 
     it('should return all books when conditions missing', async () => {
-  const searchDto: SearchBooksDto = {};
+      const searchDto: SearchBooksDto = {};
       mockBooksService.searchByConditions.mockResolvedValue([mockBook]);
       const result = await controller.searchByTags(searchDto);
       expect(result).toEqual([mockBook]);
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.searchByConditions).toHaveBeenCalledWith([]);
-    });
-  });
-
-  describe('findByTagKeyValue', () => {
-    it('should return books by specific tag key-value pair', async () => {
-      mockBooksService.findByTagKeyValue.mockResolvedValue([mockBook]);
-
-      const result = await controller.findByTagKeyValue('author', 'John Doe');
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagKeyValue).toHaveBeenCalledWith(
-        'author',
-        'John Doe',
-      );
-    });
-  });
-
-  describe('findByTagId', () => {
-    it('should return books by tag ID', async () => {
-      mockBooksService.findByTagId.mockResolvedValue([mockBook]);
-
-      const result = await controller.findByTagId('1');
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagId).toHaveBeenCalledWith(1);
-    });
-
-    it('should throw BadRequestException for invalid tag ID', () => {
-      expect(() => controller.findByTagId('invalid')).toThrow(
-        BadRequestException,
-      );
-      expect(() => controller.findByTagId('invalid')).toThrow('Invalid tag ID');
-    });
-
-    it('should throw BadRequestException for negative tag ID', () => {
-      expect(() => controller.findByTagId('-1')).toThrow(BadRequestException);
-      expect(() => controller.findByTagId('-1')).toThrow('Invalid tag ID');
-    });
-  });
-
-  describe('findByTagIds', () => {
-    it('should return books by multiple tag IDs', async () => {
-      mockBooksService.findByTagIds.mockResolvedValue([mockBook]);
-
-      const result = await controller.findByTagIds('1,2,3');
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagIds).toHaveBeenCalledWith([1, 2, 3]);
-    });
-
-    it('should filter out invalid tag IDs', async () => {
-      mockBooksService.findByTagIds.mockResolvedValue([mockBook]);
-
-      const result = await controller.findByTagIds('1,invalid,3,0');
-
-      expect(result).toEqual([mockBook]);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(service.findByTagIds).toHaveBeenCalledWith([1, 3]);
-    });
-
-    it('should throw BadRequestException when no valid tag IDs provided', () => {
-      expect(() => controller.findByTagIds('invalid,0,-1')).toThrow(
-        BadRequestException,
-      );
-      expect(() => controller.findByTagIds('invalid,0,-1')).toThrow(
-        'No valid tag IDs provided',
+      expect(service.searchByConditions).toHaveBeenCalledWith(
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
       );
     });
   });
@@ -281,7 +208,7 @@ describe('BooksController', () => {
 
   describe('update', () => {
     it('should update a book', async () => {
-  const updateBookDto: UpdateBookDto = { tags: [] };
+      const updateBookDto: UpdateBookDto = { tags: [] };
       const updatedBook = { ...mockBook };
 
       mockBooksService.update.mockResolvedValue(updatedBook);

@@ -169,234 +169,111 @@ describe('BooksService', () => {
     });
   });
 
-  describe('findByTags', () => {
-    it('should return books filtered by tags', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockBook]),
-      };
-
-      mockBookRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
-      );
-
-      const result = await service.findByTags(['author', 'genre']);
-
-      expect(result).toEqual([mockBook]);
-      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'book',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'book.tags',
-        'tag',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'tag.key IN (:...tagKeys)',
-        { tagKeys: ['author', 'genre'] },
-      );
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'book.created_at',
-        'DESC',
-      );
-    });
-  });
-
-  describe('findByTagKeyValue', () => {
-    it('should return books filtered by specific tag key-value pair', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockBook]),
-      };
-
-      mockBookRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
-      );
-
-      const result = await service.findByTagKeyValue('author', 'John Doe');
-
-      expect(result).toEqual([mockBook]);
-      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'book',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'book.tags',
-        'tag',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'tag.key = :key AND tag.value = :value',
-        { key: 'author', value: 'John Doe' },
-      );
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'book.created_at',
-        'DESC',
-      );
-    });
-  });
-
-  describe('findByMultipleTagValues', () => {
-    it('should return books filtered by multiple tag key-value pairs', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockBook]),
-      };
-
-      mockBookRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
-      );
-
-      const tagFilters = [
-        { key: 'author', value: 'John Doe' },
-        { key: 'genre', value: 'Fiction' },
-      ];
-
-      const result = await service.findByMultipleTagValues(tagFilters);
-
-      expect(result).toEqual([mockBook]);
-      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'book',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'book.tags',
-        'tag',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        '(tag.key = :key0 AND tag.value = :value0) OR (tag.key = :key1 AND tag.value = :value1)',
-        {
-          key0: 'author',
-          value0: 'John Doe',
-          key1: 'genre',
-          value1: 'Fiction',
-        },
-      );
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'book.created_at',
-        'DESC',
-      );
-    });
-  });
-
-  describe('findByTagId', () => {
-    it('should return books filtered by tag ID', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockBook]),
-      };
-
-      mockBookRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
-      );
-
-      const result = await service.findByTagId(1);
-
-      expect(result).toEqual([mockBook]);
-      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'book',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'book.tags',
-        'tag',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('tag.id = :tagId', {
-        tagId: 1,
-      });
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'book.created_at',
-        'DESC',
-      );
-    });
-  });
-
-  describe('findByTagIds', () => {
-    it('should return books filtered by multiple tag IDs', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockBook]),
-      };
-
-      mockBookRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
-      );
-
-      const result = await service.findByTagIds([1, 2, 3]);
-
-      expect(result).toEqual([mockBook]);
-      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'book',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'book.tags',
-        'tag',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'book.id IN (' +
-          'SELECT bt.book_id FROM book_tags bt ' +
-          'WHERE bt.tag_id IN (:...tagIds) ' +
-          'GROUP BY bt.book_id ' +
-          'HAVING COUNT(DISTINCT bt.tag_id) = :tagCount' +
-          ')',
-        { tagIds: [1, 2, 3], tagCount: 3 },
-      );
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'book.created_at',
-        'DESC',
-      );
-    });
-  });
-
-  describe('findByFuzzy', () => {
-    it('should return empty array on blank query', async () => {
-      const res = await service.findByFuzzy('   ');
-      expect(res).toEqual([]);
-    });
-
-    it('should perform fuzzy ILIKE search on tag key/value', async () => {
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([mockBook]),
-      };
-      mockBookRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<Book>,
-      );
-      const res = await service.findByFuzzy('john');
-      expect(res).toEqual([mockBook]);
-      expect(mockBookRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'book',
-      );
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'book.tags',
-        'tag',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'tag.key ILIKE :pattern OR tag.value ILIKE :pattern',
-        { pattern: '%john%' },
-      );
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'book.created_at',
-        'DESC',
-      );
-    });
-  });
-
   describe('searchByConditions', () => {
-    it('should delegate to findAll when conditions empty', async () => {
-      const spy = jest
-        .spyOn(service, 'findAll')
-        .mockResolvedValueOnce([mockBook]);
+    it('should sort by created_at desc by default', async () => {
+      mockBookRepository.find.mockResolvedValue([mockBook]);
       const res = await service.searchByConditions([]);
-      expect(spy).toHaveBeenCalled();
       expect(res).toEqual([mockBook]);
+      expect(mockBookRepository.find).toHaveBeenCalledWith({
+        relations: ['tags'],
+        order: { created_at: 'DESC' },
+      });
+    });
+
+    it('should sort by updated_at asc', async () => {
+      mockBookRepository.find.mockResolvedValue([mockBook]);
+      const res = await service.searchByConditions(
+        [],
+        undefined,
+        undefined,
+        'updated_at',
+        'asc',
+      );
+      expect(res).toEqual([mockBook]);
+      expect(mockBookRepository.find).toHaveBeenCalledWith({
+        relations: ['tags'],
+        order: { updated_at: 'ASC' },
+      });
+    });
+
+    it('should sort by rating desc (no paging)', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockBook]),
+      } as unknown as Pick<
+        SelectQueryBuilder<Book>,
+        'leftJoinAndSelect' | 'leftJoin' | 'orderBy' | 'addOrderBy' | 'getMany'
+      >;
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        qb as unknown as SelectQueryBuilder<Book>,
+      );
+      const res = await service.searchByConditions(
+        [],
+        undefined,
+        undefined,
+        'rating',
+        'desc',
+      );
+      expect(res).toEqual([mockBook]);
+      expect(qb.leftJoin).toHaveBeenCalled();
+      expect(qb.orderBy).toHaveBeenCalledWith(
+        'COALESCE(br.avg_rating, -1)',
+        'DESC',
+      );
+      expect(qb.addOrderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
+      expect(qb.getMany).toHaveBeenCalled();
+    });
+
+    it('should sort by rating asc with paging', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockBook], 1]),
+      } as unknown as Pick<
+        SelectQueryBuilder<Book>,
+        | 'leftJoinAndSelect'
+        | 'leftJoin'
+        | 'orderBy'
+        | 'addOrderBy'
+        | 'take'
+        | 'skip'
+        | 'getManyAndCount'
+      >;
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        qb as unknown as SelectQueryBuilder<Book>,
+      );
+      const res = await service.searchByConditions([], 10, 0, 'rating', 'asc');
+      expect(res).toEqual({
+        total: 1,
+        limit: 10,
+        offset: 0,
+        items: [mockBook],
+      });
+      expect(qb.leftJoin).toHaveBeenCalled();
+      expect(qb.orderBy).toHaveBeenCalledWith(
+        'COALESCE(br.avg_rating, -1)',
+        'ASC',
+      );
+      expect(qb.addOrderBy).toHaveBeenCalledWith('book.created_at', 'DESC');
+      expect(qb.take).toHaveBeenCalledWith(10);
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.getManyAndCount).toHaveBeenCalled();
+    });
+    it('should fetch all with default created_at desc when conditions empty', async () => {
+      mockBookRepository.find.mockResolvedValueOnce([mockBook]);
+      const res = await service.searchByConditions([]);
+      expect(res).toEqual([mockBook]);
+      expect(mockBookRepository.find).toHaveBeenCalledWith({
+        relations: ['tags'],
+        order: { created_at: 'DESC' },
+      });
     });
 
     it('should build AND chain for eq, neq, match', async () => {
@@ -460,15 +337,120 @@ describe('BooksService', () => {
     it('should throw BadRequestException for unsupported op', async () => {
       const invalid = [
         { target: 'x', op: 'eq', value: '1' },
-        { target: 'y', op: 'invalid', value: '2' } as unknown as {
-          target: string;
-          op: 'eq' | 'neq' | 'match';
-          value: string;
-        },
+        { target: 'y', op: 'invalid' as unknown as 'eq', value: '2' },
       ];
-      await expect(service.searchByConditions(invalid)).rejects.toThrow(
-        'Unsupported op: invalid',
+      // 静态类型被强制为合法，运行时抛错验证防线
+      await expect(
+        service.searchByConditions(
+          invalid as unknown as Array<{
+            target: string;
+            op: 'eq' | 'neq' | 'match';
+            value: string;
+          }>,
+        ),
+      ).rejects.toThrow('Unsupported op: invalid');
+    });
+
+    it('should handle duplicate conditions (same key/value eq twice)', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockBook]),
+      } as unknown as Pick<
+        SelectQueryBuilder<Book>,
+        'leftJoinAndSelect' | 'andWhere' | 'orderBy' | 'getMany'
+      >;
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        qb as unknown as SelectQueryBuilder<Book>,
       );
+      const res = await service.searchByConditions([
+        { target: 'author', op: 'eq', value: 'John Doe' },
+        { target: 'author', op: 'eq', value: 'John Doe' },
+      ]);
+      expect(res).toEqual([mockBook]);
+      const calls = (qb as unknown as { andWhere: jest.Mock }).andWhere.mock
+        .calls as Array<[string, Record<string, unknown>]>;
+      expect(calls.length).toBe(2);
+      calls.forEach((c) => expect(c[0]).toContain('EXISTS'));
+    });
+
+    it('should accept empty string value (eq)', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      } as unknown as Pick<
+        SelectQueryBuilder<Book>,
+        'leftJoinAndSelect' | 'andWhere' | 'orderBy' | 'getMany'
+      >;
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        qb as unknown as SelectQueryBuilder<Book>,
+      );
+      const res = await service.searchByConditions([
+        { target: 'emptyField', op: 'eq', value: '' },
+      ]);
+      expect(res).toEqual([]);
+      const calls = (qb as unknown as { andWhere: jest.Mock }).andWhere.mock
+        .calls as Array<[string, Record<string, unknown>]>;
+      expect(calls[0][0]).toContain('EXISTS');
+      expect(calls[0][1]).toEqual({ key0: 'emptyField', val0: '' });
+    });
+
+    it('should return paged object when limit provided and no conditions', async () => {
+      mockBookRepository.findAndCount.mockResolvedValueOnce([[mockBook], 10]);
+      const res = await service.searchByConditions([], 5, 0);
+      if (!Array.isArray(res)) {
+        expect(res.total).toBe(10);
+        expect(res.limit).toBe(5);
+        expect(res.offset).toBe(0);
+        expect(res.items).toHaveLength(1);
+      } else {
+        throw new Error('Expected paged object');
+      }
+    });
+
+    it('should apply pagination when limit/offset provided with conditions', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockBook], 3]),
+      } as unknown as Pick<
+        SelectQueryBuilder<Book>,
+        | 'leftJoinAndSelect'
+        | 'andWhere'
+        | 'orderBy'
+        | 'take'
+        | 'skip'
+        | 'getManyAndCount'
+      >;
+      mockBookRepository.createQueryBuilder.mockReturnValue(
+        qb as unknown as SelectQueryBuilder<Book>,
+      );
+      const res = await service.searchByConditions(
+        [{ target: 'author', op: 'eq', value: 'John Doe' }],
+        2,
+        0,
+      );
+      expect(Array.isArray(res)).toBe(false);
+      if (!Array.isArray(res)) {
+        expect(res.total).toBe(3);
+        expect(res.limit).toBe(2);
+        expect(res.items[0]).toEqual(mockBook);
+      }
+      // access mocked methods via original qb object (typed) to avoid any
+      const qbObj = qb as unknown as {
+        take: jest.Mock;
+        skip: jest.Mock;
+        getManyAndCount: jest.Mock;
+      };
+      expect(qbObj.take).toHaveBeenCalledWith(2);
+      expect(qbObj.skip).toHaveBeenCalledWith(0);
+      expect(qbObj.getManyAndCount).toHaveBeenCalled();
     });
   });
 

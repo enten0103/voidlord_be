@@ -120,7 +120,7 @@ export class BooksService {
     };
   }
 
-  async getRating(bookId: number) {
+  async getRating(bookId: number, userId?: number) {
     const book = await this.bookRepository.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     const agg = await this.ratingRepository
@@ -129,10 +129,21 @@ export class BooksService {
       .select('COUNT(1)', 'count')
       .addSelect('AVG(r.score)', 'avg')
       .getRawOne<{ count: string; avg: string }>();
+    let myRating: number | null = null;
+    if (typeof userId === 'number') {
+      const r = await this.ratingRepository.findOne({
+        where: {
+          book: { id: bookId } as Book,
+          user: { id: userId } as User,
+        } as FindOptionsWhere<BookRating>,
+      });
+      myRating = r?.score ?? null;
+    }
     return {
       bookId,
       count: Number(agg?.count ?? 0),
       avg: agg?.avg ? Number(agg.avg) : 0,
+      myRating,
     };
   }
 
