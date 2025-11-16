@@ -8,9 +8,22 @@ set -e
 WORK_DIR="/opt/voidlord"
 COMPOSE_FILE="docker-compose.prod.yml"
 
+# !!! SECURITY WARNING !!!
+# GHCR credentials are hard-coded for current operational needs.
+# Rotate and remove them from this script as soon as possible.
+GHCR_USERNAME="enten0103"          # TODO: 如需更换账号请修改此处
+GHCR_PASSWORD="CHANGE_ME_TOKEN"    # TODO: 替换为实际 GHCR Token 或密码
+
 echo "========================================="
 echo "VoidLord BE Manual Deployment Script"
 echo "========================================="
+
+echo ""
+echo "GHCR login configuration used in CI (for reference):"
+echo "  registry: ghcr.io"
+echo "  username: \${{ github.actor }}"
+echo "  password: \${{ secrets.GITHUB_TOKEN }}"
+echo ""
 
 # Check if running in the correct directory
 if [ ! -f "$WORK_DIR/$COMPOSE_FILE" ]; then
@@ -20,6 +33,15 @@ if [ ! -f "$WORK_DIR/$COMPOSE_FILE" ]; then
 fi
 
 cd "$WORK_DIR"
+
+# GHCR login with hard-coded credentials
+echo ""
+echo "Step 0: Logging into GHCR (hard-coded)..."
+MASKED_PASS="${GHCR_PASSWORD:0:4}********"  # show only first 4 chars
+echo "Using GHCR username: $GHCR_USERNAME"
+echo "Using GHCR password prefix: $MASKED_PASS"
+echo "Running: docker login ghcr.io -u $GHCR_USERNAME --password-stdin"
+echo "$GHCR_PASSWORD" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
 # Verify .env file exists
 if [ ! -f .env ]; then
