@@ -99,7 +99,7 @@ jobs:
           node-version: 20
       - name: Install pnpm (global)
         run: |
-          npm install -g pnpm@9
+          npm install -g pnpm@latest
           pnpm -v
       - name: Build job env presence check
         run: |
