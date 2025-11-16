@@ -130,8 +130,13 @@ jobs:
           password: ${{ secrets.PROD_SSH_PASSWORD }}
           script: |
             set -e
-            IMAGE="ghcr.io/${{ github.repository_owner }}/voidlord-be:sha-${{ github.sha }}"
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            REPO="ghcr.io/${{ github.repository_owner }}/voidlord-be"
+            IMAGE=""; for TAG in "sha-$SHORT_SHA" "master" "latest"; do
+              if docker pull "$REPO:$TAG" >/dev/null 2>&1; then IMAGE="$REPO:$TAG"; echo "Selected image tag: $TAG"; break; fi
+            done
+            if [ -z "$IMAGE" ]; then echo "No available image tag (sha-short/master/latest) found." >&2; exit 1; fi
             mkdir -p /opt/voidlord
             cd /opt/voidlord
             if [ ! -f docker-compose.prod.yml ]; then
@@ -174,7 +179,7 @@ jobs:
             grep -q '^JWT_SECRET=your-super-secret-jwt-key-change-in-production' .env && echo "WARNING: default JWT_SECRET" >&2 || true
             grep -q '^DB_PASSWORD=postgres' .env && echo "WARNING: default DB_PASSWORD" >&2 || true
             (grep -q '^MINIO_ACCESS_KEY=minioadmin' .env || grep -q '^MINIO_SECRET_KEY=minioadmin' .env) && echo "WARNING: default MinIO credentials" >&2 || true
-            docker pull "$IMAGE"
+            # ensure latest selected image is present (already pulled in loop if selected)
             sed -i "s|image: ghcr.io/.*/voidlord-be:.*|image: $IMAGE|g" docker-compose.prod.yml
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
