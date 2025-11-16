@@ -147,29 +147,72 @@ jobs:
             fi
             mkdir -p /opt/voidlord
             cd /opt/voidlord
-            if [ ! -f docker-compose.prod.yml ]; then
-              echo "Creating docker-compose.prod.yml"
-              {
-                echo "version: '3.8'";
-                echo "services:";
-                echo "  app:";
-                echo "    image: $IMAGE";
-                echo "    restart: always";
-                echo "    ports:";
-                echo "      - '3000:3000'";
-                echo "    env_file: .env";
-              } > docker-compose.prod.yml
-            fi
+            echo "Overwriting docker-compose.prod.yml (force)"
+            mv docker-compose.prod.yml docker-compose.prod.yml.bak 2>/dev/null || true
+            printf '%s\n' \
+              "version: '3.8'" \
+              "services:" \
+              "  app:" \
+              "    image: $IMAGE" \
+              "    container_name: voidlord-app" \
+              "    env_file: .env" \
+              "    restart: always" \
+              "    depends_on:" \
+              "      - postgres" \
+              "      - minio" \
+              "    ports:" \
+              "      - '3000:3000'" \
+              "  postgres:" \
+              "    image: postgres:15" \
+              "    container_name: voidlord-postgres" \
+              "    restart: always" \
+              "    environment:" \
+              "      POSTGRES_DB: \${DB_NAME:-voidlord}" \
+              "      POSTGRES_USER: \${DB_USERNAME:-postgres}" \
+              "      POSTGRES_PASSWORD: \${DB_PASSWORD}" \
+              "    volumes:" \
+              "      - postgres_data:/var/lib/postgresql/data" \
+              "  minio:" \
+              "    image: minio/minio:latest" \
+              "    container_name: voidlord-minio" \
+              "    restart: always" \
+              "    environment:" \
+              "      MINIO_ROOT_USER: \${MINIO_ACCESS_KEY}" \
+              "      MINIO_ROOT_PASSWORD: \${MINIO_SECRET_KEY}" \
+              "    command: server /data --console-address ':9001'" \
+              "    volumes:" \
+              "      - minio_data:/data" \
+              "    ports:" \
+              "      - '9000:9000'" \
+              "      - '9001:9001'" \
+              "volumes:" \
+              "  postgres_data:" \
+              "  minio_data:" > docker-compose.prod.yml
             if [ ! -f .env.example ]; then
               echo "Creating .env.example"
               {
-                echo "PORT=3000";
-                echo "PUBLIC_HOST_IP=localhost";
-                echo "ADMIN_PASSWORD=admin123";
-                echo "JWT_SECRET=your-super-secret-jwt-key-change-in-production";
+                echo "DB_HOST=postgres";
+                echo "DB_PORT=5432";
+                echo "DB_USERNAME=postgres";
                 echo "DB_PASSWORD=postgres";
+                echo "DB_NAME=voidlord";
+                echo "DB_SYNCHRONIZE=false";
+                echo "DB_LOGGING=false";
+                echo "NODE_ENV=production";
+                echo "JWT_SECRET=your-super-secret-jwt-key-change-in-production";
+                echo "JWT_EXPIRES_IN=7d";
+                echo "PORT=3000";
+                echo "ADMIN_USERNAME=admin";
+                echo "ADMIN_EMAIL=admin@example.com";
+                echo "ADMIN_PASSWORD=admin123";
+                echo "PUBLIC_HOST_IP=localhost";
+                echo "MINIO_ENDPOINT=http://minio:9000";
+                echo "MINIO_PUBLIC_ENDPOINT=";
                 echo "MINIO_ACCESS_KEY=minioadmin";
                 echo "MINIO_SECRET_KEY=minioadmin";
+                echo "MINIO_REGION=us-east-1";
+                echo "MINIO_FORCE_PATH_STYLE=true";
+                echo "MINIO_BUCKET=voidlord";
               } > .env.example
             fi
             cp .env.example .env
