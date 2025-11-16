@@ -207,6 +207,19 @@ jobs:
             if [ -n "$FAIL_KEYS" ]; then
               echo "❌ 关键环境变量为空: $FAIL_KEYS" >&2
               exit 1
+            # 默认值警告（不阻断部署）
+            JWT_ACTUAL=$(grep -E "^JWT_SECRET=" .env | cut -d'=' -f2-)
+            DB_ACTUAL=$(grep -E "^DB_PASSWORD=" .env | cut -d'=' -f2-)
+            MINIO_AK=$(grep -E "^MINIO_ACCESS_KEY=" .env | cut -d'=' -f2-)
+            MINIO_SK=$(grep -E "^MINIO_SECRET_KEY=" .env | cut -d'=' -f2-)
+            if [ "$JWT_ACTUAL" = "your-super-secret-jwt-key-change-in-production" ]; then
+              echo "⚠ WARNING: JWT_SECRET 使用默认占位值，请在环境 Secrets 中覆盖。" >&2
+            fi
+            if [ "$DB_ACTUAL" = "postgres" ]; then
+              echo "⚠ WARNING: DB_PASSWORD=postgres 是弱默认值，建议更换。" >&2
+            fi
+            if [ "$MINIO_AK" = "minioadmin" ] || [ "$MINIO_SK" = "minioadmin" ]; then
+              echo "⚠ WARNING: MinIO 默认凭证(minioadmin)仍在使用，建议替换。" >&2
             fi
             echo "Pulling image $IMAGE"
             docker pull $IMAGE
