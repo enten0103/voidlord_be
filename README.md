@@ -372,47 +372,86 @@ test/                 # E2E 测试目录
 
 1. 安装依赖并运行 Lint、单元测试与 E2E 测试。
 2. 构建多阶段 Docker 镜像并推送到 GitHub Container Registry (GHCR)。
-3. 通过 SSH 登录生产服务器，拉取最新镜像并使用 `docker-compose.prod.yml` 滚动更新。
+3. 通过 SSH 连接生产服务器，生成 `docker-compose.prod.yml` 和 `.env` 配置文件，并上传部署脚本。
+4. **部署需手动执行**：CI 完成后，登录服务器运行 `/opt/voidlord/deploy-app.sh` 完成部署。
 
 ### 新增文件概述
 
 - `Dockerfile`：多阶段构建，裁剪为仅生产依赖。
 - `.dockerignore`：防止无关文件进入镜像构建上下文。
-- `docker-compose.prod.yml`：生产编排文件，CI 部署时使用 `sed` 替换镜像 tag。
+- `docker-compose.prod.yml`：生产编排文件，由 CI 自动生成。
 - `.github/workflows/cd.yml`：CI/CD 工作流配置。
+- `deploy-app.sh`：手动部署脚本，用于拉取镜像并启动服务。
 
 ### 需要配置的 GitHub Secrets
 
-在仓库 Settings -> Secrets -> Actions 中添加：
+在仓库 Settings -> Secrets -> Actions -> Environments -> voidlordBe 中添加：
 
-- `GHCR_TOKEN`：拥有 `read:packages write:packages` 权限的 PAT（或使用默认 `GITHUB_TOKEN` 搭配 `packages: write` 权限改写工作流）。
 - `PROD_HOST`：生产服务器 IP 或域名。
 - `PROD_SSH_USER`：SSH 登录用户名。
-- `PROD_SSH_KEY`：私钥内容（建议只读部署账号，格式为 OpenSSH）。
+- `PROD_SSH_PASSWORD`：SSH 登录密码。
+- `PORT`：应用端口（默认 3000）。
+- `PUBLIC_HOST_IP`：公网访问地址。
+- `ADMIN_PASSWORD`：管理员密码。
+- `JWT_SECRET`：JWT 密钥（强密码）。
+- `DB_PASSWORD`：数据库密码（强密码）。
+- `MINIO_ACCESS_KEY`：MinIO 访问密钥。
+- `MINIO_SECRET_KEY`：MinIO 密钥。
 
-可选扩展：如需自定义端口、S3 参数、JWT_SECRET 等，可再添加对应 Secrets 并在工作流中以 `env` 注入。
+> 注意：工作流使用默认 `GITHUB_TOKEN` 进行 GHCR 认证，无需额外配置 PAT。
 
 ### 生产服务器准备步骤（一次性）
 
+确保服务器已安装 Docker 和 Docker Compose：
+
 ```bash
-sudo mkdir -p /opt/voidlord && cd /opt/voidlord
-# 将仓库中的 docker-compose.prod.yml 与 .env 上传或通过 git clone 获取
-# .env 示例（使用强密码与安全配置）
-cat > .env <<'EOF'
-DB_NAME=voidlord
-DB_USERNAME=postgres
-DB_PASSWORD=强密码123!
-MINIO_ACCESS_KEY=更换为安全AK
-MINIO_SECRET_KEY=更换为安全SK
-JWT_SECRET=更长更复杂的随机串
-EOF
+# 安装 Docker（如未安装）
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
 
-# 预拉一次占位镜像（可选）
-docker pull ghcr.io/REPLACE_OWNER/voidlord-be:latest || true
-
-# 首次启动（若未由 CI 自动部署）
-docker compose -f docker-compose.prod.yml up -d
+# 创建工作目录
+sudo mkdir -p /opt/voidlord
+sudo chown $USER:$USER /opt/voidlord
 ```
+
+### 部署流程
+
+1. **推送代码到 master 分支**，GitHub Actions 会自动执行 CI/CD 流程。
+
+2. **等待 CI 完成**，工作流会：
+   - 运行测试
+   - 构建并推送 Docker 镜像到 GHCR
+   - 在生产服务器生成 `docker-compose.prod.yml` 和 `.env`
+   - 上传 `deploy-app.sh` 部署脚本
+
+3. **登录生产服务器手动部署**：
+
+   ```bash
+   cd /opt/voidlord
+   ./deploy-app.sh
+   ```
+
+   或者手动执行部署命令：
+
+   ```bash
+   cd /opt/voidlord
+   docker compose -f docker-compose.prod.yml pull
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+4. **查看日志和状态**：
+
+   ```bash
+   cd /opt/voidlord
+   docker compose -f docker-compose.prod.yml ps
+   docker compose -f docker-compose.prod.yml logs -f app
+   ```
+
+### 为什么采用手动部署？
+
+- ⚡ **更快的 CI 流程**：避免在 GitHub Actions 中进行缓慢的镜像拉取
+- 🎯 **更好的控制**：管理员可选择合适的时间窗口进行部署
+- 🔧 **易于调试**：如遇到问题可以手动排查，不会阻塞 CI 流水线
 
 ### 工作流镜像 Tag 约定
 
