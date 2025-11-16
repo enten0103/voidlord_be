@@ -29,7 +29,8 @@
     "docker:restart": "docker-compose down && docker-compose up -d",
     "docker:clean": "docker-compose down -v",
     "reset:db": "ts-node src/scripts/reset-database.ts",
-    "verify:admin": "ts-node src/scripts/verify-admin.ts"
+  "verify:admin": "ts-node src/scripts/verify-admin.ts",
+  "bulk:upload": "ts-node -r tsconfig-paths/register src/scripts/bulk-upload-books.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
