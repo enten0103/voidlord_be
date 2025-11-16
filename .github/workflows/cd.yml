@@ -111,6 +111,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: voidlordBe
     steps:
+      - uses: actions/checkout@v4
+
       - name: Secrets presence
         env:
           PROD_HOST: ${{ secrets.PROD_HOST }}
@@ -130,129 +132,160 @@ jobs:
             if [ -z "${!v}" ]; then echo "$v=MISSING"; MISSING="$MISSING $v"; else echo "$v=SET"; fi
           done
           if [ -n "$MISSING" ]; then echo "Missing required secrets:$MISSING" >&2; exit 1; fi
-      - name: Deploy
+      - name: Prepare deployment files
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
           password: ${{ secrets.PROD_SSH_PASSWORD }}
-          command_timeout: 600s
+          command_timeout: 120s
           script: |
             set -e
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             REPO="ghcr.io/${{ github.repository_owner }}/voidlord-be"
             DIGEST='${{ needs.build-and-push.outputs.image_digest }}'
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-            PRIMARY_IMAGE="$REPO@$DIGEST"
-            FALLBACK_TAG1="$REPO:sha-$SHORT_SHA"
-            FALLBACK_TAG2="$REPO:latest"
-            echo "Attempt pulling by digest: $PRIMARY_IMAGE"
-            PULL_OK=0
-            for i in 1 2 3 4 5; do
-              if docker pull "$PRIMARY_IMAGE"; then PULL_OK=1; IMAGE="$PRIMARY_IMAGE"; break; fi
-              echo "Digest pull attempt $i failed; retrying..."; sleep $((i*5));
-            done
-            if [ $PULL_OK -ne 1 ]; then
-              echo "Digest pull failed, trying tag $FALLBACK_TAG1"
-              if docker pull "$FALLBACK_TAG1"; then IMAGE="$FALLBACK_TAG1"; PULL_OK=1; fi
+
+            # Determine image reference (prefer digest, fallback to tag)
+            if [ -n "$DIGEST" ]; then
+              IMAGE="$REPO@$DIGEST"
+            else
+              IMAGE="$REPO:sha-$SHORT_SHA"
             fi
-            if [ $PULL_OK -ne 1 ]; then
-              echo "Trying fallback tag $FALLBACK_TAG2"
-              if docker pull "$FALLBACK_TAG2"; then IMAGE="$FALLBACK_TAG2"; PULL_OK=1; fi
-            fi
-            if [ $PULL_OK -ne 1 ]; then echo "All pull attempts failed" >&2; exit 1; fi
+
             echo "Using image reference: $IMAGE"
-            docker image inspect "$IMAGE" >/dev/null || { echo "Image not present after pull" >&2; exit 1; }
-            echo "Top 5 layers (docker image inspect):"; docker image inspect "$IMAGE" | grep -E 'sha256:' | head -n 5 || true
             mkdir -p /opt/voidlord
             cd /opt/voidlord
-            echo "Overwriting docker-compose.prod.yml (force)"
-            mv docker-compose.prod.yml docker-compose.prod.yml.bak 2>/dev/null || true
-            printf '%s\n' \
-              "version: '3.8'" \
-              "services:" \
-              "  app:" \
-              "    image: $IMAGE" \
-              "    container_name: voidlord-app" \
-              "    env_file: .env" \
-              "    restart: always" \
-              "    depends_on:" \
-              "      - postgres" \
-              "      - minio" \
-              "    ports:" \
-              "      - '3000:3000'" \
-              "  postgres:" \
-              "    image: postgres:15" \
-              "    container_name: voidlord-postgres" \
-              "    restart: always" \
-              "    environment:" \
-              "      POSTGRES_DB: \${DB_NAME:-voidlord}" \
-              "      POSTGRES_USER: \${DB_USERNAME:-postgres}" \
-              "      POSTGRES_PASSWORD: \${DB_PASSWORD}" \
-              "    volumes:" \
-              "      - postgres_data:/var/lib/postgresql/data" \
-              "  minio:" \
-              "    image: minio/minio:latest" \
-              "    container_name: voidlord-minio" \
-              "    restart: always" \
-              "    environment:" \
-              "      MINIO_ROOT_USER: \${MINIO_ACCESS_KEY}" \
-              "      MINIO_ROOT_PASSWORD: \${MINIO_SECRET_KEY}" \
-              "    command: server /data --console-address ':9001'" \
-              "    volumes:" \
-              "      - minio_data:/data" \
-              "    ports:" \
-              "      - '9000:9000'" \
-              "      - '9001:9001'" \
-              "volumes:" \
-              "  postgres_data:" \
-              "  minio_data:" > docker-compose.prod.yml
-            if [ ! -f .env.example ]; then
-              echo "Creating .env.example"
-              {
-                echo "DB_HOST=postgres";
-                echo "DB_PORT=5432";
-                echo "DB_USERNAME=postgres";
-                echo "DB_PASSWORD=postgres";
-                echo "DB_NAME=voidlord";
-                echo "DB_SYNCHRONIZE=false";
-                echo "DB_LOGGING=false";
-                echo "NODE_ENV=production";
-                echo "JWT_SECRET=your-super-secret-jwt-key-change-in-production";
-                echo "JWT_EXPIRES_IN=7d";
-                echo "PORT=3000";
-                echo "ADMIN_USERNAME=admin";
-                echo "ADMIN_EMAIL=admin@example.com";
-                echo "ADMIN_PASSWORD=admin123";
-                echo "PUBLIC_HOST_IP=localhost";
-                echo "MINIO_ENDPOINT=http://minio:9000";
-                echo "MINIO_PUBLIC_ENDPOINT=";
-                echo "MINIO_ACCESS_KEY=minioadmin";
-                echo "MINIO_SECRET_KEY=minioadmin";
-                echo "MINIO_REGION=us-east-1";
-                echo "MINIO_FORCE_PATH_STYLE=true";
-                echo "MINIO_BUCKET=voidlord";
-              } > .env.example
-            fi
-            cp .env.example .env
-            [ -n "${{ secrets.PORT }}" ] && sed -i "s|^PORT=.*|PORT=${{ secrets.PORT }}|" .env
-            [ -n "${{ secrets.PUBLIC_HOST_IP }}" ] && sed -i "s|^PUBLIC_HOST_IP=.*|PUBLIC_HOST_IP=${{ secrets.PUBLIC_HOST_IP }}|" .env
-            [ -n "${{ secrets.ADMIN_PASSWORD }}" ] && sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}|" .env
-            [ -n "${{ secrets.JWT_SECRET }}" ] && sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${{ secrets.JWT_SECRET }}|" .env
-            [ -n "${{ secrets.DB_PASSWORD }}" ] && sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|" .env
-            [ -n "${{ secrets.MINIO_ACCESS_KEY }}" ] && sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}|" .env
-            [ -n "${{ secrets.MINIO_SECRET_KEY }}" ] && sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}|" .env
-            echo "Preview (.env):"; grep -E '^(PORT|PUBLIC_HOST_IP)=' .env || true
-            for k in PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
-              VAL=$(grep -E "^$k=" .env | cut -d'=' -f2-); [ -z "$VAL" ] && echo "Missing $k" && exit 1
+
+            # Backup existing files
+            [ -f docker-compose.prod.yml ] && \
+              mv docker-compose.prod.yml docker-compose.prod.yml.bak
+            [ -f .env ] && mv .env .env.bak
+
+            # Generate docker-compose.prod.yml
+            cat > docker-compose.prod.yml << 'EOF'
+            version: '3.8'
+            services:
+              app:
+                image: IMAGE_PLACEHOLDER
+                container_name: voidlord-app
+                env_file: .env
+                restart: always
+                depends_on:
+                  - postgres
+                  - minio
+                ports:
+                  - '3000:3000'
+              postgres:
+                image: postgres:15
+                container_name: voidlord-postgres
+                restart: always
+                environment:
+                  POSTGRES_DB: ${DB_NAME:-voidlord}
+                  POSTGRES_USER: ${DB_USERNAME:-postgres}
+                  POSTGRES_PASSWORD: ${DB_PASSWORD}
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+              minio:
+                image: minio/minio:latest
+                container_name: voidlord-minio
+                restart: always
+                environment:
+                  MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+                  MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+                command: server /data --console-address ':9001'
+                volumes:
+                  - minio_data:/data
+                ports:
+                  - '9000:9000'
+                  - '9001:9001'
+            volumes:
+              postgres_data:
+              minio_data:
+            EOF
+
+            # Update image reference in compose file
+            sed -i "s|IMAGE_PLACEHOLDER|$IMAGE|g" docker-compose.prod.yml
+
+            # Generate .env file
+            cat > .env << 'EOF'
+            DB_HOST=postgres
+            DB_PORT=5432
+            DB_USERNAME=postgres
+            DB_PASSWORD=PLACEHOLDER_DB_PASSWORD
+            DB_NAME=voidlord
+            DB_SYNCHRONIZE=false
+            DB_LOGGING=false
+            NODE_ENV=production
+            JWT_SECRET=PLACEHOLDER_JWT_SECRET
+            JWT_EXPIRES_IN=7d
+            PORT=PLACEHOLDER_PORT
+            ADMIN_USERNAME=admin
+            ADMIN_EMAIL=admin@example.com
+            ADMIN_PASSWORD=PLACEHOLDER_ADMIN_PASSWORD
+            PUBLIC_HOST_IP=PLACEHOLDER_PUBLIC_HOST_IP
+            MINIO_ENDPOINT=http://minio:9000
+            MINIO_PUBLIC_ENDPOINT=
+            MINIO_ACCESS_KEY=PLACEHOLDER_MINIO_ACCESS_KEY
+            MINIO_SECRET_KEY=PLACEHOLDER_MINIO_SECRET_KEY
+            MINIO_REGION=us-east-1
+            MINIO_FORCE_PATH_STYLE=true
+            MINIO_BUCKET=voidlord
+            EOF
+
+            # Replace placeholders with actual secrets
+            sed -i "s|PLACEHOLDER_PORT|${{ secrets.PORT }}|g" .env
+            sed -i "s|PLACEHOLDER_PUBLIC_HOST_IP|${{ secrets.PUBLIC_HOST_IP }}|g" .env
+            sed -i "s|PLACEHOLDER_ADMIN_PASSWORD|${{ secrets.ADMIN_PASSWORD }}|g" .env
+            sed -i "s|PLACEHOLDER_JWT_SECRET|${{ secrets.JWT_SECRET }}|g" .env
+            sed -i "s|PLACEHOLDER_DB_PASSWORD|${{ secrets.DB_PASSWORD }}|g" .env
+            sed -i "s|PLACEHOLDER_MINIO_ACCESS_KEY|${{ secrets.MINIO_ACCESS_KEY }}|g" .env
+            sed -i "s|PLACEHOLDER_MINIO_SECRET_KEY|${{ secrets.MINIO_SECRET_KEY }}|g" .env
+
+            # Verify all secrets are set
+            echo "Verifying configuration..."
+            for k in PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET \
+                     DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
+              VAL=$(grep -E "^$k=" .env | cut -d'=' -f2-)
+              if [ -z "$VAL" ] || echo "$VAL" | grep -q "PLACEHOLDER"; then
+                echo "Error: $k is not set properly" >&2
+                exit 1
+              fi
             done
-            grep -q '^JWT_SECRET=your-super-secret-jwt-key-change-in-production' .env && echo "WARNING: default JWT_SECRET" >&2 || true
-            grep -q '^DB_PASSWORD=postgres' .env && echo "WARNING: default DB_PASSWORD" >&2 || true
-            (grep -q '^MINIO_ACCESS_KEY=minioadmin' .env || grep -q '^MINIO_SECRET_KEY=minioadmin' .env) && echo "WARNING: default MinIO credentials" >&2 || true
-            # 只更新 compose 中镜像引用，不自动启动，便于手动调试镜像拉取与启动
-            sed -i "s|image: ghcr.io/.*/voidlord-be[:@].*|image: $IMAGE|g" docker-compose.prod.yml
-            echo "docker-compose.prod.yml 和 .env 已生成/更新。"
-            echo "请手动登录服务器执行："
+
+            echo "=========================================="
+            echo "Deployment files prepared successfully!"
+            echo "=========================================="
+            echo ""
+            echo "Files created:"
+            echo "  - /opt/voidlord/docker-compose.prod.yml"
+            echo "  - /opt/voidlord/.env"
+            echo ""
+            echo "To complete deployment, run on the server:"
+            echo "  cd /opt/voidlord"
+            echo "  ./deploy-app.sh"
+            echo ""
+            echo "Or manually execute:"
             echo "  cd /opt/voidlord"
             echo "  docker compose -f docker-compose.prod.yml pull"
             echo "  docker compose -f docker-compose.prod.yml up -d"
+            echo ""
+
+      - name: Upload deployment script
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          password: ${{ secrets.PROD_SSH_PASSWORD }}
+          source: "deploy-app.sh"
+          target: "/opt/voidlord/"
+          strip_components: 0
+
+      - name: Make script executable
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          password: ${{ secrets.PROD_SSH_PASSWORD }}
+          script: |
+            chmod +x /opt/voidlord/deploy-app.sh
+            echo "Deployment script is ready at: /opt/voidlord/deploy-app.sh"
