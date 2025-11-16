@@ -36,10 +36,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Enable pnpm via corepack
+      - name: Install pnpm (global)
         run: |
-          corepack enable
-          corepack prepare pnpm@9 --activate
+          npm install -g pnpm@9
           pnpm -v
       - name: Env presence check (non-secret)
         run: |
@@ -91,10 +90,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Enable pnpm via corepack
+      - name: Install pnpm (global)
         run: |
-          corepack enable
-          corepack prepare pnpm@9 --activate
+          npm install -g pnpm@9
           pnpm -v
       - name: Build job env presence check
         run: |
