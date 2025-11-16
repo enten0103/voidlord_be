@@ -36,12 +36,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
+      - name: Enable pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+          pnpm -v
       - name: Env presence check (non-secret)
         run: |
           echo "== Environment Variable Presence Check (test job) =="
@@ -92,11 +91,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
+      - name: Enable pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+          pnpm -v
       - name: Build job env presence check
         run: |
           echo "== Environment Variable Presence Check (build job) =="
