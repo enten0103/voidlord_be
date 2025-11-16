@@ -31,8 +31,11 @@ jobs:
       MINIO_FORCE_PATH_STYLE: true
       MINIO_BUCKET: voidlord
       JWT_SECRET: test-ci-secret
+      JWT_EXPIRES_IN: 1d
       PORT: 3000
       PUBLIC_HOST_IP: localhost
+      ADMIN_USERNAME: admin
+      ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: admin123
     steps:
       - uses: actions/checkout@v4
