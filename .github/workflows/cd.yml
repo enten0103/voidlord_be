@@ -37,8 +37,27 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+      - name: Env presence check (non-secret)
+        run: |
+          echo "== Environment Variable Presence Check (test job) =="
+          VARS=(DB_HOST DB_PORT DB_USERNAME DB_PASSWORD DB_NAME MINIO_ENDPOINT MINIO_ACCESS_KEY MINIO_SECRET_KEY MINIO_FORCE_PATH_STYLE MINIO_BUCKET PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET)
+          for v in "${VARS[@]}"; do
+            val="${!v}"
+            if [ -n "$val" ]; then
+              if [[ "$v" =~ (PASSWORD|SECRET|JWT_SECRET) ]]; then
+                echo "$v=SET(len=${#val})"
+              else
+                echo "$v=$val"
+              fi
+            else
+              echo "$v=NOT_SET"
+            fi
+          done
       - name: Start MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
@@ -73,8 +92,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+      - name: Build job env presence check
+        run: |
+          echo "== Environment Variable Presence Check (build job) =="
+          VARS=(PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET)
+          for v in "${VARS[@]}"; do
+            val="${!v}"
+            if [ -n "$val" ]; then
+              if [[ "$v" =~ (PASSWORD|SECRET|JWT_SECRET) ]]; then
+                echo "$v=SET(len=${#val})"
+              else
+                echo "$v=$val"
+              fi
+            else
+              echo "$v=NOT_SET"
+            fi
+          done
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -101,6 +139,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Deployment secrets presence check
+        run: |
+          echo "== Required Secrets Presence (names only) =="
+          check(){ [ -n "$1" ] && echo SET || echo MISSING; }
+          echo "PROD_HOST=$(check '${{ secrets.PROD_HOST }}')"
+          echo "PROD_SSH_USER=$(check '${{ secrets.PROD_SSH_USER }}')"
+          echo "PROD_SSH_PASSWORD=$(check '${{ secrets.PROD_SSH_PASSWORD }}')"
+          echo "PORT=$(check '${{ secrets.PORT }}')"
+          echo "PUBLIC_HOST_IP=$(check '${{ secrets.PUBLIC_HOST_IP }}')"
+          echo "ADMIN_PASSWORD=$(check '${{ secrets.ADMIN_PASSWORD }}')"
+          echo "JWT_SECRET=$(check '${{ secrets.JWT_SECRET }}')"
+          echo "DB_PASSWORD=$(check '${{ secrets.DB_PASSWORD }}')"
+          echo "MINIO_ACCESS_KEY=$(check '${{ secrets.MINIO_ACCESS_KEY }}')"
+          echo "MINIO_SECRET_KEY=$(check '${{ secrets.MINIO_SECRET_KEY }}')"
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
