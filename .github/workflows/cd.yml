@@ -38,7 +38,7 @@ jobs:
           node-version: 20
       - name: Install pnpm (global)
         run: |
-          npm install -g pnpm@9
+          npm install -g pnpm@latest
           pnpm -v
       - name: Env presence check (non-secret)
         run: |
