@@ -30,6 +30,11 @@ jobs:
       MINIO_SECRET_KEY: minioadmin
       MINIO_FORCE_PATH_STYLE: true
       MINIO_BUCKET: voidlord
+      # 测试环境缺失 JWT_SECRET 导致 sign 报错，这里提供 CI 专用密钥及必要占位
+      JWT_SECRET: test-ci-secret
+      PORT: 3000
+      PUBLIC_HOST_IP: localhost
+      ADMIN_PASSWORD: admin123
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
@@ -134,22 +139,35 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    environment: voidlordBe
     steps:
       - uses: actions/checkout@v4
       - name: Deployment secrets presence check
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_PASSWORD: ${{ secrets.PROD_SSH_PASSWORD }}
+          PORT: ${{ secrets.PORT }}
+          PUBLIC_HOST_IP: ${{ secrets.PUBLIC_HOST_IP }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
         run: |
           echo "== Required Secrets Presence (names only) =="
-          check(){ [ -n "$1" ] && echo SET || echo MISSING; }
-          echo "PROD_HOST=$(check '${{ secrets.PROD_HOST }}')"
-          echo "PROD_SSH_USER=$(check '${{ secrets.PROD_SSH_USER }}')"
-          echo "PROD_SSH_PASSWORD=$(check '${{ secrets.PROD_SSH_PASSWORD }}')"
-          echo "PORT=$(check '${{ secrets.PORT }}')"
-          echo "PUBLIC_HOST_IP=$(check '${{ secrets.PUBLIC_HOST_IP }}')"
-          echo "ADMIN_PASSWORD=$(check '${{ secrets.ADMIN_PASSWORD }}')"
-          echo "JWT_SECRET=$(check '${{ secrets.JWT_SECRET }}')"
-          echo "DB_PASSWORD=$(check '${{ secrets.DB_PASSWORD }}')"
-          echo "MINIO_ACCESS_KEY=$(check '${{ secrets.MINIO_ACCESS_KEY }}')"
-          echo "MINIO_SECRET_KEY=$(check '${{ secrets.MINIO_SECRET_KEY }}')"
+          MISSING_LIST=""
+          for v in PROD_HOST PROD_SSH_USER PROD_SSH_PASSWORD PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
+            if [ -n "${!v}" ]; then
+              echo "$v=SET"
+            else
+              echo "$v=MISSING"; MISSING_LIST="$MISSING_LIST $v";
+            fi
+          done
+          if [ -n "$MISSING_LIST" ]; then
+            echo "❌ 缺失 Secrets: $MISSING_LIST" >&2
+            exit 1
+          fi
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.1.0
         with:
@@ -165,9 +183,29 @@ jobs:
             git checkout origin/master -- .env.example
             echo "Generating .env from .env.example"
             cp .env.example .env
-            sed -i "s|^PORT=.*|PORT=${{ secrets.PORT }}|" .env
-            sed -i "s|^PUBLIC_HOST_IP=.*|PUBLIC_HOST_IP=${{ secrets.PUBLIC_HOST_IP }}|" .env
-            sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}|" .env
+            sed -i "s|^PORT=.*|PORT=${PORT}|" .env
+            sed -i "s|^PUBLIC_HOST_IP=.*|PUBLIC_HOST_IP=${PUBLIC_HOST_IP}|" .env
+            sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" .env
+            # 生产环境关键变量完整性检查（为空则失败）
+            echo "Validating generated .env (critical keys not empty)";
+            CRITICAL_KEYS="PORT PUBLIC_HOST_IP ADMIN_PASSWORD JWT_SECRET DB_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
+            FAIL_KEYS=""
+            for k in $CRITICAL_KEYS; do
+              VAL=$(grep -E "^${k}=" .env | head -n1 | cut -d'=' -f2-)
+              if [ -z "$VAL" ]; then
+                echo "[MISSING] $k"; FAIL_KEYS="$FAIL_KEYS $k";
+              else
+                if echo "$k" | grep -Eq "(PASSWORD|SECRET|JWT_SECRET)"; then
+                  echo "[OK] $k (len=${#VAL})"
+                else
+                  echo "[OK] $k=$VAL"
+                fi
+              fi
+            done
+            if [ -n "$FAIL_KEYS" ]; then
+              echo "❌ 关键环境变量为空: $FAIL_KEYS" >&2
+              exit 1
+            fi
             echo "Pulling image $IMAGE"
             docker pull $IMAGE
             sed -i "s|image: ghcr.io/.*/voidlord-be:.*|image: $IMAGE|g" docker-compose.prod.yml
