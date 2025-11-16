@@ -145,7 +145,7 @@ jobs:
             if [ -f /opt/voidlord/deploy-app.sh ]; then
               echo "Patching GHCR credentials in /opt/voidlord/deploy-app.sh"
               sed -i "s|__GHCR_USERNAME_PLACEHOLDER__|enten0103|g" /opt/voidlord/deploy-app.sh
-              sed -i "s|__GHCR_PASSWORD_PLACEHOLDER__|${{ secrets.GHCR_PASSWORD }}|g" /opt/voidlord/deploy-app.sh
+              sed -i "s|__GHCR_PASSWORD_PLACEHOLDER__|${{ secrets.GITHUB_TOKEN }}|g" /opt/voidlord/deploy-app.sh
             fi
 
             REPO="ghcr.io/${{ github.repository_owner }}/voidlord-be"
@@ -269,30 +269,6 @@ jobs:
             echo ""
             echo "To complete deployment, run on the server:"
             echo "  cd /opt/voidlord"
-            echo "  ./deploy-app.sh"
-            echo ""
-            echo "Or manually execute:"
-            echo "  cd /opt/voidlord"
             echo "  docker compose -f docker-compose.prod.yml pull"
             echo "  docker compose -f docker-compose.prod.yml up -d"
             echo ""
-
-      - name: Upload deployment script
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_SSH_USER }}
-          password: ${{ secrets.PROD_SSH_PASSWORD }}
-          source: "deploy-app.sh"
-          target: "/opt/voidlord/"
-          strip_components: 0
-
-      - name: Make script executable
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_SSH_USER }}
-          password: ${{ secrets.PROD_SSH_PASSWORD }}
-          script: |
-            chmod +x /opt/voidlord/deploy-app.sh
-            echo "Deployment script is ready at: /opt/voidlord/deploy-app.sh"

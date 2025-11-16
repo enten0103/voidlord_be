@@ -29,8 +29,8 @@
     "docker:restart": "docker-compose down && docker-compose up -d",
     "docker:clean": "docker-compose down -v",
     "reset:db": "ts-node src/scripts/reset-database.ts",
-  "verify:admin": "ts-node src/scripts/verify-admin.ts",
-  "bulk:upload": "ts-node -r tsconfig-paths/register src/scripts/bulk-upload-books.ts"
+    "verify:admin": "ts-node src/scripts/verify-admin.ts",
+    "bulk:upload": "ts-node -r tsconfig-paths/register src/scripts/bulk-upload-books.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.873.0",
@@ -72,9 +72,12 @@
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
+    "form-data": "^4.0.4",
     "globals": "^16.0.0",
     "jest": "^30.0.0",
+    "node-fetch": "^3.3.2",
     "prettier": "^3.4.2",
+    "simple-git-hooks": "^2.11.1",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
@@ -82,8 +85,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0",
-    "simple-git-hooks": "^2.11.1"
+    "typescript-eslint": "^8.20.0"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm test && pnpm test:e2e"
@@ -103,6 +105,6 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-  "testEnvironment": "node"
+    "testEnvironment": "node"
   }
 }
