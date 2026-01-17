@@ -31,6 +31,7 @@ describe('BooksController', () => {
     remove: jest.fn(),
     searchByConditions: jest.fn(),
     recommendByBook: jest.fn(),
+    setCover: jest.fn(),
   };
 
   const mockPermissionsService = {

@@ -5,23 +5,28 @@ import {
   Controller,
   Delete,
   Get,
+  Put,
   Req,
   Param,
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
   ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiBody,
   ApiOperation,
   ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as multer from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
@@ -369,6 +374,56 @@ export class BooksController {
   })
   update(@Param('id') id: string, @Body() updateBookDto: UpdateBookDto) {
     return this.booksService.update(+id, updateBookDto);
+  }
+
+  @Put(':id/cover')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @ApiPermission('BOOK_UPDATE', 1)
+  @ApiBearerAuth('JWT-auth')
+  @UseInterceptors(FileInterceptor('file', { storage: multer.memoryStorage() }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Upload/replace book cover (stored in MinIO, bound to book)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Cover image file (image/*)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cover uploaded and bound to book via tags',
+    schema: {
+      example: {
+        ok: true,
+        key: 'books/42/cover.jpg',
+        url: 'http://localhost:9000/voidlord/books/42/cover.jpg',
+      },
+    },
+  })
+  async uploadCover(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: JwtRequestWithUser,
+  ) {
+    const bookId = Number(id);
+    if (!Number.isFinite(bookId) || bookId <= 0) {
+      throw new BadRequestException('Invalid book ID');
+    }
+    const { key, url } = await this.booksService.setCover(
+      bookId,
+      file,
+      req.user.userId,
+    );
+    return { ok: true, key, url };
   }
 
   @Delete(':id')

@@ -4,7 +4,7 @@
 		{
 			"label": "Run tests (unit + e2e)",
 			"type": "shell",
-			"command": "pnpm test && pnpm test:e2e",
+			"command": "pnpm test; pnpm test:e2e",
 			"isBackground": false,
 			"problemMatcher": [
 				"$tsc",

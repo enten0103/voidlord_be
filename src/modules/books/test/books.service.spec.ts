@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SelectQueryBuilder } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { BooksService } from '../books.service';
 import { createRepoMock } from '../../../../test/repo-mocks';
 import { Book } from '../../../entities/book.entity';
@@ -9,6 +9,7 @@ import { Tag } from '../../../entities/tag.entity';
 import { BookRating } from '../../../entities/book-rating.entity';
 import { Comment } from '../../../entities/comment.entity';
 import { User } from '../../../entities/user.entity';
+import { FilesService } from '../../files/files.service';
 
 describe('BooksService', () => {
   let service: BooksService;
@@ -34,6 +35,24 @@ describe('BooksService', () => {
   const mockTagRepository = createRepoMock<Tag>();
   const mockRatingRepository = createRepoMock<BookRating>();
   const mockCommentRepository = createRepoMock<Comment>();
+  const mockFilesService = {
+    putObject: jest.fn(),
+    deleteObject: jest.fn(),
+    deleteRecordByKey: jest.fn(),
+    listObjects: jest.fn(),
+    deleteObjects: jest.fn(),
+    deleteRecordsByKeys: jest.fn(),
+    getPublicUrl: jest.fn().mockImplementation((k: string) => `http://x/${k}`),
+  } as unknown as Pick<
+    FilesService,
+    | 'putObject'
+    | 'deleteObject'
+    | 'deleteRecordByKey'
+    | 'listObjects'
+    | 'deleteObjects'
+    | 'deleteRecordsByKeys'
+    | 'getPublicUrl'
+  >;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -54,6 +73,10 @@ describe('BooksService', () => {
         {
           provide: getRepositoryToken(Comment),
           useValue: mockCommentRepository,
+        },
+        {
+          provide: FilesService,
+          useValue: mockFilesService,
         },
       ],
     }).compile();
@@ -131,6 +154,90 @@ describe('BooksService', () => {
     });
   });
 
+  describe('setCover', () => {
+    it('throws NotFoundException when book not found', async () => {
+      mockBookRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.setCover(1, { buffer: Buffer.from('x') } as any, 1),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException for non-image content type', async () => {
+      mockBookRepository.findOne.mockResolvedValue({
+        ...mockBook,
+        tags: [],
+      } as unknown as Book);
+
+      await expect(
+        service.setCover(
+          1,
+          { buffer: Buffer.from('x'), mimetype: 'application/pdf' } as any,
+          1,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('uploads cover, updates cover tags, and deletes old cover after save', async () => {
+      const oldCoverKey = 'books/1/cover.png';
+      const book = {
+        ...mockBook,
+        tags: [
+          { id: 1, key: 'cover', value: oldCoverKey, shown: false } as Tag,
+          { id: 2, key: 'author', value: 'A', shown: true } as Tag,
+        ],
+      } as unknown as Book;
+      mockBookRepository.findOne.mockResolvedValue(book);
+      mockBookRepository.save.mockResolvedValue(book);
+
+      const processSpy = jest
+        .spyOn(service as any, 'processTags')
+        .mockResolvedValue([
+          { id: 3, key: 'author', value: 'A', shown: true } as Tag,
+          { id: 4, key: 'cover', value: 'books/1/cover.jpg', shown: false } as Tag,
+          { id: 5, key: 'cover_mime', value: 'image/jpeg', shown: false } as Tag,
+        ]);
+
+      const res = await service.setCover(
+        1,
+        { buffer: Buffer.from('img'), mimetype: 'image/jpeg' } as any,
+        7,
+      );
+
+      expect(mockFilesService.putObject).toHaveBeenCalledWith(
+        'books/1/cover.jpg',
+        expect.any(Buffer),
+        'image/jpeg',
+        undefined,
+        7,
+      );
+      expect(processSpy).toHaveBeenCalled();
+      expect(mockBookRepository.save).toHaveBeenCalled();
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith(oldCoverKey);
+      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith(oldCoverKey);
+      expect(res.key).toBe('books/1/cover.jpg');
+    });
+
+    it('rolls back uploaded cover if saving book fails', async () => {
+      const book = { ...mockBook, tags: [] } as unknown as Book;
+      mockBookRepository.findOne.mockResolvedValue(book);
+      mockBookRepository.save.mockRejectedValue(new Error('db failed'));
+      jest
+        .spyOn(service as any, 'processTags')
+        .mockResolvedValue([{ id: 1, key: 'cover', value: 'books/1/cover.png', shown: false } as Tag]);
+
+      await expect(
+        service.setCover(
+          1,
+          { buffer: Buffer.from('img'), mimetype: 'image/png' } as any,
+          7,
+        ),
+      ).rejects.toThrow('db failed');
+
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith('books/1/cover.png');
+      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith('books/1/cover.png');
+    });
+  });
+
   // findByHash removed
 
   describe('update', () => {
@@ -160,6 +267,29 @@ describe('BooksService', () => {
       await service.remove(1);
 
       expect(mockBookRepository.remove).toHaveBeenCalledWith(mockBook);
+    });
+
+    it('cleans up cover + epub objects before removing book', async () => {
+      const bookWithAssets = {
+        ...mockBook,
+        id: 1,
+        has_epub: true,
+        tags: [{ id: 1, key: 'cover', value: 'books/1/cover.png', shown: false } as any],
+      } as Book;
+
+      const epubKeys = ['books/1/epub/mimetype', 'books/1/epub/META-INF/container.xml'];
+      mockBookRepository.findOne.mockResolvedValue(bookWithAssets);
+      (mockFilesService.listObjects as jest.Mock).mockResolvedValue(epubKeys);
+      mockBookRepository.remove.mockResolvedValue(bookWithAssets);
+
+      await service.remove(1);
+
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith('books/1/cover.png');
+      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith('books/1/cover.png');
+      expect(mockFilesService.listObjects).toHaveBeenCalledWith('books/1/epub/');
+      expect(mockFilesService.deleteObjects).toHaveBeenCalledWith(epubKeys);
+      expect(mockFilesService.deleteRecordsByKeys).toHaveBeenCalledWith(epubKeys);
+      expect(mockBookRepository.remove).toHaveBeenCalledWith(bookWithAssets);
     });
 
     it('should throw NotFoundException if book not found', async () => {

@@ -11,5 +11,10 @@ process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'postgres';
 process.env.DB_NAME = process.env.DB_NAME || 'voidlord_test';
 process.env.DB_SYNCHRONIZE = 'true';
 
+// JWT（部分 e2e 使用 createTestModule，不一定会加载 .env，因此这里兜底）
+process.env.JWT_SECRET =
+	process.env.JWT_SECRET || 'voidlord-test-jwt-secret-do-not-use-in-prod';
+process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
+
 // 设置测试超时时间
 jest.setTimeout(30000);

@@ -10,16 +10,21 @@ import { createTestModule } from '../../../../test/test-module.factory';
 import { Book } from '../../../entities/book.entity';
 import { Tag } from '../../../entities/tag.entity';
 import { User } from '../../../entities/user.entity';
+import { FileObject } from '../../../entities/file-object.entity';
 import { grantPermissions } from '../../permissions/test/permissions.seed';
+import { join } from 'path';
+import { S3_CLIENT } from '../../files/tokens';
 
 describe('Books (e2e)', () => {
   let app: INestApplication;
   let bookRepository: Repository<Book>;
   let tagRepository: Repository<Tag>;
   let userRepository: Repository<User>;
+  let fileObjectRepository: Repository<FileObject>;
   let authToken: string;
   let userId: number;
   let httpServer: Server;
+  let s3: any;
 
   interface CreatedBookLite {
     id: number;
@@ -61,6 +66,10 @@ describe('Books (e2e)', () => {
     userRepository = moduleFixture.get<Repository<User>>(
       getRepositoryToken(User),
     );
+    fileObjectRepository = moduleFixture.get<Repository<FileObject>>(
+      getRepositoryToken(FileObject),
+    );
+    s3 = moduleFixture.get(S3_CLIENT) as any;
 
     // 创建测试用户并获取认证token
     const testUser = {
@@ -112,6 +121,7 @@ describe('Books (e2e)', () => {
       await bookRepository.query('DELETE FROM book_tags');
       await bookRepository.query('DELETE FROM book');
       await tagRepository.query('DELETE FROM tag');
+      await fileObjectRepository.query('DELETE FROM file_object');
       await userRepository.query('DELETE FROM "user"');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -134,11 +144,80 @@ describe('Books (e2e)', () => {
       await bookRepository.query('DELETE FROM book_tags');
       await bookRepository.query('DELETE FROM book');
       await tagRepository.query('DELETE FROM tag');
+      await fileObjectRepository.query('DELETE FROM file_object');
     } catch (error) {
       // 忽略清理错误，因为表可能不存在
       const msg = error instanceof Error ? error.message : String(error);
       console.log('Error cleaning up before test:', msg);
     }
+  });
+
+  describe('/books/:id/cover (PUT)', () => {
+    it('should upload cover and bind it as tags, without leaving old records', async () => {
+      // create book
+      const created: Response = await request(httpServer)
+        .post('/books')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ tags: [{ key: 'author', value: 'CoverUser' }] })
+        .expect(201);
+
+      const bookId = parseBody(created.body, isBookLite).id;
+
+      // upload png cover
+      await request(httpServer)
+        .put(`/books/${bookId}/cover`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', Buffer.from('png-bytes'), {
+          filename: 'cover.png',
+          contentType: 'image/png',
+        })
+        .expect(200);
+
+      const after1 = await bookRepository.findOne({
+        where: { id: bookId },
+        relations: ['tags'],
+      });
+      expect(after1).toBeTruthy();
+      const cover1 = after1!.tags.find((t) => t.key === 'cover')?.value;
+      const mime1 = after1!.tags.find((t) => t.key === 'cover_mime')?.value;
+      expect(cover1).toBe(`books/${bookId}/cover.png`);
+      expect(mime1).toBe('image/png');
+
+      // file record exists
+      const fo1 = await fileObjectRepository.findOne({
+        where: { key: `books/${bookId}/cover.png` },
+        relations: ['owner'],
+      });
+      expect(fo1?.owner?.id).toBe(userId);
+
+      // replace with jpeg cover (should remove old record)
+      await request(httpServer)
+        .put(`/books/${bookId}/cover`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', Buffer.from('jpg-bytes'), {
+          filename: 'cover.jpg',
+          contentType: 'image/jpeg',
+        })
+        .expect(200);
+
+      const after2 = await bookRepository.findOne({
+        where: { id: bookId },
+        relations: ['tags'],
+      });
+      const cover2 = after2!.tags.find((t) => t.key === 'cover')?.value;
+      const mime2 = after2!.tags.find((t) => t.key === 'cover_mime')?.value;
+      expect(cover2).toBe(`books/${bookId}/cover.jpg`);
+      expect(mime2).toBe('image/jpeg');
+
+      const foOld = await fileObjectRepository.findOne({
+        where: { key: `books/${bookId}/cover.png` },
+      });
+      expect(foOld).toBeNull();
+      const foNew = await fileObjectRepository.findOne({
+        where: { key: `books/${bookId}/cover.jpg` },
+      });
+      expect(foNew).toBeTruthy();
+    });
   });
 
   describe('/books (POST)', () => {
@@ -690,6 +769,45 @@ describe('Books (e2e)', () => {
         where: { id: bookId },
       });
       expect(deletedBook).toBeNull();
+    });
+
+    it('should delete bound cover + epub objects and records when deleting book', async () => {
+      // upload cover
+      await request(httpServer)
+        .put(`/books/${bookId}/cover`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', Buffer.from('png-bytes'), {
+          filename: 'cover.png',
+          contentType: 'image/png',
+        })
+        .expect(200);
+
+      // upload epub
+      const epubFixture = join(__dirname, '../../epub/test/test.epub');
+      await request(httpServer)
+        .post(`/epub/book/${bookId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', epubFixture)
+        .expect(201);
+
+      const coverKey = `books/${bookId}/cover.png`;
+
+      // delete book
+      await request(httpServer)
+        .delete(`/books/${bookId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      // verify book removed
+      await request(httpServer)
+        .get(`/books/${bookId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+
+      // verify objects removed from fake S3
+      const storeKeysAfter = Array.from((s3?.__store as Map<string, any>)?.keys?.() ?? []);
+      expect(storeKeysAfter.some((k) => typeof k === 'string' && k.startsWith(`books/${bookId}/epub/`))).toBe(false);
+      expect(storeKeysAfter.includes(coverKey)).toBe(false);
     });
 
     it('should return 401 without authentication', () => {

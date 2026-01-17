@@ -13,6 +13,7 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { FilesModule } from '../files/files.module';
 import { UserConfigModule } from '../user-config/user-config.module';
 import { MediaLibrariesModule } from '../media-libraries/media-libraries.module';
+import { EpubModule } from '../epub/epub.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { MediaLibrariesModule } from '../media-libraries/media-libraries.module'
     FilesModule,
     UserConfigModule,
     MediaLibrariesModule,
+    EpubModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],

@@ -167,12 +167,12 @@ export class RecommendationsController {
       example: { statusCode: 403, message: 'Forbidden', error: 'Forbidden' },
     },
   })
-  updateSection(
+  async updateSection(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSectionDto,
   ) {
     if (dto.sectionOrder) {
-      void this.svc.batchReorder(dto.sectionOrder);
+      await this.svc.batchReorder(dto.sectionOrder);
     }
     return this.svc.updateSection(id, dto);
   }

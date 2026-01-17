@@ -19,6 +19,9 @@ import { Comment } from '../src/entities/comment.entity';
 import { MediaLibrary } from '../src/entities/media-library.entity';
 import { MediaLibraryItem } from '../src/entities/media-library-item.entity';
 import { MediaLibrariesModule } from '../src/modules/media-libraries/media-libraries.module';
+import { FilesModule } from '../src/modules/files/files.module';
+import { EpubModule } from '../src/modules/epub/epub.module';
+import { S3_CLIENT } from '../src/modules/files/tokens';
 import request from 'supertest';
 
 export interface LoginResult {
@@ -57,6 +60,59 @@ export function parseLoginResult(data: unknown): LoginResult {
 }
 
 export async function createTestModule(): Promise<TestingModule> {
+  // Minimal in-memory S3 replacement for tests to avoid external MinIO dependency.
+  const store = new Map<string, { body: Buffer; contentType?: string }>();
+  const fakeS3 = {
+    __store: store,
+    send: jest.fn().mockImplementation(async (command: any) => {
+      const name = command?.constructor?.name as string | undefined;
+      const input = command?.input as Record<string, any> | undefined;
+
+      if (name === 'HeadBucketCommand' || name === 'CreateBucketCommand') {
+        return {};
+      }
+      if (name === 'PutObjectCommand') {
+        const key = input?.Key as string | undefined;
+        const body = input?.Body as any;
+        if (!key) throw new Error('Missing Key');
+        const buf = Buffer.isBuffer(body) ? body : Buffer.from(body);
+        store.set(key, { body: buf, contentType: input?.ContentType });
+        return {};
+      }
+      if (name === 'DeleteObjectCommand') {
+        const key = input?.Key as string | undefined;
+        if (!key) throw new Error('Missing Key');
+        store.delete(key);
+        return {};
+      }
+      if (name === 'HeadObjectCommand') {
+        const key = input?.Key as string | undefined;
+        if (!key) throw new Error('Missing Key');
+        if (!store.has(key)) throw new Error('NotFound');
+        return {};
+      }
+      if (name === 'ListObjectsV2Command') {
+        const prefix = (input?.Prefix as string | undefined) ?? '';
+        const keys = Array.from(store.keys()).filter((k) => k.startsWith(prefix));
+        return {
+          Contents: keys.map((k) => ({ Key: k })),
+          IsTruncated: false,
+          NextContinuationToken: undefined,
+        };
+      }
+      if (name === 'DeleteObjectsCommand') {
+        const objs = (input?.Delete?.Objects as Array<{ Key?: string }> | undefined) ?? [];
+        for (const o of objs) {
+          const key = o?.Key;
+          if (typeof key === 'string') store.delete(key);
+        }
+        return {};
+      }
+      // For unneeded commands in current test suites, just return empty.
+      return {};
+    }),
+  };
+
   return Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
@@ -107,8 +163,13 @@ export async function createTestModule(): Promise<TestingModule> {
       RecommendationsModule,
       UserConfigModule,
       MediaLibrariesModule,
+      FilesModule,
+      EpubModule,
     ],
-  }).compile();
+  })
+    .overrideProvider(S3_CLIENT)
+    .useValue(fakeS3)
+    .compile();
 }
 
 /**

@@ -1,2 +1,5 @@
 onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@scarf/scarf'
   - simple-git-hooks
+  - unrs-resolver

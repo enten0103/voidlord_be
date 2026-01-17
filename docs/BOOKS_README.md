@@ -1,243 +1,77 @@
-# Book 模块使用指南
+# Books（用法示例）
 
-本说明聚焦当前稳定的 Book 模块功能，仅保留与现行实现相关的内容；历史迁移与废弃模块说明已移除以保持简洁。
-
-## 📖 概述
-
-Book 模块是一个完整的图书管理系统，支持图书的 CRUD 操作以及与标签的多对多关系管理。
-
-## 🏗️ 数据库设计
-
-### Book 实体（精简后）
-- `id` (number): 主键，自增
-- `create_by` (number, 可选): 创建者用户 ID（从 JWT 中写入）
-- `created_at` (Date): 创建时间
-- `updated_at` (Date): 更新时间
-- `tags` (Tag[]): 关联的标签列表（多对多关系）
-
-### Tag 实体
-- `id` (number): 主键，自增
-- `key` (string): 标签键（如 "author", "genre"）
-- `value` (string): 标签值（如 "John Doe", "Fiction"）
-- `shown` (boolean): 是否显示，默认 true
-- `created_at` (Date): 创建时间
-- `updated_at` (Date): 更新时间
-- `books` (Book[]): 关联的图书列表（多对多关系）
-
-### 关系表
-- `book_tags`: 图书和标签的中间表
-  - `book_id`: 图书 ID
-  - `tag_id`: 标签 ID
-
-## 🚀 API 端点
-
-### 1. 创建图书（仅支持标签，已移除 hash/title/description）
-```http
-POST /books
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "tags": [
-    { "key": "author", "value": "作者名" },
-    { "key": "genre", "value": "科幻" }
-  ]
-}
-```
-
-成功响应（示例）：
-```json
-{
-  "id": 101,
-  "create_by": 12,
-  "tags": [
-    {"id": 5, "key": "author", "value": "作者名", "shown": true, "created_at": "...", "updated_at": "..."}
-  ],
-  "created_at": "...",
-  "updated_at": "..."
-}
-```
-
-说明：服务端会自动根据请求用户写入 `create_by`，无需在请求体中提供。
-
-### 2. 获取所有图书
-```http
-GET /books
-# 或者按标签筛选
-GET /books?tags=author,genre
-```
-
-### 3. 根据 ID 获取图书
-```http
-GET /books/:id
-```
-
-（已移除：根据 hash 获取图书 `/books/hash/:hash` 接口不再存在）
-
-### 4.1 获取本人上传的图书
-```http
-GET /books/my
-Authorization: Bearer <jwt_token>
-```
-
-说明：
-- 需要登录（JWT）。
-- 仅返回当前登录用户创建的图书（`create_by = 当前用户ID`），结果包含 `tags`，按 `created_at` 倒序。
-
-示例响应：
-```json
-[
-  {
-    "id": 12,
-    "create_by": 5,
-    "tags": [],
-    "created_at": "...",
-    "updated_at": "..."
-  }
-]
-```
-
-### 5. 更新图书
-```http
-PATCH /books/:id
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "tags": [
-    { "key": "year", "value": "2024" }
-  ]
-}
-```
-
-### 6. 删除图书
-```http
-DELETE /books/:id
-Authorization: Bearer <jwt_token>
-```
-
-## 🔐 权限控制
-
-- **公开访问**: GET 请求（查询 / 搜索 / 推荐）当前允许匿名；可在未来收紧为 `BOOK_READ` level >=1。
-- **写操作**: `BOOK_CREATE` / `BOOK_UPDATE` / `BOOK_DELETE` 需要对应权限 level >=1。
-- **授权模型**: 详见 PERMISSIONS_GUIDE.md （多等级 0/1/2/3）。
-
-## 🎯 核心功能
-
-### 标签智能管理
-- 自动去重：相同 key 和 value 的标签会复用现有标签
-- 级联创建：创建图书时自动创建不存在的标签
-- 多对多关系：一本书可以有多个标签，一个标签可以关联多本书
-
-### 查询功能
-- 分页查询：按创建时间倒序
-- 标签筛选：根据标签键筛选图书 (GET /books?tags=author,genre)
-- 统一标签搜索入口：POST /books/search (五种模式，见 BOOKS_TAG_SEARCH.md)
-
-### 推荐功能
-- GET /books/recommend/:id?limit=5
-- 共享标签数降序 + 创建时间降序
-
-### 数据验证
--- 已移除 hash/title/description，避免冗余存储；标题等展示型信息可通过标签体系或扩展表后续补充
-- 输入数据验证（使用 class-validator）
-- 错误处理（404, 409, 401 等）
-
-## 🧪 测试覆盖
-
-### 单元测试
-- ✅ BooksService 测试（17 个测试用例）
-- ✅ BooksController 测试（7 个测试用例）
-- 覆盖所有主要功能：创建、查询、更新、删除、错误处理
-
-### E2E 测试
-- ✅ 完整的端到端测试套件
-- 测试所有 API 端点
-- 包含认证和权限测试
-- 数据库集成测试
- - 验证创建接口自动写入 `create_by`
-
-## 🗄️ 数据库表结构
-
-```sql
--- Book 表
-CREATE TABLE book (
-    id SERIAL PRIMARY KEY,
-  -- 已移除 hash/title/description 字段
-  create_by INTEGER NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tag 表
-CREATE TABLE tag (
-    id SERIAL PRIMARY KEY,
-    key VARCHAR NOT NULL,
-    value VARCHAR NOT NULL,
-    shown BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- 关系表
-CREATE TABLE book_tags (
-    book_id INTEGER REFERENCES book(id) ON DELETE CASCADE,
-    tag_id INTEGER REFERENCES tag(id) ON DELETE CASCADE,
-    PRIMARY KEY (book_id, tag_id)
-);
-```
-
-## 📦 使用示例
-
-### 1. 启动应用
+## 创建图书
 ```bash
-# 启动数据库
-pnpm run docker:up
-
-# 启动应用
-pnpm run start:dev
+curl -X POST http://localhost:3000/books \
+  -H 'Authorization: Bearer <jwt>' \
+  -H 'Content-Type: application/json' \
+  -d '{"tags":[{"key":"author","value":"作者名"},{"key":"genre","value":"科幻"}]}'
 ```
 
-### 2. 创建图书示例
-```javascript
-// 创建一本带标签的图书（仅 tags）
-const response = await fetch('/books', {
-    method: 'POST',
-    headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
-    },
-  body: JSON.stringify({
-    tags: [
-      { key: 'author', value: '刘慈欣' },
-      { key: 'genre', value: '科幻' },
-      { key: 'language', value: '中文' }
-    ]
-  })
-});
+## 获取图书列表 / 单本
+```bash
+curl http://localhost:3000/books
+curl http://localhost:3000/books/12
 ```
 
-### 3. 查询图书示例
-```javascript
-// 获取所有科幻类图书
-const books = await fetch('/books?tags=genre').then(r => r.json());
-
+## 获取我创建的图书
+```bash
+curl http://localhost:3000/books/my \
+  -H 'Authorization: Bearer <jwt>'
 ```
 
-## 🏃‍♂️ 快速开始
+## 更新图书（替换 tags）
+```bash
+curl -X PATCH http://localhost:3000/books/12 \
+  -H 'Authorization: Bearer <jwt>' \
+  -H 'Content-Type: application/json' \
+  -d '{"tags":[{"key":"year","value":"2024"}]}'
+```
 
-1. 确保 PostgreSQL 数据库运行
-2. 运行 `pnpm run build` 检查编译
-3. 运行 `pnpm run test` 执行单元测试
-4. 启动应用访问 Swagger 文档: http://localhost:3000/api
-5. 使用认证端点获取 JWT token
-6. 开始使用图书管理 API！
+## 删除图书
+```bash
+curl -X DELETE http://localhost:3000/books/12 \
+  -H 'Authorization: Bearer <jwt>'
+```
 
-## 📝 注意事项
+## 搜索（统一入口）
+更多示例见 `BOOKS_TAG_SEARCH.md`。
+```bash
+curl -X POST http://localhost:3000/books/search -H 'Content-Type: application/json' \
+  -d '{"conditions":[{"target":"author","op":"eq","value":"作者名"}]}'
+```
 
--- 不再包含 hash/title/description 字段
-- 删除图书会自动清理关联关系
-- 标签不会因为没有关联图书而被自动删除
+## 推荐
+```bash
+curl "http://localhost:3000/books/recommend/12?limit=5"
+```
+
+## 上传/替换封面
+`PUT /books/:id/cover`（multipart/form-data）
+```bash
+curl -X PUT http://localhost:3000/books/12/cover \
+  -H 'Authorization: Bearer <jwt>' \
+  -F "file=@./cover.jpg"
+```
+
+## EPUB：上传 / 读取内部文件 / 删除
+上传：`POST /epub/book/:id`（multipart/form-data）
+```bash
+curl -X POST http://localhost:3000/epub/book/12 \
+  -H 'Authorization: Bearer <jwt>' \
+  -F "file=@./book.epub"
+```
+
+读取 EPUB 内部文件（例：OPF、HTML、图片等）：`GET /epub/book/:id/<path>`
+```bash
+curl http://localhost:3000/epub/book/12/META-INF/container.xml
+```
+
+删除：`DELETE /epub/book/:id`
+```bash
+curl -X DELETE http://localhost:3000/epub/book/12 \
+  -H 'Authorization: Bearer <jwt>'
+```
 - 所有写操作都需要认证
 - E2E 测试需要测试数据库支持；标签搜索与推荐详见 BOOKS_TAG_SEARCH.md
 

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
+import * as mime from 'mime-types';
 import { Book } from '../../entities/book.entity';
 import { Tag } from '../../entities/tag.entity';
 import { CreateBookDto } from './dto/create-book.dto';
@@ -13,6 +14,7 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { BookRating } from '../../entities/book-rating.entity';
 import { Comment } from '../../entities/comment.entity';
 import { User } from '../../entities/user.entity';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class BooksService {
@@ -25,6 +27,7 @@ export class BooksService {
     private ratingRepository: Repository<BookRating>,
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
+    private files: FilesService,
   ) {}
 
   async create(createBookDto: CreateBookDto, userId?: number): Promise<Book> {
@@ -80,7 +83,94 @@ export class BooksService {
 
   async remove(id: number): Promise<void> {
     const book = await this.findOne(id);
+
+    // Cleanup bound cover if exists (stored via tags)
+    const coverKey = book.tags?.find((t) => t.key === 'cover')?.value;
+    if (coverKey) {
+      await this.files.deleteObject(coverKey);
+      await this.files.deleteRecordByKey(coverKey);
+    }
+
+    // Cleanup extracted EPUB objects if present
+    if (book.has_epub) {
+      const prefix = `books/${id}/epub/`;
+      const keys = await this.files.listObjects(prefix);
+      await this.files.deleteObjects(keys);
+      await this.files.deleteRecordsByKeys(keys);
+    }
+
     await this.bookRepository.remove(book);
+  }
+
+  async setCover(
+    bookId: number,
+    file: Express.Multer.File,
+    userId: number,
+  ): Promise<{ key: string; url: string }> {
+    const book = await this.bookRepository.findOne({
+      where: { id: bookId },
+      relations: ['tags'],
+    });
+    if (!book) throw new NotFoundException(`Book with ID ${bookId} not found`);
+    if (!file?.buffer) throw new BadRequestException('File is required');
+
+    const contentType = file.mimetype || 'application/octet-stream';
+    if (!contentType.startsWith('image/')) {
+      throw new BadRequestException('Cover must be an image');
+    }
+
+    const extRaw = mime.extension(contentType) || '';
+    const ext = extRaw === 'jpeg' ? 'jpg' : extRaw;
+    if (!ext) {
+      throw new BadRequestException('Unsupported cover image type');
+    }
+
+    const newKey = `books/${bookId}/cover.${ext}`;
+    const oldKey =
+      book.tags?.find((t) => t.key === 'cover')?.value || undefined;
+
+    await this.files.putObject(
+      newKey,
+      file.buffer,
+      contentType,
+      undefined,
+      userId,
+    );
+
+    try {
+      const baseTagDtos = (book.tags || [])
+        .filter((t) => t.key !== 'cover' && t.key !== 'cover_mime')
+        .map((t) => ({ key: t.key, value: t.value, shown: t.shown }));
+
+      const updatedTags = await this.processTags([
+        ...baseTagDtos,
+        { key: 'cover', value: newKey, shown: false },
+        { key: 'cover_mime', value: contentType, shown: false },
+      ]);
+
+      book.tags = updatedTags;
+      await this.bookRepository.save(book);
+    } catch (e) {
+      // rollback to avoid orphaned objects
+      try {
+        await this.files.deleteObject(newKey);
+        await this.files.deleteRecordByKey(newKey);
+      } catch {
+        /* ignore rollback errors */
+      }
+      throw e;
+    }
+
+    if (oldKey && oldKey !== newKey) {
+      try {
+        await this.files.deleteObject(oldKey);
+        await this.files.deleteRecordByKey(oldKey);
+      } catch {
+        /* ignore cleanup errors */
+      }
+    }
+
+    return { key: newKey, url: this.files.getPublicUrl(newKey) };
   }
 
   async rateBook(bookId: number, userId: number, score: number) {

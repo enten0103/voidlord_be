@@ -9,13 +9,15 @@ import {
   GetObjectCommand,
   PutBucketPolicyCommand,
   DeleteBucketPolicyCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3_CLIENT } from './tokens';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FileObject } from '../../entities/file-object.entity';
 import { User } from '../../entities/user.entity';
 
@@ -111,6 +113,17 @@ export class FilesService implements OnModuleInit {
     await this.fileRepo.delete({ key, bucket: Bucket });
   }
 
+  async deleteRecordsByKeys(keys: string[], bucket?: string): Promise<void> {
+    if (keys.length === 0) return;
+    const Bucket = this.getBucket(bucket);
+    // Keep batch size consistent with S3 deleteObjects to avoid huge IN clauses.
+    const batchSize = 1000;
+    for (let i = 0; i < keys.length; i += batchSize) {
+      const batch = keys.slice(i, i + batchSize);
+      await this.fileRepo.delete({ bucket: Bucket, key: In(batch) });
+    }
+  }
+
   async createUploadUrl(options: PresignedUrlOptions): Promise<string> {
     const Bucket = this.getBucket(options.bucket);
     const cmd = new PutObjectCommand({
@@ -174,5 +187,52 @@ export class FilesService implements OnModuleInit {
     const Bucket = this.getBucket(bucket);
     await this.s3.send(new DeleteBucketPolicyCommand({ Bucket }));
     this.logger.log(`Bucket ${Bucket} policy removed (set to private)`);
+  }
+
+  async listObjects(
+    prefix: string,
+    bucket?: string,
+  ): Promise<string[]> {
+    const Bucket = this.getBucket(bucket);
+    const keys: string[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const response = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      if (response.Contents) {
+        keys.push(...response.Contents.map((obj) => obj.Key as string));
+      }
+
+      continuationToken = response.NextContinuationToken;
+    } while (continuationToken);
+
+    return keys;
+  }
+
+  async deleteObjects(keys: string[], bucket?: string): Promise<void> {
+    if (keys.length === 0) return;
+
+    const Bucket = this.getBucket(bucket);
+    // S3 DeleteObjects max 1000 keys per request
+    const batchSize = 1000;
+
+    for (let i = 0; i < keys.length; i += batchSize) {
+      const batch = keys.slice(i, i + batchSize);
+      await this.s3.send(
+        new DeleteObjectsCommand({
+          Bucket,
+          Delete: {
+            Objects: batch.map((key) => ({ Key: key })),
+          },
+        }),
+      );
+    }
   }
 }
