@@ -13,10 +13,12 @@ import { BookRating } from '../entities/book-rating.entity';
 import { Comment } from '../entities/comment.entity';
 import { MediaLibrary } from '../entities/media-library.entity';
 import { MediaLibraryItem } from '../entities/media-library-item.entity';
+import { ReaderEngine } from '../entities/reader-engine.entity';
+import { ReaderInstance } from '../entities/reader-instance.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
   createTypeOrmOptions(): TypeOrmModuleOptions {
     return {
       type: 'postgres',
@@ -38,6 +40,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Comment,
         MediaLibrary,
         MediaLibraryItem,
+        ReaderEngine,
+        ReaderInstance,
       ],
       synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE', true), // 仅在开发环境使用
       logging: this.configService.get<boolean>('DB_LOGGING', false),

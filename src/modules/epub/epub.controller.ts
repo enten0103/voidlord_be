@@ -10,6 +10,7 @@ import {
   Res,
   BadRequestException,
   Req,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
@@ -31,7 +32,7 @@ import type { JwtRequestWithUser } from '../../types/request.interface';
 @ApiTags('epub')
 @Controller('epub')
 export class EpubController {
-  constructor(private readonly epubService: EpubService) {}
+  constructor(private readonly epubService: EpubService) { }
 
   @Post('book/:id')
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -52,12 +53,12 @@ export class EpubController {
     },
   })
   async uploadEpub(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
     @Req() req: JwtRequestWithUser,
   ) {
     if (!file) throw new BadRequestException('File is required');
-    await this.epubService.uploadEpub(+id, file.buffer, req.user.userId);
+    await this.epubService.uploadEpub(id, file.buffer, req.user.userId);
     return { success: true };
   }
 
@@ -70,13 +71,13 @@ export class EpubController {
     description: 'Book ID',
   })
   async getEpubFile(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Param('path') path: string | string[],
     @Res() res: Response,
   ) {
     const rawPath = Array.isArray(path) ? path.join('/') : path;
     const { stream, contentType, length } = await this.epubService.getFile(
-      +id,
+      id,
       rawPath,
     );
 
@@ -100,7 +101,11 @@ export class EpubController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete EPUB files for a book' })
   async deleteEpub(@Param('id') id: string) {
-    await this.epubService.deleteEpub(+id);
+    const bookId = Number(id);
+    if (!Number.isInteger(bookId)) {
+      throw new BadRequestException('Invalid book id');
+    }
+    await this.epubService.deleteEpub(bookId);
     return { success: true };
   }
 }

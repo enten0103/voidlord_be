@@ -18,6 +18,8 @@ import { BookRating } from '../src/entities/book-rating.entity';
 import { Comment } from '../src/entities/comment.entity';
 import { MediaLibrary } from '../src/entities/media-library.entity';
 import { MediaLibraryItem } from '../src/entities/media-library-item.entity';
+import { ReaderEngine } from '../src/entities/reader-engine.entity';
+import { ReaderInstance } from '../src/entities/reader-instance.entity';
 import { MediaLibrariesModule } from '../src/modules/media-libraries/media-libraries.module';
 import { FilesModule } from '../src/modules/files/files.module';
 import { EpubModule } from '../src/modules/epub/epub.module';
@@ -139,6 +141,8 @@ export async function createTestModule(): Promise<TestingModule> {
           Comment,
           MediaLibrary,
           MediaLibraryItem,
+          ReaderEngine,
+          ReaderInstance,
         ],
         synchronize: true,
         dropSchema: true, // 每次测试都重新创建数据库结构
@@ -156,6 +160,8 @@ export async function createTestModule(): Promise<TestingModule> {
         Comment,
         MediaLibrary,
         MediaLibraryItem,
+        ReaderEngine,
+        ReaderInstance,
       ]),
       UsersModule,
       AuthModule,

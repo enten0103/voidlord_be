@@ -38,7 +38,7 @@ export class EpubService {
     private filesService: FilesService,
     @Inject(S3_CLIENT) private s3: S3Client,
     private config: ConfigService,
-  ) {}
+  ) { }
 
   private async cleanupEpubPrefix(prefix: string): Promise<void> {
     const keys = await this.filesService.listObjects(prefix);
@@ -47,6 +47,9 @@ export class EpubService {
   }
 
   async uploadEpub(bookId: number, fileBuffer: Buffer, ownerId: number) {
+    if (!Number.isInteger(bookId)) {
+      throw new BadRequestException('Invalid book id');
+    }
     const book = await this.bookRepo.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
 
@@ -119,6 +122,9 @@ export class EpubService {
     bookId: number,
     path: string,
   ): Promise<{ stream: Readable; contentType: string; length?: number }> {
+    if (!Number.isInteger(bookId)) {
+      throw new BadRequestException('Invalid book id');
+    }
     const book = await this.bookRepo.findOne({ where: { id: bookId } });
     if (!book || !book.has_epub) {
       throw new NotFoundException('Book EPUB not available');
@@ -147,6 +153,9 @@ export class EpubService {
   }
 
   async deleteEpub(bookId: number): Promise<void> {
+    if (!Number.isInteger(bookId)) {
+      throw new BadRequestException('Invalid book id');
+    }
     const book = await this.bookRepo.findOne({ where: { id: bookId } });
     if (!book) throw new NotFoundException('Book not found');
     if (!book.has_epub) {
