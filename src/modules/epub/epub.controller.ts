@@ -32,7 +32,7 @@ import type { JwtRequestWithUser } from '../../types/request.interface';
 @ApiTags('epub')
 @Controller('epub')
 export class EpubController {
-  constructor(private readonly epubService: EpubService) { }
+  constructor(private readonly epubService: EpubService) {}
 
   @Post('book/:id')
   @UseGuards(JwtAuthGuard, PermissionGuard)

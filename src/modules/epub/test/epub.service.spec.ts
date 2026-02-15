@@ -129,8 +129,17 @@ describe('EpubService', () => {
         has_epub: true,
       } as unknown as Book);
       mockTagRepository.findOne.mockResolvedValue(null);
-      mockTagRepository.create.mockReturnValue({ key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
-      mockTagRepository.save.mockResolvedValue({ id: 99, key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
+      mockTagRepository.create.mockReturnValue({
+        key: 'SOURCE',
+        value: 'books/1/source.epub',
+        shown: false,
+      } as any);
+      mockTagRepository.save.mockResolvedValue({
+        id: 99,
+        key: 'SOURCE',
+        value: 'books/1/source.epub',
+        shown: false,
+      } as any);
 
       const zip = new AdmZip();
       zip.addFile('mimetype', Buffer.from('application/epub+zip'));
@@ -145,9 +154,9 @@ describe('EpubService', () => {
         4,
       );
       // source.epub is uploaded first
-      const sourceCall = (mockFilesService.putObject as jest.Mock).mock.calls.find(
-        (c: any[]) => c[0] === 'books/1/source.epub',
-      );
+      const sourceCall = (
+        mockFilesService.putObject as jest.Mock
+      ).mock.calls.find((c: any[]) => c[0] === 'books/1/source.epub');
       expect(sourceCall).toBeDefined();
       expect(mockBookRepository.save).toHaveBeenCalled();
       const saved = (mockBookRepository.save as jest.Mock).mock.calls[0][0];
@@ -164,8 +173,17 @@ describe('EpubService', () => {
         has_epub: true,
       } as unknown as Book);
       mockTagRepository.findOne.mockResolvedValue(null);
-      mockTagRepository.create.mockReturnValue({ key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
-      mockTagRepository.save.mockResolvedValue({ id: 99, key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
+      mockTagRepository.create.mockReturnValue({
+        key: 'SOURCE',
+        value: 'books/1/source.epub',
+        shown: false,
+      } as any);
+      mockTagRepository.save.mockResolvedValue({
+        id: 99,
+        key: 'SOURCE',
+        value: 'books/1/source.epub',
+        shown: false,
+      } as any);
 
       const fixturePath = join(__dirname, 'test.epub');
       const buf = readFileSync(fixturePath);
@@ -175,9 +193,8 @@ describe('EpubService', () => {
 
       await service.uploadEpub(1, buf, 123);
 
-      const calls = (mockFilesService.putObject as jest.Mock).mock.calls as Array<
-        [string, Buffer, string]
-      >;
+      const calls = (mockFilesService.putObject as jest.Mock).mock
+        .calls as Array<[string, Buffer, string]>;
       // epub entries + 1 source.epub
       expect(calls.length).toBe(fileEntries.length + 1);
 
@@ -196,7 +213,8 @@ describe('EpubService', () => {
       );
       expect(containerCall).toBeDefined();
       expect(containerCall![2]).toBe(
-        (mime.lookup('META-INF/container.xml') || 'application/octet-stream') as string,
+        (mime.lookup('META-INF/container.xml') ||
+          'application/octet-stream') as string,
       );
 
       // verify bytes for container.xml are exactly what is in the epub
@@ -257,18 +275,14 @@ describe('EpubService', () => {
     it('throws NotFoundException when book does not exist', async () => {
       mockBookRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.deleteEpub(999)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.deleteEpub(999)).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException when book has no epub', async () => {
       const book = { id: 1, has_epub: false } as unknown as Book;
       mockBookRepository.findOne.mockResolvedValue(book);
 
-      await expect(service.deleteEpub(1)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.deleteEpub(1)).rejects.toThrow(BadRequestException);
     });
 
     it('deletes all epub objects and sets has_epub to false', async () => {
@@ -287,11 +301,15 @@ describe('EpubService', () => {
 
       await service.deleteEpub(1);
 
-      expect(mockFilesService.listObjects).toHaveBeenCalledWith('books/1/epub/');
+      expect(mockFilesService.listObjects).toHaveBeenCalledWith(
+        'books/1/epub/',
+      );
       expect(mockFilesService.deleteObjects).toHaveBeenCalledWith(keys);
       expect(mockFilesService.deleteRecordsByKeys).toHaveBeenCalledWith(keys);
       // also attempts to delete source.epub
-      expect(mockFilesService.deleteObject).toHaveBeenCalledWith('books/1/source.epub');
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith(
+        'books/1/source.epub',
+      );
       expect(mockBookRepository.save).toHaveBeenCalled();
       const saved = (mockBookRepository.save as jest.Mock).mock.calls[0][0];
       expect(saved.has_epub).toBe(false);

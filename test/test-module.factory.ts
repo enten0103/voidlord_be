@@ -95,7 +95,9 @@ export async function createTestModule(): Promise<TestingModule> {
       }
       if (name === 'ListObjectsV2Command') {
         const prefix = (input?.Prefix as string | undefined) ?? '';
-        const keys = Array.from(store.keys()).filter((k) => k.startsWith(prefix));
+        const keys = Array.from(store.keys()).filter((k) =>
+          k.startsWith(prefix),
+        );
         return {
           Contents: keys.map((k) => ({ Key: k })),
           IsTruncated: false,
@@ -103,7 +105,8 @@ export async function createTestModule(): Promise<TestingModule> {
         };
       }
       if (name === 'DeleteObjectsCommand') {
-        const objs = (input?.Delete?.Objects as Array<{ Key?: string }> | undefined) ?? [];
+        const objs =
+          (input?.Delete?.Objects as Array<{ Key?: string }> | undefined) ?? [];
         for (const o of objs) {
           const key = o?.Key;
           if (typeof key === 'string') store.delete(key);

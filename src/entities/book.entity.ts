@@ -24,7 +24,10 @@ export class Book {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ApiProperty({ description: 'Whether the book has an uploaded EPUB', required: false })
+  @ApiProperty({
+    description: 'Whether the book has an uploaded EPUB',
+    required: false,
+  })
   @Column({ default: false })
   has_epub?: boolean;
 

@@ -1,6 +1,7 @@
 # VoidLord Backend（用法示例）
 
 ## 启动
+
 ```bash
 pnpm install
 pnpm run docker:up
@@ -10,6 +11,7 @@ pnpm run start:dev
 Swagger：`http://localhost:3000/api`
 
 ## Auth
+
 ```bash
 curl -X POST http://localhost:3000/auth/register -H 'Content-Type: application/json' \
   -d '{"username":"alice","email":"alice@example.com","password":"Password123"}'
@@ -19,6 +21,7 @@ curl -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json
 ```
 
 ## Books
+
 ```bash
 curl -X POST http://localhost:3000/books \
   -H 'Authorization: Bearer <jwt>' \
@@ -30,6 +33,7 @@ curl -X POST http://localhost:3000/books/search -H 'Content-Type: application/js
 ```
 
 上传封面：
+
 ```bash
 curl -X PUT http://localhost:3000/books/12/cover \
   -H 'Authorization: Bearer <jwt>' \
@@ -37,6 +41,7 @@ curl -X PUT http://localhost:3000/books/12/cover \
 ```
 
 ## EPUB
+
 ```bash
 curl -X POST http://localhost:3000/epub/book/12 \
   -H 'Authorization: Bearer <jwt>' \
@@ -49,6 +54,7 @@ curl -X DELETE http://localhost:3000/epub/book/12 \
 ```
 
 ## Media Libraries
+
 ```bash
 curl -X POST http://localhost:3000/media-libraries \
   -H 'Authorization: Bearer <jwt>' \
@@ -60,4 +66,5 @@ curl http://localhost:3000/media-libraries/reading-record \
 ```
 
 ## 更多示例
+
 见 `docs/`：`docs/README.md`、`docs/BOOKS_README.md`、`docs/FILES_GUIDE.md` 等。

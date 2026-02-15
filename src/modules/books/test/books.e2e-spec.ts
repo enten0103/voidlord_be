@@ -805,8 +805,14 @@ describe('Books (e2e)', () => {
         .expect(404);
 
       // verify objects removed from fake S3
-      const storeKeysAfter = Array.from((s3?.__store as Map<string, any>)?.keys?.() ?? []);
-      expect(storeKeysAfter.some((k) => typeof k === 'string' && k.startsWith(`books/${bookId}/epub/`))).toBe(false);
+      const storeKeysAfter = Array.from(
+        (s3?.__store as Map<string, any>)?.keys?.() ?? [],
+      );
+      expect(
+        storeKeysAfter.some(
+          (k) => typeof k === 'string' && k.startsWith(`books/${bookId}/epub/`),
+        ),
+      ).toBe(false);
       expect(storeKeysAfter.includes(coverKey)).toBe(false);
     });
 

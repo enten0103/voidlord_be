@@ -1,8 +1,12 @@
 // .vscode/settings.json
 {
-    "explorer.fileNesting.enabled": true,
-    "explorer.fileNesting.patterns": {
-        "package.json": "pnpm-lock.yaml, pnpm-workspace.yaml,  .eslintrc.cjs, .prettierrc.json",
-        "tsconfig.json": "jest-e2e.json,tsconfig.build.json,eslint.config.mjs, nest-cli.json,.prettierrc,jest.config.ts, docker-compose.yml, .eslintrc.cjs, .prettierrc.json",
-    }
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "always"
+  },
+  "oxc.typeAware": true,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "package.json": "pnpm-lock.yaml, pnpm-workspace.yaml,  .eslintrc.cjs, .prettierrc.json",
+    "tsconfig.json": "jest-e2e.json,tsconfig.build.json,eslint.config.mjs, nest-cli.json,.prettierrc,jest.config.ts, docker-compose.yml, .eslintrc.cjs, .prettierrc.json"
+  }
 }

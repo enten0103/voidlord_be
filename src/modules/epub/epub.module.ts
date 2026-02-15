@@ -18,5 +18,4 @@ import { TonoModule } from '../tono/tono.module';
   controllers: [EpubController],
   providers: [EpubService],
 })
-
-export class EpubModule { }
+export class EpubModule {}

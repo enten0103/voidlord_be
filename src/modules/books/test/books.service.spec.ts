@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SelectQueryBuilder } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { BooksService } from '../books.service';
 import { createRepoMock } from '../../../../test/repo-mocks';
 import { Book } from '../../../entities/book.entity';
@@ -193,8 +197,18 @@ describe('BooksService', () => {
         .spyOn(service as any, 'processTags')
         .mockResolvedValue([
           { id: 3, key: 'author', value: 'A', shown: true } as Tag,
-          { id: 4, key: 'cover', value: 'books/1/cover.jpg', shown: false } as Tag,
-          { id: 5, key: 'cover_mime', value: 'image/jpeg', shown: false } as Tag,
+          {
+            id: 4,
+            key: 'cover',
+            value: 'books/1/cover.jpg',
+            shown: false,
+          } as Tag,
+          {
+            id: 5,
+            key: 'cover_mime',
+            value: 'image/jpeg',
+            shown: false,
+          } as Tag,
         ]);
 
       const res = await service.setCover(
@@ -213,7 +227,9 @@ describe('BooksService', () => {
       expect(processSpy).toHaveBeenCalled();
       expect(mockBookRepository.save).toHaveBeenCalled();
       expect(mockFilesService.deleteObject).toHaveBeenCalledWith(oldCoverKey);
-      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith(oldCoverKey);
+      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith(
+        oldCoverKey,
+      );
       expect(res.key).toBe('books/1/cover.jpg');
     });
 
@@ -221,9 +237,14 @@ describe('BooksService', () => {
       const book = { ...mockBook, tags: [] } as unknown as Book;
       mockBookRepository.findOne.mockResolvedValue(book);
       mockBookRepository.save.mockRejectedValue(new Error('db failed'));
-      jest
-        .spyOn(service as any, 'processTags')
-        .mockResolvedValue([{ id: 1, key: 'cover', value: 'books/1/cover.png', shown: false } as Tag]);
+      jest.spyOn(service as any, 'processTags').mockResolvedValue([
+        {
+          id: 1,
+          key: 'cover',
+          value: 'books/1/cover.png',
+          shown: false,
+        } as Tag,
+      ]);
 
       await expect(
         service.setCover(
@@ -233,8 +254,12 @@ describe('BooksService', () => {
         ),
       ).rejects.toThrow('db failed');
 
-      expect(mockFilesService.deleteObject).toHaveBeenCalledWith('books/1/cover.png');
-      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith('books/1/cover.png');
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith(
+        'books/1/cover.png',
+      );
+      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith(
+        'books/1/cover.png',
+      );
     });
   });
 
@@ -274,21 +299,39 @@ describe('BooksService', () => {
         ...mockBook,
         id: 1,
         has_epub: true,
-        tags: [{ id: 1, key: 'cover', value: 'books/1/cover.png', shown: false } as any],
+        tags: [
+          {
+            id: 1,
+            key: 'cover',
+            value: 'books/1/cover.png',
+            shown: false,
+          } as any,
+        ],
       } as Book;
 
-      const epubKeys = ['books/1/epub/mimetype', 'books/1/epub/META-INF/container.xml'];
+      const epubKeys = [
+        'books/1/epub/mimetype',
+        'books/1/epub/META-INF/container.xml',
+      ];
       mockBookRepository.findOne.mockResolvedValue(bookWithAssets);
       (mockFilesService.listObjects as jest.Mock).mockResolvedValue(epubKeys);
       mockBookRepository.remove.mockResolvedValue(bookWithAssets);
 
       await service.remove(1);
 
-      expect(mockFilesService.deleteObject).toHaveBeenCalledWith('books/1/cover.png');
-      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith('books/1/cover.png');
-      expect(mockFilesService.listObjects).toHaveBeenCalledWith('books/1/epub/');
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith(
+        'books/1/cover.png',
+      );
+      expect(mockFilesService.deleteRecordByKey).toHaveBeenCalledWith(
+        'books/1/cover.png',
+      );
+      expect(mockFilesService.listObjects).toHaveBeenCalledWith(
+        'books/1/epub/',
+      );
       expect(mockFilesService.deleteObjects).toHaveBeenCalledWith(epubKeys);
-      expect(mockFilesService.deleteRecordsByKeys).toHaveBeenCalledWith(epubKeys);
+      expect(mockFilesService.deleteRecordsByKeys).toHaveBeenCalledWith(
+        epubKeys,
+      );
       expect(mockBookRepository.remove).toHaveBeenCalledWith(bookWithAssets);
     });
 

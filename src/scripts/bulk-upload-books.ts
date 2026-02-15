@@ -78,9 +78,15 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const typoDescriptionKey = args.includes('--use-typo-key'); // 如果需要故意使用 DESCRTIPION 拼写
   const limitArgIdx = args.findIndex((a) => a.startsWith('--limit='));
-  const limit = limitArgIdx !== -1 ? parseInt(args[limitArgIdx].split('=')[1], 10) : undefined;
+  const limit =
+    limitArgIdx !== -1
+      ? parseInt(args[limitArgIdx].split('=')[1], 10)
+      : undefined;
   const baseArgIdx = args.findIndex((a) => a.startsWith('--base='));
-  const base = baseArgIdx !== -1 ? args[baseArgIdx].split('=')[1] : path.resolve(process.cwd(), 'example');
+  const base =
+    baseArgIdx !== -1
+      ? args[baseArgIdx].split('=')[1]
+      : path.resolve(process.cwd(), 'example');
 
   if (!fs.existsSync(base) || !fs.statSync(base).isDirectory()) {
     console.error('[bulk-upload] 基础目录不存在或不是目录:', base);
@@ -90,7 +96,9 @@ async function main() {
   console.log('[bulk-upload] 使用目录:', base);
   console.log('[bulk-upload] dry-run =', dryRun);
 
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: false,
+  });
   const booksService = app.get(BooksService);
   const filesService = app.get(FilesService);
   const config = app.get(ConfigService);
@@ -107,8 +115,11 @@ async function main() {
     console.warn('[bulk-upload] 未找到 admin 用户，将以匿名方式创建书籍');
   }
 
-  const entries = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory());
-  const targetEntries = typeof limit === 'number' ? entries.slice(0, limit) : entries;
+  const entries = fs
+    .readdirSync(base, { withFileTypes: true })
+    .filter((d) => d.isDirectory());
+  const targetEntries =
+    typeof limit === 'number' ? entries.slice(0, limit) : entries;
 
   let success = 0;
   let skipped = 0;
@@ -126,7 +137,9 @@ async function main() {
     const coverDir = path.join(fullDir, 'OEBPS', 'Images');
     let coverKey: string | undefined;
     if (fs.existsSync(coverDir) && fs.statSync(coverDir).isDirectory()) {
-      const coverFile = fs.readdirSync(coverDir).find((f) => /^cover\./i.test(f));
+      const coverFile = fs
+        .readdirSync(coverDir)
+        .find((f) => /^cover\./i.test(f));
       if (coverFile) {
         const coverPath = path.join(coverDir, coverFile);
         const ext = path.extname(coverFile).toLowerCase();
@@ -134,21 +147,27 @@ async function main() {
           ext === '.jpg' || ext === '.jpeg'
             ? 'image/jpeg'
             : ext === '.png'
-            ? 'image/png'
-            : ext === '.webp'
-            ? 'image/webp'
-            : 'application/octet-stream';
+              ? 'image/png'
+              : ext === '.webp'
+                ? 'image/webp'
+                : 'application/octet-stream';
         const buffer = fs.readFileSync(coverPath);
         const safeName = dirName.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_');
         const objectKey = `covers/${Date.now()}_${safeName}_${coverFile}`;
         if (!dryRun) {
           try {
-            coverKey = await filesService.putObject(objectKey, buffer, contentType, undefined, adminId);
+            coverKey = await filesService.putObject(
+              objectKey,
+              buffer,
+              contentType,
+              undefined,
+              adminId,
+            );
           } catch (e) {
             console.error('[bulk-upload] 封面上传失败:', dirName, e);
           }
         } else {
-            coverKey = objectKey; // dry-run 展示预期 key
+          coverKey = objectKey; // dry-run 展示预期 key
         }
       } else {
         console.warn('[bulk-upload] 未找到封面文件 cover.* 路径:', coverDir);
@@ -181,7 +200,10 @@ async function main() {
     if (meta.volume) console.log('[bulk-upload] 卷号:', meta.volume);
     if (coverKey) console.log('[bulk-upload] 封面对象键:', coverKey);
     if (summary) console.log('[bulk-upload] 摘要长度:', summary.length);
-    console.log('[bulk-upload] Tags:', tags.map((t) => `${t.key}=${t.value.substring(0, 40)}`));
+    console.log(
+      '[bulk-upload] Tags:',
+      tags.map((t) => `${t.key}=${t.value.substring(0, 40)}`),
+    );
 
     if (dryRun) {
       skipped++;

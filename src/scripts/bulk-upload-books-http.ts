@@ -83,7 +83,10 @@ async function login(): Promise<string> {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ username: ADMIN_USERNAME, password: ADMIN_PASSWORD }),
+    body: JSON.stringify({
+      username: ADMIN_USERNAME,
+      password: ADMIN_PASSWORD,
+    }),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -96,7 +99,11 @@ async function login(): Promise<string> {
   return data.access_token;
 }
 
-async function uploadCover(filePath: string, token: string, objectKeySuggestion: string): Promise<string> {
+async function uploadCover(
+  filePath: string,
+  token: string,
+  objectKeySuggestion: string,
+): Promise<string> {
   // 使用 /files/upload multipart API，符合 FILES_GUIDE.md 描述
   const buffer = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
@@ -104,10 +111,10 @@ async function uploadCover(filePath: string, token: string, objectKeySuggestion:
     ext === '.jpg' || ext === '.jpeg'
       ? 'image/jpeg'
       : ext === '.png'
-      ? 'image/png'
-      : ext === '.webp'
-      ? 'image/webp'
-      : 'application/octet-stream';
+        ? 'image/png'
+        : ext === '.webp'
+          ? 'image/webp'
+          : 'application/octet-stream';
 
   const form = new FormData();
   form.append('file', buffer, path.basename(filePath));
@@ -156,9 +163,15 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const typoDescriptionKey = args.includes('--use-typo-key');
   const limitArgIdx = args.findIndex((a) => a.startsWith('--limit='));
-  const limit = limitArgIdx !== -1 ? parseInt(args[limitArgIdx].split('=')[1], 10) : undefined;
+  const limit =
+    limitArgIdx !== -1
+      ? parseInt(args[limitArgIdx].split('=')[1], 10)
+      : undefined;
   const baseArgIdx = args.findIndex((a) => a.startsWith('--base='));
-  const base = baseArgIdx !== -1 ? args[baseArgIdx].split('=')[1] : path.resolve(process.cwd(), 'example');
+  const base =
+    baseArgIdx !== -1
+      ? args[baseArgIdx].split('=')[1]
+      : path.resolve(process.cwd(), 'example');
 
   if (!fs.existsSync(base) || !fs.statSync(base).isDirectory()) {
     console.error('[bulk-upload-http] 基础目录不存在或不是目录:', base);
@@ -175,8 +188,11 @@ async function main() {
     console.log('[bulk-upload-http] 登录成功');
   }
 
-  const entries = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory());
-  const targetEntries = typeof limit === 'number' ? entries.slice(0, limit) : entries;
+  const entries = fs
+    .readdirSync(base, { withFileTypes: true })
+    .filter((d) => d.isDirectory());
+  const targetEntries =
+    typeof limit === 'number' ? entries.slice(0, limit) : entries;
 
   let success = 0;
   let skipped = 0;
@@ -195,7 +211,9 @@ async function main() {
     const coverDir = path.join(fullDir, 'OEBPS', 'Images');
     let coverKey: string | undefined;
     if (fs.existsSync(coverDir) && fs.statSync(coverDir).isDirectory()) {
-      const coverFile = fs.readdirSync(coverDir).find((f) => /^cover\./i.test(f));
+      const coverFile = fs
+        .readdirSync(coverDir)
+        .find((f) => /^cover\./i.test(f));
       if (coverFile) {
         const coverPath = path.join(coverDir, coverFile);
         const safeName = dirName.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_');
@@ -210,7 +228,10 @@ async function main() {
           coverKey = objectKey;
         }
       } else {
-        console.warn('[bulk-upload-http] 未找到封面文件 cover.* 路径:', coverDir);
+        console.warn(
+          '[bulk-upload-http] 未找到封面文件 cover.* 路径:',
+          coverDir,
+        );
       }
     } else {
       console.warn('[bulk-upload-http] Images 目录缺失:', coverDir);
@@ -239,7 +260,10 @@ async function main() {
     if (meta.volume) console.log('[bulk-upload-http] 卷号:', meta.volume);
     if (coverKey) console.log('[bulk-upload-http] 封面对象键:', coverKey);
     if (summary) console.log('[bulk-upload-http] 摘要长度:', summary.length);
-    console.log('[bulk-upload-http] Tags:', tags.map((t) => `${t.key}=${t.value.substring(0, 40)}`));
+    console.log(
+      '[bulk-upload-http] Tags:',
+      tags.map((t) => `${t.key}=${t.value.substring(0, 40)}`),
+    );
 
     if (dryRun) {
       skipped++;

@@ -58,9 +58,13 @@ describe('Epub (e2e)', () => {
             _bucket?: string,
             _ownerId?: number,
           ) => {
-          storage.put(key, Buffer.isBuffer(body) ? body : Buffer.from(body as any), contentType || 'application/octet-stream');
-          return key;
-        },
+            storage.put(
+              key,
+              Buffer.isBuffer(body) ? body : Buffer.from(body as any),
+              contentType || 'application/octet-stream',
+            );
+            return key;
+          },
         ),
       getBucket: jest.fn().mockReturnValue('voidlord'),
       listObjects: jest.fn().mockImplementation(async (prefix: string) => {
@@ -69,7 +73,9 @@ describe('Epub (e2e)', () => {
       deleteObjects: jest.fn().mockImplementation(async (keys: string[]) => {
         keys.forEach((k) => storage.delete(k));
       }),
-      deleteRecordByKey: jest.fn().mockImplementation(async (_key: string) => undefined),
+      deleteRecordByKey: jest
+        .fn()
+        .mockImplementation(async (_key: string) => undefined),
       deleteRecordsByKeys: jest
         .fn()
         .mockImplementation(async (_keys: string[]) => undefined),
@@ -100,7 +106,9 @@ describe('Epub (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
 
     await app.init();
     httpServer = app.getHttpServer() as unknown as Server;
@@ -173,7 +181,9 @@ describe('Epub (e2e)', () => {
 
     // ensure upload wrote something into storage
     expect(storage.has(`books/${book.id}/epub/mimetype`)).toBe(true);
-    expect(storage.has(`books/${book.id}/epub/META-INF/container.xml`)).toBe(true);
+    expect(storage.has(`books/${book.id}/epub/META-INF/container.xml`)).toBe(
+      true,
+    );
 
     const res = await request(httpServer)
       .get(`/epub/book/${book.id}/META-INF/container.xml`)
@@ -181,7 +191,8 @@ describe('Epub (e2e)', () => {
       .expect(200);
 
     // supertest: text response is in res.text; fallback to buffer if needed
-    const text = res.text || (Buffer.isBuffer(res.body) ? res.body.toString('utf-8') : '');
+    const text =
+      res.text || (Buffer.isBuffer(res.body) ? res.body.toString('utf-8') : '');
     expect(text).toContain('container');
   });
 
@@ -262,9 +273,9 @@ describe('Epub (e2e)', () => {
       .expect(200);
 
     // Verify all keys removed
-    const keysAfter = storage.keys().filter((k) =>
-      k.startsWith(`books/${book.id}/epub/`),
-    ).length;
+    const keysAfter = storage
+      .keys()
+      .filter((k) => k.startsWith(`books/${book.id}/epub/`)).length;
     expect(keysAfter).toBe(0);
 
     // Verify book flag updated

@@ -8,9 +8,12 @@ import { TonoController } from './tono.controller';
 import { TonoService } from './tono.service';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Book, ReaderEngine, ReaderInstance]), FilesModule],
-    controllers: [TonoController],
-    providers: [TonoService],
-    exports: [TonoService],
+  imports: [
+    TypeOrmModule.forFeature([Book, ReaderEngine, ReaderInstance]),
+    FilesModule,
+  ],
+  controllers: [TonoController],
+  providers: [TonoService],
+  exports: [TonoService],
 })
-export class TonoModule { }
+export class TonoModule {}

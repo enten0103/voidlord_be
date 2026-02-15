@@ -3,15 +3,15 @@
 统一入口：`POST /books/search`
 
 请求体示例：
+
 ```json
 {
-  "conditions": [
-    { "target": "author", "op": "eq", "value": "Isaac Asimov" }
-  ]
+  "conditions": [{ "target": "author", "op": "eq", "value": "Isaac Asimov" }]
 }
 ```
 
 ## 常用示例（curl）
+
 ```bash
 # 1) 单条件 eq
 curl -X POST http://localhost:3000/books/search -H 'Content-Type: application/json' \
@@ -35,6 +35,7 @@ curl -X POST http://localhost:3000/books/search -H 'Content-Type: application/js
 ```
 
 ## 推荐（基于共享标签）
+
 ```bash
 curl "http://localhost:3000/books/recommend/42?limit=10"
 ```

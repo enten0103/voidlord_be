@@ -15,6 +15,7 @@ import { UserConfigModule } from '../user-config/user-config.module';
 import { MediaLibrariesModule } from '../media-libraries/media-libraries.module';
 import { EpubModule } from '../epub/epub.module';
 import { TonoModule } from '../tono/tono.module';
+import { ReadingRecordsModule } from '../reading-records/reading-records.module';
 
 @Module({
   imports: [
@@ -34,8 +35,9 @@ import { TonoModule } from '../tono/tono.module';
     MediaLibrariesModule,
     EpubModule,
     TonoModule,
+    ReadingRecordsModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseInitService],
 })
-export class AppModule { }
+export class AppModule {}

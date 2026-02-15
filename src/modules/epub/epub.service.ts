@@ -42,7 +42,7 @@ export class EpubService {
     @Inject(S3_CLIENT) private s3: S3Client,
     private config: ConfigService,
     private tonoService: TonoService,
-  ) { }
+  ) {}
 
   private async cleanupEpubPrefix(prefix: string): Promise<void> {
     const keys = await this.filesService.listObjects(prefix);
@@ -128,11 +128,18 @@ export class EpubService {
 
       // Trigger async Tono parse so the reader instance is ready when the user opens the book
       this.logger.log(`Triggering auto-parse for book ${bookId}...`);
-      this.tonoService.startParseJob(bookId).then(({ jobId }) => {
-        this.logger.log(`Auto-parse job started for book ${bookId}, jobId=${jobId}`);
-      }).catch((err) => {
-        this.logger.warn(`Auto-parse failed for book ${bookId}: ${err.message ?? err}`);
-      });
+      this.tonoService
+        .startParseJob(bookId)
+        .then(({ jobId }) => {
+          this.logger.log(
+            `Auto-parse job started for book ${bookId}, jobId=${jobId}`,
+          );
+        })
+        .catch((err) => {
+          this.logger.warn(
+            `Auto-parse failed for book ${bookId}: ${err.message ?? err}`,
+          );
+        });
     } catch (e) {
       // rollback to avoid leaving partial/wild extracted objects
       try {
@@ -173,7 +180,7 @@ export class EpubService {
         contentType: response.ContentType || 'application/octet-stream',
         length: response.ContentLength,
       };
-    } catch (e) {
+    } catch {
       throw new NotFoundException(`File not found: ${path}`);
     }
   }
@@ -210,7 +217,9 @@ export class EpubService {
 
     book.has_epub = false;
     await this.bookRepo.save(book);
-    this.logger.log(`Deleted EPUB for book ${bookId}, removed ${keys.length} objects`);
+    this.logger.log(
+      `Deleted EPUB for book ${bookId}, removed ${keys.length} objects`,
+    );
   }
 
   /**

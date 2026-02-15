@@ -189,10 +189,7 @@ export class FilesService implements OnModuleInit {
     this.logger.log(`Bucket ${Bucket} policy removed (set to private)`);
   }
 
-  async listObjects(
-    prefix: string,
-    bucket?: string,
-  ): Promise<string[]> {
+  async listObjects(prefix: string, bucket?: string): Promise<string[]> {
     const Bucket = this.getBucket(bucket);
     const keys: string[] = [];
     let continuationToken: string | undefined;

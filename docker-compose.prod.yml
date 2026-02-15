@@ -10,7 +10,7 @@ services:
       - postgres
       - minio
     ports:
-      - "3000:3000"
+      - '3000:3000'
   postgres:
     image: postgres:15
     container_name: voidlord-postgres
@@ -32,8 +32,8 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
 volumes:
   postgres_data:
   minio_data:

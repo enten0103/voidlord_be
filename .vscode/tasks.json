@@ -1,15 +1,12 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Run tests (unit + e2e)",
-			"type": "shell",
-			"command": "pnpm test; pnpm test:e2e",
-			"isBackground": false,
-			"problemMatcher": [
-				"$tsc",
-				"$eslint-stylish"
-			]
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run tests (unit + e2e)",
+      "type": "shell",
+      "command": "pnpm test; pnpm test:e2e",
+      "isBackground": false,
+      "problemMatcher": ["$tsc", "$eslint-stylish"]
+    }
+  ]
 }
