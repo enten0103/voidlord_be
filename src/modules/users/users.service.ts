@@ -6,7 +6,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../entities/user.entity';
-import { MediaLibrary } from '../../entities/media-library.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -16,8 +15,6 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(MediaLibrary)
-    private readonly mediaLibraryRepo: Repository<MediaLibrary>,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -43,23 +40,6 @@ export class UsersService {
     });
 
     const saved = await this.userRepository.save(user);
-
-    // 创建系统“阅读记录”媒体库（替代原 reading-records 模块的记录集合）
-    // 若后续需要扩展进度/统计，可在单独表或扩展 MediaLibraryItem 属性中实现。
-    const systemReadingLibExists = await this.mediaLibraryRepo.findOne({
-      where: { owner: { id: saved.id }, is_system: true, name: '系统阅读记录' },
-    });
-    if (!systemReadingLibExists) {
-      const systemLib = this.mediaLibraryRepo.create({
-        name: '系统阅读记录',
-        description: '用户阅读书籍的系统集合（原 reading-records 模块已移除）',
-        is_public: false,
-        is_system: true,
-        owner: { id: saved.id } as User,
-        tags: [],
-      });
-      await this.mediaLibraryRepo.save(systemLib);
-    }
 
     return saved;
   }

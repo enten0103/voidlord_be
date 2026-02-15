@@ -22,11 +22,10 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { ApiPermission } from '../auth/permissions.decorator';
-import { JwtRequestWithUser } from '../../types/request.interface';
+import type { JwtRequestWithUser } from '../../types/request.interface';
 import { ReadingRecordsService } from './reading-records.service';
 import { StartReadingDto } from './dto/start-reading.dto';
 import { HeartbeatDto } from './dto/heartbeat.dto';
-import { EndReadingDto } from './dto/end-reading.dto';
 import { ReadingRecord } from '../../entities/reading-record.entity';
 
 @ApiTags('reading-records')
@@ -56,7 +55,11 @@ export class ReadingRecordsController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @ApiPermission('BOOK_READ', 1)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Heartbeat: update last_active_at and position' })
+  @ApiOperation({
+    summary:
+      'Heartbeat: update last_active_at and reading position. ' +
+      'No explicit end — session duration = last_active_at - started_at.',
+  })
   @ApiResponse({ status: 200, type: ReadingRecord })
   async heartbeat(
     @Req() req: JwtRequestWithUser,
@@ -64,22 +67,6 @@ export class ReadingRecordsController {
     @Body() dto: HeartbeatDto,
   ): Promise<ReadingRecord> {
     return this.service.heartbeat(req.user.userId, id, dto);
-  }
-
-  // ── End a reading session ────────────────────────────────
-
-  @Patch(':id/end')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @ApiPermission('BOOK_READ', 1)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'End a reading session' })
-  @ApiResponse({ status: 200, type: ReadingRecord })
-  async end(
-    @Req() req: JwtRequestWithUser,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: EndReadingDto,
-  ): Promise<ReadingRecord> {
-    return this.service.end(req.user.userId, id, dto);
   }
 
   // ── User timeline ────────────────────────────────────────
@@ -104,6 +91,36 @@ export class ReadingRecordsController {
   }
 
   // ── Per-book records ─────────────────────────────────────
+
+  @Get('me/books')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @ApiPermission('BOOK_READ', 1)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Get reading timeline grouped by book (paginated distinct books with aggregate stats and preview records)',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({
+    name: 'previewCount',
+    required: false,
+    type: Number,
+    description: 'Number of recent records to include per book (default 5)',
+  })
+  async getGroupedByBook(
+    @Req() req: JwtRequestWithUser,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('previewCount') previewCount?: string,
+  ) {
+    return this.service.getGroupedByBook(
+      req.user.userId,
+      limit ? parseInt(limit, 10) : 10,
+      offset ? parseInt(offset, 10) : 0,
+      previewCount ? parseInt(previewCount, 10) : 5,
+    );
+  }
 
   @Get('book/:bookId')
   @UseGuards(JwtAuthGuard, PermissionGuard)

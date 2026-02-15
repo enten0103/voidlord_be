@@ -81,38 +81,6 @@ export class MediaLibrariesController {
     >;
   }
 
-  @Get('reading-record')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Get my system reading record media library',
-    description:
-      '获取系统自动创建的“系统阅读记录”媒体库详情，只读；异常缺失返回 404。',
-  })
-  @ApiResponse({ status: 404, description: '系统阅读记录库缺失（异常状态）' })
-  @ApiResponse({ status: 200, description: 'Detail' })
-  @ApiOkResponse({ type: MediaLibraryDetailDto })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description:
-      '分页每页数量 (1-100)。提供任一分页参数时，响应包含 items_count/limit/offset。',
-  })
-  @ApiQuery({
-    name: 'offset',
-    required: false,
-    description: '分页偏移 (>=0)。未提供则为 0。',
-  })
-  getReadingRecord(
-    @Req() req: JwtRequestWithUser,
-    @Query() page?: PaginateQueryDto,
-  ): Promise<MediaLibraryDetailDto> {
-    return this.service.getReadingRecord(
-      req.user.userId,
-      page?.limit,
-      page?.offset,
-    ) as Promise<MediaLibraryDetailDto>;
-  }
 
   @Get('virtual/my-uploaded')
   @UseGuards(JwtAuthGuard)

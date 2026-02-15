@@ -3,10 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User } from 'src/entities/user.entity';
-import { MediaLibrary } from 'src/entities/media-library.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, MediaLibrary])],
+  imports: [TypeOrmModule.forFeature([User])],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

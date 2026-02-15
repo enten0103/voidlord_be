@@ -15,6 +15,7 @@ import { MediaLibrary } from '../entities/media-library.entity';
 import { MediaLibraryItem } from '../entities/media-library-item.entity';
 import { ReaderEngine } from '../entities/reader-engine.entity';
 import { ReaderInstance } from '../entities/reader-instance.entity';
+import { ReadingRecord } from '../entities/reading-record.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -42,6 +43,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         MediaLibraryItem,
         ReaderEngine,
         ReaderInstance,
+        ReadingRecord,
       ],
       synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE', true), // 仅在开发环境使用
       logging: this.configService.get<boolean>('DB_LOGGING', false),

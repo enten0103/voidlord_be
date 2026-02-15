@@ -134,7 +134,7 @@ describe('MediaLibraries (e2e)', () => {
     await ds.query('DELETE FROM user_permission').catch(() => undefined);
     await ds.query('DELETE FROM "user"').catch(() => undefined);
 
-    // 注册两个用户 (应自动各生成一个系统“阅读记录”媒体库)
+    // 注册两个用户
     const uReg = await request(httpServer)
       .post('/auth/register')
       .send({
@@ -174,67 +174,6 @@ describe('MediaLibraries (e2e)', () => {
     ).id;
   });
 
-  it('auto system reading library created on user registration & uniqueness per user', async () => {
-    interface SysLibShape {
-      id: number;
-      name: string;
-      is_system: boolean;
-      is_public: boolean;
-    }
-    // list libraries for first user
-    const list1Res = await request(httpServer)
-      .get('/media-libraries/my')
-      .set('Authorization', `Bearer ${userToken}`)
-      .expect(200);
-    const list1Body: unknown = list1Res.body;
-    expect(Array.isArray(list1Body)).toBe(true);
-    const sysLibsUser = (list1Body as SysLibShape[]).filter(
-      (l) => l.is_system && l.name === '系统阅读记录',
-    );
-    expect(sysLibsUser).toHaveLength(1);
-    expect(sysLibsUser[0].is_public).toBe(false);
-
-    // list libraries for other user
-    const list2Res = await request(httpServer)
-      .get('/media-libraries/my')
-      .set('Authorization', `Bearer ${otherToken}`)
-      .expect(200);
-    const list2Body: unknown = list2Res.body;
-    expect(Array.isArray(list2Body)).toBe(true);
-    const sysLibsOther = (list2Body as SysLibShape[]).filter(
-      (l) => l.is_system && l.name === '系统阅读记录',
-    );
-    expect(sysLibsOther).toHaveLength(1);
-    // different owners should have different ids
-    expect(sysLibsOther[0].id).not.toBe(sysLibsUser[0].id);
-
-    // 尝试删除系统库应该被拒绝 (锁定)
-    await request(httpServer)
-      .delete(`/media-libraries/${sysLibsUser[0].id}`)
-      .set('Authorization', `Bearer ${userToken}`)
-      .expect(403);
-  });
-
-  it('fetch reading record system library via dedicated endpoint', async () => {
-    interface ReadingLibShape {
-      id: number;
-      name: string;
-      is_system: boolean;
-      is_public: boolean;
-      owner_id: number | null;
-    }
-    const res = await request(httpServer)
-      .get('/media-libraries/reading-record')
-      .set('Authorization', `Bearer ${userToken}`)
-      .expect(200);
-    const body: unknown = res.body;
-    expect(body && typeof body === 'object').toBe(true);
-    const lib = body as ReadingLibShape;
-    expect(lib.name).toBe('系统阅读记录');
-    expect(lib.is_system).toBe(true);
-    expect(lib.is_public).toBe(false);
-    expect(lib.owner_id).toBe(userId);
-  });
 
   it('create library ok & duplicate name 409', async () => {
     const create = await request(httpServer)
@@ -318,68 +257,6 @@ describe('MediaLibraries (e2e)', () => {
     expect(detail.items.length).toBeLessThanOrEqual(2);
   });
 
-  it('reading-record system library supports pagination', async () => {
-    // 获取系统阅读记录库 id
-    const listRes = await request(httpServer)
-      .get('/media-libraries/my')
-      .set('Authorization', `Bearer ${userToken}`)
-      .expect(200);
-    interface LibSummary {
-      id: number;
-      is_system?: boolean;
-      name?: string;
-    }
-    const libsRaw: unknown = listRes.body;
-    expect(Array.isArray(libsRaw)).toBe(true);
-    const libs: LibSummary[] = (libsRaw as unknown[]).filter(
-      (x): x is LibSummary => isRecord(x) && typeof x.id === 'number',
-    );
-    const reading = libs.find(
-      (l) => !!l.is_system && l.name === '系统阅读记录',
-    );
-    expect(reading).toBeDefined();
-    const readingId = reading!.id;
-    // 创建多本书并加入阅读记录库
-    const bookIds: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      const bRes = await request(httpServer)
-        .post('/books')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({ tags: [{ key: 'rr', value: String(i) }] })
-        .expect(201);
-      const bId = parseBody(
-        bRes.body,
-        (d): d is { id: number } => isRecord(d) && typeof d.id === 'number',
-      ).id;
-      bookIds.push(bId);
-      await request(httpServer)
-        .post(`/media-libraries/${readingId}/books/${bId}`)
-        .set('Authorization', `Bearer ${userToken}`)
-        .expect(201);
-    }
-    // 分页获取 limit=2 offset=0
-    const page0 = await request(httpServer)
-      .get(`/media-libraries/reading-record?limit=2&offset=0`)
-      .set('Authorization', `Bearer ${userToken}`)
-      .expect(200);
-    const p0Raw: unknown = page0.body;
-    const p0Body = parseBody(p0Raw, isPagedResp);
-    expect(p0Body.limit).toBe(2);
-    expect(p0Body.offset).toBe(0);
-    expect(p0Body.items_count).toBeGreaterThanOrEqual(5);
-    expect(Array.isArray(p0Body.items)).toBe(true);
-    expect(p0Body.items.length).toBeLessThanOrEqual(2);
-    // 分页获取第二页 offset=2
-    const page1 = await request(httpServer)
-      .get(`/media-libraries/reading-record?limit=2&offset=2`)
-      .set('Authorization', `Bearer ${userToken}`)
-      .expect(200);
-    const p1Raw: unknown = page1.body;
-    const p1Body = parseBody(p1Raw, isPagedResp);
-    expect(p1Body.limit).toBe(2);
-    expect(p1Body.offset).toBe(2);
-    expect(Array.isArray(p1Body.items)).toBe(true);
-  });
 
   it('virtual uploaded library supports pagination', async () => {
     // 创建多本书（已有一本文档中 bookId，可再创建 4 本）

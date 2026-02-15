@@ -38,19 +38,18 @@ export class ReadingRecord {
   @Column({ nullable: true })
   instance_hash: string;
 
-  @ApiProperty({ description: 'Session start time' })
-  @CreateDateColumn()
+  @ApiProperty({ description: 'Session start time (first heartbeat)' })
+  @CreateDateColumn({ type: 'timestamptz' })
   started_at: Date;
 
   @ApiProperty({
-    description: 'Last heartbeat time; updated every ~5 minutes while reading',
+    description:
+      'Last heartbeat time; updated every ~5 minutes while reading. ' +
+      'Duration = last_active_at - started_at. ' +
+      'When only one heartbeat exists, last_active_at equals started_at (duration = 0).',
   })
   @Column({ type: 'timestamptz', nullable: true })
   last_active_at: Date;
-
-  @ApiProperty({ description: 'Session explicitly ended time', nullable: true })
-  @Column({ type: 'timestamptz', nullable: true })
-  ended_at: Date;
 
   @ApiProperty({
     description: 'XHTML index when session started',
@@ -67,14 +66,14 @@ export class ReadingRecord {
   start_element_index: number;
 
   @ApiProperty({
-    description: 'XHTML index at last heartbeat / end',
+    description: 'XHTML index at last heartbeat',
     nullable: true,
   })
   @Column({ type: 'int', nullable: true })
   end_xhtml_index: number;
 
   @ApiProperty({
-    description: 'Element index at last heartbeat / end',
+    description: 'Element index at last heartbeat',
     nullable: true,
   })
   @Column({ type: 'int', nullable: true })
