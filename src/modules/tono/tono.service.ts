@@ -635,7 +635,7 @@ export class TonoService {
             _type: 'tonoContainer',
             className: 'html',
             display: 'block',
-            css: [],
+            css: baseInherited,
             children,
         };
     }

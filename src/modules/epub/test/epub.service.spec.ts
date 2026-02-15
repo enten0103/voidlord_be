@@ -10,19 +10,23 @@ import * as mime from 'mime-types';
 
 import { EpubService } from '../epub.service';
 import { Book } from '../../../entities/book.entity';
+import { Tag } from '../../../entities/tag.entity';
 import { createRepoMock } from '../../../../test/repo-mocks';
 import { FilesService } from '../../files/files.service';
 import { S3_CLIENT } from '../../files/tokens';
+import { TonoService } from '../../tono/tono.service';
 
 describe('EpubService', () => {
   let service: EpubService;
 
   const mockBookRepository = createRepoMock<Book>();
+  const mockTagRepository = createRepoMock<Tag>();
   const mockFilesService = {
     putObject: jest.fn(),
     getBucket: jest.fn().mockReturnValue('voidlord'),
     listObjects: jest.fn(),
     deleteObjects: jest.fn(),
+    deleteObject: jest.fn(),
     deleteRecordByKey: jest.fn(),
     deleteRecordsByKeys: jest.fn(),
   } as unknown as Pick<
@@ -31,9 +35,13 @@ describe('EpubService', () => {
     | 'getBucket'
     | 'listObjects'
     | 'deleteObjects'
+    | 'deleteObject'
     | 'deleteRecordByKey'
     | 'deleteRecordsByKeys'
   >;
+  const mockTonoService = {
+    startParseJob: jest.fn().mockResolvedValue({ jobId: 'test-job-id' }),
+  } as unknown as Pick<TonoService, 'startParseJob'>;
 
   const mockS3 = {
     send: jest.fn(),
@@ -50,6 +58,10 @@ describe('EpubService', () => {
           useValue: mockBookRepository,
         },
         {
+          provide: getRepositoryToken(Tag),
+          useValue: mockTagRepository,
+        },
+        {
           provide: FilesService,
           useValue: mockFilesService,
         },
@@ -60,6 +72,10 @@ describe('EpubService', () => {
         {
           provide: ConfigService,
           useValue: {},
+        },
+        {
+          provide: TonoService,
+          useValue: mockTonoService,
         },
       ],
     }).compile();
@@ -106,12 +122,15 @@ describe('EpubService', () => {
     });
 
     it('uploads all files and marks book as has_epub', async () => {
-      const book = { id: 1, has_epub: false } as unknown as Book;
+      const book = { id: 1, has_epub: false, tags: [] } as unknown as Book;
       mockBookRepository.findOne.mockResolvedValue(book);
       mockBookRepository.save.mockResolvedValue({
         ...book,
         has_epub: true,
       } as unknown as Book);
+      mockTagRepository.findOne.mockResolvedValue(null);
+      mockTagRepository.create.mockReturnValue({ key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
+      mockTagRepository.save.mockResolvedValue({ id: 99, key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
 
       const zip = new AdmZip();
       zip.addFile('mimetype', Buffer.from('application/epub+zip'));
@@ -121,23 +140,32 @@ describe('EpubService', () => {
 
       await service.uploadEpub(1, buf, 123);
 
+      // 3 epub entries + 1 source.epub = 4
       expect((mockFilesService.putObject as jest.Mock).mock.calls.length).toBe(
-        3,
+        4,
       );
-      const firstCall = (mockFilesService.putObject as jest.Mock).mock.calls[0];
-      expect(firstCall[4]).toBe(123);
+      // source.epub is uploaded first
+      const sourceCall = (mockFilesService.putObject as jest.Mock).mock.calls.find(
+        (c: any[]) => c[0] === 'books/1/source.epub',
+      );
+      expect(sourceCall).toBeDefined();
       expect(mockBookRepository.save).toHaveBeenCalled();
       const saved = (mockBookRepository.save as jest.Mock).mock.calls[0][0];
       expect(saved.has_epub).toBe(true);
+      // auto-parse triggered
+      expect(mockTonoService.startParseJob).toHaveBeenCalledWith(1);
     });
 
     it('real test.epub: uploads every non-directory entry with expected keys', async () => {
-      const book = { id: 1, has_epub: false } as unknown as Book;
+      const book = { id: 1, has_epub: false, tags: [] } as unknown as Book;
       mockBookRepository.findOne.mockResolvedValue(book);
       mockBookRepository.save.mockResolvedValue({
         ...book,
         has_epub: true,
       } as unknown as Book);
+      mockTagRepository.findOne.mockResolvedValue(null);
+      mockTagRepository.create.mockReturnValue({ key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
+      mockTagRepository.save.mockResolvedValue({ id: 99, key: 'SOURCE', value: 'books/1/source.epub', shown: false } as any);
 
       const fixturePath = join(__dirname, 'test.epub');
       const buf = readFileSync(fixturePath);
@@ -150,7 +178,8 @@ describe('EpubService', () => {
       const calls = (mockFilesService.putObject as jest.Mock).mock.calls as Array<
         [string, Buffer, string]
       >;
-      expect(calls.length).toBe(fileEntries.length);
+      // epub entries + 1 source.epub
+      expect(calls.length).toBe(fileEntries.length + 1);
 
       // spot-check a few canonical EPUB files
       const expectedKeys = [
@@ -243,7 +272,7 @@ describe('EpubService', () => {
     });
 
     it('deletes all epub objects and sets has_epub to false', async () => {
-      const book = { id: 1, has_epub: true } as unknown as Book;
+      const book = { id: 1, has_epub: true, tags: [] } as unknown as Book;
       mockBookRepository.findOne.mockResolvedValue(book);
       mockBookRepository.save.mockResolvedValue({
         ...book,
@@ -261,16 +290,17 @@ describe('EpubService', () => {
       expect(mockFilesService.listObjects).toHaveBeenCalledWith('books/1/epub/');
       expect(mockFilesService.deleteObjects).toHaveBeenCalledWith(keys);
       expect(mockFilesService.deleteRecordsByKeys).toHaveBeenCalledWith(keys);
-      expect(mockBookRepository.save).toHaveBeenCalledWith({
-        ...book,
-        has_epub: false,
-      });
+      // also attempts to delete source.epub
+      expect(mockFilesService.deleteObject).toHaveBeenCalledWith('books/1/source.epub');
+      expect(mockBookRepository.save).toHaveBeenCalled();
+      const saved = (mockBookRepository.save as jest.Mock).mock.calls[0][0];
+      expect(saved.has_epub).toBe(false);
     });
   });
 
   describe('upload rollback', () => {
     it('cleans up prefix when an upload fails', async () => {
-      const book = { id: 1, has_epub: false } as unknown as Book;
+      const book = { id: 1, has_epub: false, tags: [] } as unknown as Book;
       mockBookRepository.findOne.mockResolvedValue(book);
 
       // valid zip with 2 entries
